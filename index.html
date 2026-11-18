@@ -1456,7 +1456,8 @@ function assignCAS(t) {
   cas.forEach((f, i) => {
     if (all().some(([J, T]) => T.flight === f.id)) return;
     const rw = isHelo(f); let hit = all().find(([J, T]) => !T.flight && T.rw === rw);
-    if (!hit) { const J = S.cas.jtacs[i % S.cas.jtacs.length]; casSlot(J, J.tasks.length, rw, g, used, uniq); const T = J.tasks[J.tasks.length - 1]; const m = all().length - 1; T.missionNo = String(1010 + 10 * m); T.codes = [`15${(m % 8) + 1}1`]; hit = [J, T]; }
+    if (!hit) { const J = S.cas.jtacs[i % S.cas.jtacs.length]; casSlot(J, J.tasks.length, rw, g, used, uniq); const T = J.tasks[J.tasks.length - 1]; const m = all().length - 1; T.missionNo = String(1010 + 10 * m); T.codes = [`15${(m % 8) + 1}1`]; hit = [J, T];
+      (t.warnings = t.warnings || []).push(`CAS: aggiunto lo scenario ${T.id} per ${f.cs} (${f.type}${rw ? ', elicottero: attacca da una battle position (BP)' : ''}) perché gli scenari preparati non bastavano. Rimanda il JTAC pack a ${J.cs}.`); }
     hit[1].flight = f.id;
   });
   all().forEach(([J, T]) => { const f = casFlight(T); if (!f) return;
