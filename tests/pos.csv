@@ -1,0 +1,5 @@
+callsign,name,frequency,type,fir
+LIED_APP,Decimomannu Approach,122.100,APP,LIRR
+LIED_TWR,Decimomannu Tower,118.550,TWR,LIRR
+LIEE_TWR,Cagliari Tower,119.700,TWR,LIRR
+LIRR_CTR,Roma Control,125.500,CTR,LIRR

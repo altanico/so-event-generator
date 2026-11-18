@@ -1,0 +1,14 @@
+const ENV = require('./_env.js');
+const { chromium } = require(ENV.PW);
+(async()=>{const b=await chromium.launch({executablePath:ENV.CHROME,args:['--no-sandbox']});
+const page=await (await b.newContext({viewport:{width:1300,height:900}})).newPage();const errs=[];
+page.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
+await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(800);
+await page.click('[data-tab="scenario"]'); await page.evaluate(()=>{APP.setEvents(['MIX']);APP.renderAll()}); await page.click('#gen'); await page.waitForTimeout(300);
+const old=await page.evaluate(()=>APP.S.factions.blue);
+await page.fill('#fblue',''); await page.type('#fblue','Northern Alliance'); await page.waitForTimeout(300);
+const r=await page.evaluate(()=>({f:APP.S.factions.blue, bgHasNew:APP.S.background.includes('Northern Alliance'), bgVal:document.getElementById('bg').value.includes('Northern Alliance')}));
+await page.click('#rfac'); await page.waitForTimeout(200);
+const r2=await page.evaluate(()=>({f:APP.S.factions, bg:APP.S.background.includes(APP.S.factions.blue)&&APP.S.background.includes(APP.S.factions.red)}));
+console.log(old, JSON.stringify(r), JSON.stringify(r2)); console.log(errs.join('\n')||'no errors'); await b.close();})();

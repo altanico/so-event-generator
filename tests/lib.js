@@ -1,0 +1,18 @@
+const ENV = require('./_env.js');
+const { chromium } = require(ENV.PW);
+(async()=>{const b=await chromium.launch({executablePath:ENV.CHROME,args:['--no-sandbox']});
+const ctx=await b.newContext({acceptDownloads:true,viewport:{width:1300,height:900}});const page=await ctx.newPage();const errs=[];
+page.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+await page.route('**/*',r=>{const u=r.request().url();
+ if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK});
+ if(u.includes('pptxgen'))return r.fulfill({path:ENV.PPTX});
+ if(u.includes('pdf-lib.min.js'))return r.fulfill({path:ENV.PDFLIB});
+ if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
+await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(800);
+await page.evaluate(()=>APP.loadDemo()); await page.waitForTimeout(800);
+const info=await page.evaluate(()=>({bull:APP.S.meta.bullseye, th:APP.S.meta.theatre, reserved:APP.S.reserved, as:APP.S.t.airspace.filter(a=>a.trk||a.type==='BULLSEYE').map(a=>[a.type,a.name,a.alt,a.pts.length]), issues:APP.containmentIssues(), warn:APP.S.t.warnings})); console.log(JSON.stringify(info,null,1));
+await page.click('[data-tab="export"]');
+const [d1]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('#mpdf')]); await d1.saveAs('lib_mp.pdf');
+const [d2]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('#pptbrief')]); await d2.saveAs('lib_br.pptx');
+await page.screenshot({path:'lib_export.png'});
+console.log(errs.join('\n')||'no errors'); await b.close();})();

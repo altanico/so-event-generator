@@ -1,0 +1,22 @@
+# TODO
+
+## Next build
+- [ ] **Editable BLUE/RED boundary** – polyline with points to add/move/remove on the staff map, "reset to automatic"; used in all maps, masterplan, decks, public page, ACM (FLOT); saved with the event.
+
+## On hold (wait for the go-ahead)
+- [ ] **Inflight guide (A5 kneeboard)** – one guide for all participants: frequencies, ATC/C2 positions, airports, reserved areas, map, bullseye/tracks/routes only if pertinent, timeline, code words, emergency/lost comms. Role details stay in the mission briefing. Open questions: max number of A5 pages; source of the aerodrome charts (vSOP site not reachable from the build environment – files or a saved page are needed).
+- [ ] **Hand-over package for the website integration** – technical README, data model, tests (partly covered by this repo).
+
+## Integration into the division website
+- Connect zones, frequencies, ATC positions, sectorfile points directly to the division APIs (no CORS limits once hosted there).
+- Staff access through IVAO login/roles instead of `#staff`.
+- Move the saved-events archive from the artifact store / localStorage to the site database.
+- Public page per event as a site route.
+- Consider splitting `index.html` into modules.
+
+## Assumptions to verify
+- Sectorfile format (SCT sections VOR/NDB/FIXES/VFR, coordinates `N043.20.10.000`) – tested only on a synthetic file.
+- India (AEW) area floors interpreted as lower limits.
+- Contact e-mail inferred.
+- "Publish to public page" button not yet tested on the hosted page.
+- Hospital, DOS and relief-cell names are generic placeholders.

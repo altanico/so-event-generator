@@ -1,0 +1,12 @@
+const ENV = require('./_env.js');
+const { chromium } = require(ENV.PW);
+(async()=>{const b=await chromium.launch({executablePath:ENV.CHROME,args:['--no-sandbox']});
+const page=await (await b.newContext({viewport:{width:1300,height:900}})).newPage();const errs=[];
+page.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
+await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(800);
+await page.click('[data-tab="scenario"]'); await page.click('#gen'); await page.waitForTimeout(300);
+await page.screenshot({path:'btn.png',fullPage:true});
+await page.click('text=Avanti: Partecipanti'); await page.waitForTimeout(200);
+console.log(await page.evaluate(()=>document.querySelector('nav button.on, .tabs button.on, [data-tab].on')?.textContent));
+console.log(errs.join('\n')||'no errors'); await b.close();})();
