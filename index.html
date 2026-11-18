@@ -100,6 +100,7 @@ td input,td select{padding:3px 5px;font-size:12.5px}
 .subtabs button{font-size:12px;padding:4px 9px}
 .warn{background:#FFF6E5;border:1px solid #F3C677;color:#7A4A00;border-radius:6px;padding:6px 9px;margin:4px 0;font-size:12.5px}
 .ok{background:#EAF7EF;border:1px solid #9AD5AE;color:#166534;border-radius:6px;padding:6px 9px;margin:4px 0;font-size:12.5px}
+[hidden]{display:none!important}
 #evpanel{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:4000;display:flex;align-items:flex-start;justify-content:center;padding:60px 14px;overflow:auto}#evpanel[hidden]{display:none}.evbox{background:#fff;border-radius:12px;padding:18px;max-width:860px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}.evbox table td{vertical-align:top}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ivao);color:#fff;padding:8px 14px;border-radius:8px;display:none;z-index:5000;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#fff;color:var(--text);border:1px solid var(--line);box-shadow:0 3px 14px rgba(0,0,0,.2)}
@@ -257,9 +258,9 @@ const ROLES = {SEAD:'SEAD/DEAD',STRIKE:'Strike / Interdiction',CAS:'Close Air Su
 
 // [type, category, roles, aliases]  – "tipo" aircraft: any sim variant is mapped by alias
 const AC = [
-  ['F-35A','FIGHTER',['SEAD','STRIKE','DCA','OCA','ESCORT','RECCE'],['F35','F35A','LIGHTNING','LIGHTNINGII']],
+  ['F-35A','FIGHTER',['SEAD','STRIKE','CAS','DCA','OCA','ESCORT','RECCE'],['F35','F35A','LIGHTNING','LIGHTNINGII']],
   ['F-35B','FIGHTER',['SEAD','STRIKE','CAS','DCA','OCA','ESCORT','RECCE'],['F35B']],
-  ['EF-2000 Typhoon','FIGHTER',['DCA','OCA','ESCORT','QRA','LOWSLOW','STRIKE'],['EF2000','F2000','F2000A','TYPHOON','EUROFIGHTER','EF2K','EUFI']],
+  ['EF-2000 Typhoon','FIGHTER',['DCA','OCA','ESCORT','QRA','LOWSLOW','STRIKE','CAS'],['EF2000','F2000','F2000A','TYPHOON','EUROFIGHTER','EF2K','EUFI']],
   ['F-16','FIGHTER',['SEAD','STRIKE','CAS','DCA','OCA','ESCORT','QRA','LOWSLOW'],['F16','F16C','F16CM','F16V','VIPER','FALCON']],
   ['F/A-18','FIGHTER',['SEAD','STRIKE','CAS','ANTISHIP','DCA','OCA','ESCORT','QRA'],['FA18','F18','FA18C','FA18E','FA18F','F18E','HORNET','SUPERHORNET']],
   ['EA-18G Growler','FIGHTER',['SEAD','ESCORT'],['EA18G','EA18','GROWLER']],
@@ -1358,11 +1359,11 @@ const CAS_TGT = [
 const CAS_FRIEND = ['Platoon on the high ground', 'Company in a blocking position', 'Observation post (OP 2)', 'Mechanised platoon at the farm', 'Patrol in the olive grove'];
 const CAS_FMARK = ['VS-17 orange panels', 'IR strobe', 'none', 'orange smoke on request'];
 const CAS_WPN = { // ordnance by aircraft type (first = default)
-  'F-35B': ['GBU-12', 'GBU-32'], 'F-16': ['GBU-12', 'GBU-38'], 'F/A-18': ['GBU-12', 'GBU-38'], 'F-15E': ['GBU-12', 'GBU-38'], 'Rafale': ['GBU-12', 'AASM'],
+  'F-35A': ['GBU-12', 'GBU-31', 'GBU-32'], 'F-35B': ['GBU-12', 'GBU-32'], 'EF-2000 Typhoon': ['GBU-16', 'Paveway IV'], 'Tornado IDS': ['GBU-16', 'GBU-32'], 'F-16': ['GBU-12', 'GBU-38'], 'F/A-18': ['GBU-12', 'GBU-38'], 'F-15E': ['GBU-12', 'GBU-38'], 'Rafale': ['GBU-12', 'AASM'],
   'AMX': ['GBU-12', 'Mk-82'], 'A-10': ['GBU-12', 'GBU-38', 'AGM-65 Maverick', '30 mm gun'], 'AV-8B Harrier': ['GBU-12', 'GBU-38'], 'M-346': ['GBU-12', 'Mk-82'],
   'AH-129 Mangusta': ['Spike ER', '70 mm rockets', '20 mm gun'], 'AH-64 Apache': ['AGM-114 Hellfire', '70 mm rockets', '30 mm gun'],
 };
-const GPS_WPN = /GBU-3[128]|AASM|JDAM/;
+const GPS_WPN = /GBU-3[128]|AASM|JDAM|Paveway IV/;
 const NATO = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO', 'FOXTROT', 'GOLF', 'HOTEL', 'INDIA', 'JULIETT', 'KILO', 'LIMA', 'MIKE', 'NOVEMBER', 'OSCAR', 'PAPA', 'QUEBEC', 'ROMEO', 'SIERRA', 'TANGO', 'UNIFORM', 'VICTOR', 'WHISKEY', 'XRAY', 'YANKEE', 'ZULU'];
 const CARD8 = ['NORTH', 'NORTH-EAST', 'EAST', 'SOUTH-EAST', 'SOUTH', 'SOUTH-WEST', 'WEST', 'NORTH-WEST'];
 const card8 = b => CARD8[Math.round(((b % 360) + 360) % 360 / 45) % 8];
@@ -1431,7 +1432,7 @@ function genCAS(flights, threats) {
     const w = wpnOf(f), gps = w.some(x => GPS_WPN.test(x));
     const method = heli ? 'BOT' : (gps && Math.random() < 0.5 ? 'BOC' : 'BOT');
     const wpn = method === 'BOC' ? (w.find(x => GPS_WPN.test(x)) || w[0]) : w[0];
-    const laserWpn = /GBU-12|Hellfire|Spike/.test(wpn);
+    const laserWpn = /GBU-1[26]|Paveway|Hellfire|Spike/.test(wpn);
     const mark = J.night ? 'IR' : method === 'BOC' ? 'NONE' : laserWpn ? 'LASER' : 'WP';
     const fi = flights.filter(x => x.task === 'CAS').indexOf(f);
     J.tasks.push({ flight: f.id, target: tgt.id, ip: ipName, control: method === 'BOC' ? 2 : 1, method, wpn, fuze: method === 'BOC' ? 'INSTANTANEOUS' : 'INSTANTANEOUS', mark,
@@ -2063,7 +2064,7 @@ document.addEventListener('change', e => {
   if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (t.dataset.casg) { const c = casCfg(); c[t.dataset.casg] = t.dataset.casg === 'fmt' ? t.value : (+t.value || 0); if (t.dataset.casg === 'nJtac' && S.t) applyCAS(S.t); save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cas && S.t && S.t.cas) { const J = S.t.cas.jtacs.find(x => x.id === t.dataset.cas); if (!J) return; const f = t.dataset.cf;
-    J[f] = f === 'night' ? t.checked : t.value; if (f === 'night') J.tasks.forEach(T => { if (t.checked && T.mark !== 'NONE') T.mark = 'IR'; if (!t.checked && T.mark === 'IR') T.mark = /GBU-12|Hellfire|Spike/.test(T.wpn) ? 'LASER' : 'WP'; });
+    J[f] = f === 'night' ? t.checked : t.value; if (f === 'night') J.tasks.forEach(T => { if (t.checked && T.mark !== 'NONE') T.mark = 'IR'; if (!t.checked && T.mark === 'IR') T.mark = /GBU-1[26]|Paveway|Hellfire|Spike/.test(T.wpn) ? 'LASER' : 'WP'; });
     if (['cs', 'freq', 'controller'].includes(f)) syncCasC2(S.t); save(); if (f !== 'cs' && f !== 'freq' && f !== 'controller') renderPanel(); return; }
   if (t.dataset.cast && S.t && S.t.cas) { const [jid, tid] = t.dataset.cast.split(':'); const J = S.t.cas.jtacs.find(x => x.id === jid), x = J && J.targets.find(y => y.id === tid); if (x) { x[t.dataset.cf] = t.value; save(); } return; }
   if (t.dataset.cask && S.t && S.t.cas) { const [jid, i] = t.dataset.cask.split(':'); const J = S.t.cas.jtacs.find(x => x.id === jid), T = J && J.tasks[+i]; if (!T) return; const f = t.dataset.cf;

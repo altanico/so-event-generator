@@ -14,12 +14,14 @@ await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(800);
 console.log('STAFF:', await page.evaluate(()=>[APP.MODE, APP.S.meta.op, !!APP.S.t, document.querySelector('#staffview').hidden]));
 await page.click('[data-tab="export"]'); await page.screenshot({path:'staff_export.png'});
 await page.click('#pubpreview'); await page.waitForTimeout(500); await page.screenshot({path:'preview.png',fullPage:true});
+{ const v=await page.evaluate(()=>[getComputedStyle(document.getElementById('staffview')).display, getComputedStyle(document.getElementById('publicview')).display]); if(v[0]!=='none'||v[1]==='none') errs.push('PAGEERR preview not visible '+v.join('/')); }
 console.log('PREVIEW:', await page.evaluate(()=>[APP.MODE, document.querySelectorAll('.dl button').length, !!document.querySelector('.pv-banner')]));
 await page.click('#endpreview'); await page.waitForTimeout(500);
 console.log('BACK:', await page.evaluate(()=>[APP.MODE, location.hash, document.querySelector('#staffview').hidden]));
 const html = await page.evaluate(async()=>APP.buildPublicHtml(APP.buildPayload(true)));
 fs.mkdirSync(require('path').dirname(ENV.PREVIEW_OUT),{recursive:true}); fs.writeFileSync(ENV.PREVIEW_OUT, html); console.log('public html bytes', html.length);
 await page.goto(ENV.BASE+'/dist/index_pub.html'); await page.waitForTimeout(800);
+const vis=await page.evaluate(()=>[getComputedStyle(document.getElementById('staffview')).display, getComputedStyle(document.getElementById('publicview')).display]); if(vis[0]!=='none'||vis[1]==='none') errs.push('PAGEERR public view not visible '+vis.join('/'));
 console.log('PUBLIC:', await page.evaluate(()=>[APP.MODE, document.querySelector('#publicview h1').textContent, document.querySelectorAll('.dl button').length, document.getElementById('stafflink').hidden]));
 await page.evaluate(()=>{window.APP.LAND=[{id:'X',pts:[[38,15],[42,12],[46,8],[46,13],[41,19],[38,16.5]]}];});
 await page.screenshot({path:'public.png',fullPage:true});
