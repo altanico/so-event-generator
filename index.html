@@ -1915,9 +1915,17 @@ Giulia Verdi, 222333, ATC, GCI
   <div class="subtabs">${st('manual', 'Manuale')}${st('quick', 'Quantità')}${st('paste', 'Incolla testo')}${st('csv', 'CSV / Google Form')}${st('json', 'JSON')}</div>
   ${body}${rosterSummary()}`;
 }
+function casPreview(J, T, t) { // the briefing as the JTAC will read it, visible in the page
+  const n = casNine(J, T, t);
+  const txt = [`--- ${n.f.cs} · mission ${T.missionNo} · JTAC ${J.cs} ---`, '', 'HOLDING', casHold(J, T), '', 'EXPECTED CHECK-IN', ...casCheckIn(J, T), '', 'GAME PLAN', casGamePlan(J, T), '', '9-LINE',
+    ...n.lines.map(([a, b, c]) => `${a}. ${c}`), '', 'REMARKS', ...n.remarks, '', 'RESTRICTIONS', ...n.restr, '', 'Read-back: lines 4, 6, 8 and restrictions'].join('\n');
+  return `<details style="margin-top:8px" open><summary style="cursor:pointer;font-weight:600;color:var(--ivao)">📋 9-line ${esc(n.f.cs)} → ${esc(n.tgt.id)} (${esc(T.ip)})</summary>
+    <pre style="white-space:pre-wrap;font:12px/1.45 ui-monospace,Consolas,monospace;background:#0f172a;color:#e2e8f0;padding:10px 12px;border-radius:8px;margin:6px 0">${esc(txt)}</pre>
+    <button class="b sm" data-copy="${esc(txt)}">Copia testo</button></details>`;
+}
 function casCard(t) {
   const cfg = casCfg(), o = (v, list) => list.map(([k, l]) => `<option value="${k}" ${String(v) === String(k) ? 'selected' : ''}>${esc(l)}</option>`).join('');
-  return `<h2>CAS – JTAC e 9-line</h2>
+  return `<h2 id="cas9">CAS – JTAC e 9-line</h2>
   <p class="muted">Per ogni JTAC: settore, CP/IP, bersagli, check-in atteso, game plan e 9-line. Le 9-line restano allo staff e ai JTAC: non compaiono in masterplan, deck piloti e pagina pubblica. La quota dei bersagli (line 4) va letta nel simulatore.</p>
   <div class="row"><div><label>Numero JTAC</label><input data-casg="nJtac" type="number" min="0" max="8" value="${cfg.nJtac || ''}" placeholder="auto (${t.cas.jtacs.length})"></div>
   <div><label>Formato line 6</label><select data-casg="fmt">${o(cfg.fmt, Object.entries(CAS_FMT_LBL))}</select></div>
@@ -1937,7 +1945,8 @@ function casCard(t) {
       <td><select data-cask="${J.id}:${i}" data-cf="method">${o(T.method, [['BOT', 'BOT'], ['BOC', 'BOC'], ['SHOF', 'SHOF']])}</select></td>
       <td><select data-cask="${J.id}:${i}" data-cf="mark">${o(T.mark, [['LASER', 'Laser'], ['IR', 'IR'], ['WP', 'WP smoke'], ['NONE', 'Nessuno']])}</select></td>
       <td><select data-cask="${J.id}:${i}" data-cf="seq">${o(T.seq, [['', '—'], ['SHOOTER-SHOOTER', 'Shooter-shooter'], ['SHOOTER-COVER', 'Shooter-cover'], ['SHOOTER-SPIKER', 'Shooter-spiker'], ['SHOOTER-DECOY', 'Shooter-decoy']])}</select></td>
-      <td><input data-cask="${J.id}:${i}" data-cf="tot" type="number" value="${T.tot}" style="width:60px"></td></tr>`).join('')}</table></div>`).join('')}`;
+      <td><input data-cask="${J.id}:${i}" data-cf="tot" type="number" value="${T.tot}" style="width:60px"></td></tr>`).join('')}</table>
+    ${J.tasks.map(T => casPreview(J, T, t)).join('')}</div>`).join('')}`;
 }
 function renderTailor() {
   if (!GEN()) return `<h2>Fase 3 · Adattamento</h2><div class="warn">Prima genera lo scenario generico (fase 1).</div>`;
@@ -1948,6 +1957,10 @@ function renderTailor() {
   <div class="row"><div><label>H-hour (UTC)</label><input id="hh" placeholder="es. 19:00Z" value="${esc(S.meta.hHour)}"></div><div><label>Data evento</label><input id="edate" placeholder="es. 12 DEC 2026" value="${esc(S.meta.date)}"></div></div>
   <div class="row" style="margin-top:10px"><button class="b primary" id="dotail">${t ? 'Ri-adatta da zero' : 'Adatta scenario ai partecipanti'}</button>${t ? '<button class="b" id="regen">Rigenera minacce dai task</button>' : ''}</div>`;
   if (!t) return h;
+  { const wantCas = reqTasks().includes('CAS') && !offT('CAS'), hasCas = t.flights.some(f => f.task === 'CAS');
+    if (t.cas) h += `<div class="ok">CAS: ${t.cas.jtacs.length} JTAC, ${t.cas.jtacs.reduce((a, J) => a + J.tasks.length, 0)} 9-line pronte. <a href="javascript:void 0" data-goto="cas9">Vai alle 9-line ↓</a></div>`;
+    else if (hasCas) h += `<div class="warn">Ci sono flight CAS ma le 9-line non sono ancora state generate: premi <b>Ri-adatta da zero</b> o <button class="b sm" id="casregen">Genera CAS</button>.</div>`;
+    else if (wantCas) h += `<div class="warn">L'evento prevede CAS ma nessun flight ha il task CAS: assegnalo nella tabella dei flight (colonna Task) e poi premi "Rigenera minacce dai task".</div>`; }
   h += t.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join('') || '<div class="ok">Tutte le categorie hanno una risposta disponibile.</div>';
   h += aspIssuesHtml();
   h += `<div class="card" style="font-size:12.5px"><b>Revisione:</b> ${esc(revLabel())}${curRev() ? ' del ' + esc(curRev().date) : ''}. Quando il tabellone è definitivo emetti una nuova revisione nella scheda Export: il masterplan riporterà lo storico.</div>`;
@@ -2003,6 +2016,8 @@ function renderExport() {
   <div class="row" style="margin-top:8px"><button class="b" id="pubpreview">👁 Anteprima</button><button class="b primary" id="pubpublish">Pubblica sulla pagina pubblica</button></div>
   <div class="row" style="margin-top:6px"><button class="b" id="pubhtml">Scarica pagina pubblica (.html)</button></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>
+  ${S.t && S.t.cas ? `<div class="card"><b>JTAC pack (CAS) – solo staff e JTAC</b><p class="muted" style="margin:4px 0">PDF con mappa del settore, situation update, check-in atteso, game plan e 9-line di ogni flight. Le 9-line si vedono anche nella scheda 3.</p>
+    <div class="row" style="flex-wrap:wrap">${S.t.cas.jtacs.map(J => `<button class="b shrink" data-jpack="${J.id}">${esc(J.cs)}</button>`).join('')}<button class="b primary shrink" data-jpack="ALL">Tutti i JTAC</button></div></div>` : ''}
   <div class="card"><b>Salvare e riaprire l'evento</b><p class="muted" style="margin:4px 0">Usa <b>📁 Eventi salvati</b> in alto: salva, riapri, duplica, esporta o importa un evento.</p><button class="b" id="evbtn2">📁 Apri eventi salvati</button></div>`;
 }
 function renderPanel() {
@@ -2035,6 +2050,7 @@ function facEdit(t, end) {
   if (FAC_ED.old && FAC_ED.old.length > 2 && FAC_ED.bg.includes(FAC_ED.old)) { S.background = FAC_ED.bg.split(FAC_ED.old).join(nv.trim() ? nv : FAC_ED.old); const bg = document.getElementById('bg'); if (bg) bg.value = S.background; }
   S.factions[k] = nv; if (end) FAC_ED = null; save(); clearTimeout(facEdit._t); facEdit._t = setTimeout(() => drawMap(), 120);
 }
+document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); });
 document.addEventListener('change', e => {
   const t = e.target;
@@ -2100,6 +2116,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('button,[data-tab]'); if (!t) return;
   if (t.dataset.tab) { TAB = t.dataset.tab; ADDMODE = ''; renderAll(); return; }
   if (t.dataset.sub) { SUBTAB = t.dataset.sub; renderPanel(); return; }
+  if (t.dataset.copy !== undefined) { try { navigator.clipboard.writeText(t.dataset.copy).then(() => toast('Copiato')); } catch (err) { toast('Copia non disponibile'); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.c2del) { S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
   if (t.dataset.del) {
