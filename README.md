@@ -27,7 +27,7 @@ Events are saved in the artifact's shared store (staff only) or in the browser, 
 | Event profiles | `EVT`, `PROF()`, `REL()` (what is pertinent), `reqTasks`, `proposeC2`, `genEventElements` |
 | Generation | `generateGeneric`, `genZones`, `genBackground`, `assignTasks`, `buildFlights`, `generateElements`, `buildC2`, `buildTexts(Sober)`, `tailor` |
 | Outputs | `renderMap` (canvas), masterplan PDF (`MPSEC`, `mpOn`, `sec()`), decks, `renderPublic`, `buildPayload` |
-| CAS / JTAC | `genCAS`, `applyCAS`, `casNine`, `casGamePlan`, `casCheckIn`, `casSitUpdate`, `casPublic`, `exportJtacPack` (from the IVAO *Manuale Close Air Support v2.0*) |
+| CAS / JTAC | `S.cas` prepared before sign-ups (tab "CAS / JTAC"), `genCAS`, `assignCAS`, `applyCAS`, `casNine`, `casGamePlan`, `casCheckIn`, `casSitUpdate`, `casPublic`, `exportJtacPack` (from the IVAO *Manuale Close Air Support v2.0*) |
 | Persistence | `save()` (current work), saved-events archive (`evSave`, `evLoad`, db or localStorage) |
 
 Data contracts for the division database (zones, frequencies, ATC positions, bullseyes, tracks, navigation points): [`docs/DB_INTERFACE.md`](docs/DB_INTERFACE.md).
