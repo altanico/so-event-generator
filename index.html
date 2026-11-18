@@ -170,6 +170,7 @@ details summary{cursor:pointer;margin:6px 0}
   <nav id="tabs">
     <button data-tab="scenario" class="on">1 · Scenario generico</button>
     <button data-tab="cas" id="tabcas" hidden>CAS / JTAC</button>
+    <button data-tab="pr" id="tabpr" hidden>CSAR / MEDEVAC</button>
     <button data-tab="roster">2 · Partecipanti</button>
     <button data-tab="tailor">3 · Adattamento</button>
     <button data-tab="export">4 · Export</button>
@@ -386,7 +387,7 @@ const OBJT = { // BLUE objectives
 };
 const AST = { // airspace control measures
   BULLSEYE:'Bullseye', FLOT:'FLOT (front line)', CAP:'CAP point', TRACK:'Tanker track', ORBIT:'AEW orbit',
-  KILLBOX:'Kill box', IP:'Initial point / battle position', CP:'Control point (CAS)', HOLD:'Holding / CSAR point', ROUTE:'Navigation route'
+  KILLBOX:'Kill box', SARDOT:'SARDOT (CSAR reference point)', IP:'Initial point / battle position', CP:'Control point (CAS)', HOLD:'Holding / CSAR point', ROUTE:'Navigation route'
 };
 
 const PKG = {
@@ -1015,7 +1016,7 @@ function REL() { // what is pertinent to this event
   return {
     threats: combat, factions: combat, bull: combat || ids.includes('ID'),
     aar: t ? (has('AAR') || has('RECEIVER')) : want('AAR'), aew: t ? has('AEW') : want('AEW'),
-    cas: casWanted() && !!S.cas, routes: t ? routesOf(t).length > 0 : (ids.includes('NAVI') || ids.includes('NAVL')), points: ids.includes('NAVI') || ids.includes('NAVL'),
+    cas: casWanted() && !!S.cas, pr: prWanted() && !!S.pr, routes: t ? routesOf(t).length > 0 : (ids.includes('NAVI') || ids.includes('NAVL')), points: ids.includes('NAVI') || ids.includes('NAVL'),
   };
 }
 const MPSEC = [ // fixed template structure; each item can be switched off (empty section -> NIL)
@@ -1026,7 +1027,7 @@ const MPSEC = [ // fixed template structure; each item can be switched off (empt
     ['map', 'Mappa', () => true], ['acm', 'Misure di controllo dello spazio aereo', () => true], ['routes', 'Rotte di navigazione', () => REL().routes], ['threats', 'Aree di minaccia', () => REL().threats]]],
   ['Timeline', [['tl', 'Timeline', () => true]]],
   ['Roles', [['flights', 'Flight e task', () => true], ['airframes', 'Ruoli e velivoli ammessi', () => true], ['c2', 'Postazioni ATC / C2', () => true]]],
-  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Serial', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
+  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Serial', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
   ['Resources', [['resources', 'Risorse e link', () => true]]],
   ['Contact', [['contact', 'Contatti', () => true]]],
 ];
@@ -1114,6 +1115,7 @@ function generateGeneric() {
   if (!S.c2sel) S.c2sel = proposeC2();
   S.gen = true; S.zones = genZones(); S.background = genBackground(); S.t = null;
   if (casWanted()) genCAS(); else S.cas = null;
+  if (prWanted()) genPR(); else S.pr = null;
   save(); renderAll(true); toast('Scenario generico creato');
 }
 
@@ -1577,6 +1579,165 @@ function casAttackGeom(J, T) {
   const arrow = (a, b, km) => { const br = bearing(b, a); return [dest(b, br - 25, km), b, dest(b, br + 25, km)]; };
   return { tgt, ip, cp, runin: [ip.pos, tgt.pos], wedge, egress, runArrow: arrow(ip.pos, tgt.pos, T.rw ? 0.25 : 1.2), egArrow: arrow(egress[egress.length - 2], egress[egress.length - 1], T.rw ? 0.25 : 1.2) };
 }
+/* =====================================================================
+   5d. PERSONNEL RECOVERY (CSAR) and MILITARY MEDEVAC scenarios
+   (IVAO Manuale Personnel Recovery e Mil MEDEVAC v2.0). Prepared before
+   sign-ups in S.pr; tailoring assigns rescue / escort flights. Authentication,
+   survivor positions and the 9-line MEDEVAC stay with staff, AMC and OSC.
+   ===================================================================== */
+const PR_SURV = ['BAT', 'HAWK', 'RIDER', 'SABRE', 'DAGGER', 'LANCE', 'TORCH', 'FALCON'];
+const PR_AC = ['AMX', 'F-35A', 'EF-2000 Typhoon', 'Tornado IDS', 'F-16'];
+const PR_CAUSE = ['SAM hit', 'AAA hit', 'engine fire', 'bird strike, double engine failure'];
+const PR_INJ = ['uninjured', 'minor injuries (sprained ankle), mobile', 'injured, cannot move far', 'back injury, immobile'];
+const PR_TERRAIN = ['woodlands to the south and east, a village to the north', 'open fields, powerlines to the west', 'hilly terrain with olive groves', 'river bank with steep slopes', 'vineyards on a gentle slope, farm buildings to the east'];
+const PR_ENEMY = ['an infantry platoon active 2 km to the east', 'an enemy patrol searching the area', 'no enemy activity observed so far', 'light vehicles moving on the road to the north'];
+const PR_WX = ['clear skies, wind 270/08 kt', 'scattered clouds 3000 ft, wind 320/12 kt', 'haze, visibility 5 km, wind calm', 'broken clouds 2000 ft, wind 210/15 kt'];
+const PR_SARNEG = ['BLACKHORSE', 'PATHFINDER', 'CUMBERLAND', 'DUMBWAITER', 'LOGARITHMS', 'FLOWCHARTS', 'BRUTALISMO'];
+const PR_SARDOT = ['CHURCH', 'TOWER', 'LAKE', 'BRIDGE', 'CASTLE', 'QUARRY', 'DAM', 'MILL'];
+const PR_COLORS = ['RED', 'GREEN', 'BLUE', 'YELLOW', 'WHITE', 'ORANGE'];
+const PR_CODEEV = ['EF launch request', 'RESCORT launch', 'CSARTF RV and ready', 'EF at survivor location', 'Survivor recovered', 'Survivor uninjured', 'Cleared to execute mission', 'Mission abort', 'Mission delay', 'Change route', 'Request more CAS', 'Survivor not located', 'Hostile contact'];
+const MED_UNIT = ['VIKING 6', 'RAIDER 2', 'TITAN 3', 'BRONCO 4', 'GRIZZLY 1', 'STALLION 5'];
+const prCfg = () => { S.prCfg = Object.assign({ nCsar: 2, nMed: 1, fmt: 'DMM' }, S.prCfg || {}); return S.prCfg; };
+const prWanted = () => reqTasks().includes('CSAR') && !offT('CSAR');
+const prLoc = p => casLoc(p, prCfg().fmt);
+const prFlight = id => (S.t && id && S.t.flights.find(f => f.id === id)) || null;
+function prThreat(pos, t) { t = t || S.t;
+  const th = t ? t.threats.filter(x => dist(x.pos, pos) < 30).map(x => x.type) : (S.zones || []).filter(z => dist(z.center, pos) < 40).map(z => z.cat);
+  return th.some(x => /IADS|SAM_LR|SAM_MR|SAM\b/.test(x)) ? 'HIGH' : th.some(x => /SHORAD|MANPADS|AAA|SAM_SR/.test(x)) ? 'MEDIUM' : 'LOW'; }
+function sarneg(word, p) { // degrees-minutes-seconds digits encoded with the 10-letter word (no hemisphere letters)
+  const d = (v, w) => { v = Math.abs(v); const D = Math.floor(v), m = Math.floor((v - D) * 60), s = Math.round(((v - D) * 60 - m) * 60); return String(D).padStart(w, '0') + String(m).padStart(2, '0') + String(Math.min(59, s)).padStart(2, '0'); };
+  const enc = s => [...s].map(c => word[+c]).join('');
+  return `${enc(d(p[0], 2))} BREAK ${enc(d(p[1], 3))}`;
+}
+function genPR() {
+  const g = geom(), cfg = prCfg(), used = new Set(), sp = shuffle(PR_SURV), csar = [], med = [];
+  const word = () => { const w = pick(WORDS.filter(x => !used.has(x))) || pick(WORDS); used.add(w); return w; };
+  for (let i = 0; i < cfg.nCsar; i++) {
+    const surv = snapRes(dest(dest(g.front, g.dir + 90, (i - (cfg.nCsar - 1) / 2) * 30 + (Math.random() * 10 - 5)), g.dir + 180, 8 + Math.random() * 10));
+    const lz = snapRes(dest(surv, Math.random() * 360, 0.25 + Math.random() * 0.35));
+    const rv = snapRes(dest(lz, g.dir + (Math.random() * 40 - 20), 22 + Math.random() * 8));
+    const wpIn = snapRes(dest(dest(rv, bearing(rv, lz), dist(rv, lz) * 0.5), bearing(rv, lz) + 90, 4 + Math.random() * 3));
+    const wpOut = snapRes(dest(dest(rv, bearing(rv, lz), dist(rv, lz) * 0.5), bearing(rv, lz) - 90, 4 + Math.random() * 3));
+    const sardot = { name: 'SARDOT ' + PR_SARDOT[i % PR_SARDOT.length], pos: snapRes(dest(surv, Math.random() * 360, 14 + Math.random() * 10)) };
+    const type = pick(PR_AC), pob = type === 'Tornado IDS' ? 2 : 1, cs = `${sp[i % sp.length]} ${2 + i}1`;
+    const located = i % 3 !== 2, threat = prThreat(surv);
+    csar.push({ id: 'C' + (i + 1), cs, wing: cs.replace(/1$/, '2'), type, pob, chutes: pob, cause: pick(PR_CAUSE), inj: pick(PR_INJ), surv, lz, rv, wpIn, wpOut, sardot, located,
+      threat, terrain: pick(PR_TERRAIN), enemy: pick(PR_ENEMY), wx: pick(PR_WX), time: 12 + i * 10, alt: pick(['8000', '12000', '15000']), info: NATO[i % 26], elev: '',
+      auth: { wod: word(), lod: pick(NATO), nod: String(1 + Math.floor(Math.random() * 9)), cod: pick(PR_COLORS), challenge: word(), password: word(), duress: word(), sarneg: pick(PR_SARNEG) },
+      codes: Object.fromEntries(PR_CODEEV.map(e => [e, word()])), rescue: [], rescort: [], amc: '', osc: '' });
+  }
+  const bases = S.blueBases.map(b => [b, ap(b)]).filter(x => x[1]);
+  for (let i = 0; i < cfg.nMed; i++) {
+    const poi = snapRes(dest(dest(g.front, g.dir + 90, (i - (cfg.nMed - 1) / 2) * 25 + 12), g.dir, 1.5 + Math.random() * 3));
+    const mtf = bases.length ? bases.slice().sort((a, b) => dist(a[1], poi) - dist(b[1], poi))[0] : ['FIELD HOSPITAL', snapRes(dest(poi, g.dir, 25))];
+    const urg = 1 + Math.floor(Math.random() * 2), rou = Math.floor(Math.random() * 3), pri = Math.floor(Math.random() * 2), n = urg + pri + rou, litter = Math.min(n, urg + pri);
+    const thr = prThreat(poi), sec = thr === 'LOW' ? pick(['N', 'P']) : thr === 'MEDIUM' ? pick(['P', 'E']) : 'X';
+    med.push({ id: 'M' + (i + 1), unit: MED_UNIT[i % MED_UNIT.length], freq: '', poi, mtf: { name: mtf[0], pos: mtf[1] }, urg, pri, rou, equip: pick(['A', 'A', 'B', 'D']), litter, amb: n - litter,
+      sec, mark: pick(['A', 'B', 'C', 'C']), smoke: pick(PR_COLORS), nat: 'A', terrain: pick(PR_TERRAIN), time: 20 + i * 12, threat: thr, flight: null, escort: [] });
+  }
+  S.pr = { csar, med, made: Date.now() };
+  return S.pr;
+}
+const MED_EQ = { A: 'NONE', B: 'HOIST', C: 'EXTRACTION EQUIPMENT', D: 'VENTILATOR' }, MED_SEC = { N: 'NO ENEMY TROOPS IN AREA', P: 'POSSIBLE ENEMY TROOPS – APPROACH WITH CAUTION', E: 'ENEMY TROOPS IN AREA – APPROACH WITH CAUTION', X: 'ENEMY TROOPS IN AREA – ARMED ESCORT REQUIRED' };
+const MED_MARK = { A: 'PANELS', B: 'PYROTECHNIC SIGNAL', C: 'SMOKE', D: 'NONE' };
+function med9(m) {
+  return [
+    ['1', 'Location of pick-up site', prLoc(m.poi)], ['2', 'Call sign / frequency', `${m.unit} – ${m.freq || 'TBD'}`],
+    ['3', 'Patients by precedence', [m.urg && `${m.urg}A`, m.pri && `${m.pri}B`, m.rou && `${m.rou}C`].filter(Boolean).join(' – ')],
+    ['4', 'Special equipment', `${m.equip} (${MED_EQ[m.equip]})`], ['5', 'Patients by type', [m.litter && `${m.litter}L`, m.amb && `${m.amb}A`].filter(Boolean).join(' – ')],
+    ['6', 'Security of pick-up site', `${m.sec} (${MED_SEC[m.sec]})`], ['7', 'Method of marking', m.mark === 'C' ? `C – ${m.smoke} (SMOKE)` : `${m.mark} (${MED_MARK[m.mark]})`],
+    ['8', 'Patient nationality', 'A (MILITARY)'], ['9', 'Terrain / obstacles', m.terrain.toUpperCase()],
+  ];
+}
+// tailoring: rescue helicopters to CSAR scenarios (primary, then secondary), escorts, remaining helicopters to MEDEVAC
+function assignPR(t) {
+  if (!S.pr) genPR();
+  const P = S.pr, ids = new Set(t.flights.map(f => f.id));
+  P.csar.forEach(c => { c.rescue = c.rescue.filter(id => ids.has(id)); c.rescort = c.rescort.filter(id => ids.has(id)); });
+  P.med.forEach(m => { if (m.flight && !ids.has(m.flight)) m.flight = null; m.escort = m.escort.filter(id => ids.has(id)); });
+  const taken = new Set([...P.csar.flatMap(c => [...c.rescue, ...c.rescort]), ...P.med.flatMap(m => [m.flight, ...m.escort])].filter(Boolean));
+  const free = task => t.flights.filter(f => f.task === task && !taken.has(f.id));
+  free('CSAR').forEach(f => { const c = P.csar.find(x => !x.rescue.length); if (c) { c.rescue.push(f.id); taken.add(f.id); } });
+  free('CSAR').forEach(f => { const m = P.med.find(x => !x.flight); if (m) { m.flight = f.id; taken.add(f.id); } });
+  free('MEDEVAC').forEach(f => { const m = P.med.find(x => !x.flight); if (m) { m.flight = f.id; taken.add(f.id); } });
+  free('CSAR').forEach(f => { const c = P.csar.slice().sort((a, b) => a.rescue.length - b.rescue.length)[0]; if (c) { c.rescue.push(f.id); taken.add(f.id); } });
+  free('RESCORT').forEach(f => { const c = P.csar.slice().sort((a, b) => a.rescort.length - b.rescort.length)[0]; if (c) { c.rescort.push(f.id); taken.add(f.id); } });
+  const gci = t.c2.find(r => r.key === 'GCI'), aew = t.flights.find(f => f.task === 'AEW');
+  P.csar.forEach(c => { c.amc = (gci && gci.cs) || (aew && aew.cs) || 'MAGIC'; c.osc = c.rescort.length ? (prFlight(c.rescort[0]) || {}).cs : c.wing; });
+  P.med.forEach(m => { if (m.sec === 'X' && !m.escort.length) { const e = t.flights.find(f => f.task === 'RESCORT' && !P.med.some(x => x.escort.includes(f.id))); if (e) m.escort.push(e.id); } });
+}
+function applyPR(t) {
+  t.airspace = t.airspace.filter(a => !a.pr);
+  if (!prWanted() || !t.flights.some(f => ['CSAR', 'RESCORT', 'MEDEVAC'].includes(f.task))) return;
+  assignPR(t);
+  const prF = new Set(t.flights.filter(f => f.task === 'CSAR').map(f => f.id));
+  t.threats = t.threats.filter(x => !(x.type === 'ISOLATED' && prF.has(x.flight)));
+  t.airspace = t.airspace.filter(a => !(a.type === 'HOLD' && prF.has(a.flight)));
+  S.pr.csar.forEach(c => { t.airspace.push({ id: 'A' + (t.airspace.length + 1), type: 'HOLD', name: `CSAR RV ${c.id}`, pts: [c.rv], alt: 'low level', pr: 1 });
+    t.airspace.push({ id: 'A' + (t.airspace.length + 1), type: 'SARDOT', name: c.sardot.name, pts: [c.sardot.pos], pr: 1, pub: true }); });
+  (t.serials || []).filter(r => r.kind === 'CSAR').forEach(r => { const c = S.pr.csar.find(x => x.rescue.includes(r.flights[0]) || x.rescort.includes(r.flights[0])); if (!c) return;
+    r.text = `CSAR ${c.id}: rendezvous at CSAR RV ${c.id}, contact the AMC (${c.amc}) and the OSC (${c.osc}), authenticate the isolated personnel with the SPINS, recover them at the LZ and egress to friendly territory.`;
+    r.success = 'Survivor located and authenticated; LZ secured; recovery without losses; egress and hand-over reported.'; });
+}
+// --- texts (English) ---
+function prMayday(c) { const d = dist(c.sardot.pos, c.surv), b = bearing(c.sardot.pos, c.surv);
+  return `MAYDAY MAYDAY MAYDAY, THIS IS ${c.cs}, ${c.sardot.name} ${magHdg(b)} FOR ${(d / 1.852).toFixed(0)}, ${c.alt} FEET, ${c.cause.toUpperCase()}, EJECTING`; }
+function prElevenLine(c) {
+  return [['1', 'Callsign / type / mission', `${c.cs} / ${c.type} / ${c.pob} POB`], ['2', 'Location / source / time', `${c.sardot.name} ${magHdg(bearing(c.sardot.pos, c.surv))}/${(dist(c.sardot.pos, c.surv) / 1.852).toFixed(1)} NM · reported by ${c.wing} · ${totClock(c.time)}`],
+    ['3', 'Comms with survivor', c.located ? 'YES, voice on CSAR A' : 'NO, beacon only'], ['4', 'Authentication', c.located ? 'YES, word of the day' : 'NO'], ['5', 'Injuries / conditions', c.inj.toUpperCase()],
+    ['6', 'OSC / bingo / loadout / POC', `${c.osc || c.wing}, playtime 40 minutes`], ['7', 'Chutes seen', String(c.chutes)], ['8', 'Cause of incident', c.cause.toUpperCase()],
+    ['9', 'Hazards / threats / access', `${c.enemy}; threat ${c.threat}; ${c.terrain}`.toUpperCase()], ['10', 'Weather in survivor area', c.wx.toUpperCase()], ['11', 'Survivor radio frequency', 'a) CSAR A  b) GUARD 243.000']];
+}
+function prBrief(c) {
+  const cs = id => (prFlight(id) || {}).cs, res = c.rescue.map(cs).filter(Boolean), esc2 = c.rescort.map(cs).filter(Boolean);
+  return [`${[...esc2, ...res].join(' and ') || '[RESCORT] and [RESCUE HELICOPTER]'}, this is ${c.amc || '[AMC]'}. CSAR information ${c.info}:`,
+    `${c.cs} (${c.type}, ${c.pob} POB) down at ${totClock(c.time)}, cause ${c.cause}.`, `Enemy forces: ${c.enemy}. Threat level ${c.threat.toLowerCase()}.`, `Weather: ${c.wx}.`, `Terrain: ${c.terrain}.`,
+    `${c.cs} is located ${c.sardot.name} ${magHdg(bearing(c.sardot.pos, c.surv))} for ${(dist(c.sardot.pos, c.surv) / 1.852).toFixed(1)} NM${c.located ? '' : ' (approximate – search required)'}.`,
+    c.located ? `Parachute seen, ${c.wing} in contact with ${c.cs} on CSAR A.` : 'No voice contact, beacon heard on GUARD.',
+    `Rendezvous at CSAR RV ${c.id} not later than ${totClock(c.time + 35)}.`, `OSC is ${c.osc || c.wing}. RESCORT is ${esc2.join(', ') || '[RESCORT]'}. Rescue helicopter${res.length > 1 ? 's are' : ' is'} ${res.join(', ') || '[RESCUE]'}.`,
+    `Ingress via the briefed waypoint from CSAR RV ${c.id}; egress via the second waypoint unless otherwise required.`,
+    'Go / no-go: abort if the threat is too high for the extraction or if the rescue helicopters take enemy fire.', 'ROE as briefed, minimise collateral damage.', 'CSAR operations on CSAR A, CSAR B as backup.'];
+}
+function prOscBrief(c) {
+  return [['Isolated personnel', String(c.pob)], ['Distance from RV', `${(dist(c.rv, c.lz) / 1.852).toFixed(1)} NM`], ['Terrain', c.terrain], ['Location', `${prLoc(c.lz)} (LZ) – survivor ${prLoc(c.surv)}`],
+    ['Elevation of recovery area', c.elev ? c.elev + ' ft' : '____ ft (read in the sim)'], ['Wind', c.wx.replace(/^.*wind /, 'wind ')], ['Enemy activity', c.enemy], ['Ingress / egress', `RV ${c.id} → WP IN ${prLoc(c.wpIn)} → LZ; LZ → WP OUT ${prLoc(c.wpOut)} → RV`],
+    ['Emergency landing area', `${prLoc(dest(c.lz, bearing(c.lz, c.rv), 3))} (3 km towards the RV)`]];
+}
+function prPublic(pr) { if (!pr) return null;
+  return { csar: pr.csar.map(c => ({ id: c.id, rv: c.rv, sardot: c.sardot, rescue: c.rescue, rescort: c.rescort })), med: pr.med.map(m => ({ id: m.id, flight: m.flight, mtf: m.mtf })) }; }
+// --- UI: tab "CSAR / MEDEVAC" ---
+function prPre(title, lines) { const txt = lines.join('\n');
+  return `<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600;color:var(--ivao)">📋 ${esc(title)}</summary><pre style="white-space:pre-wrap;font:12px/1.45 ui-monospace,Consolas,monospace;background:#0f172a;color:#e2e8f0;padding:10px 12px;border-radius:8px;margin:6px 0">${esc(txt)}</pre><button class="b sm" data-copy="${esc(txt)}">Copia testo</button></details>`; }
+function prTexts(c) {
+  const a = c.auth;
+  return { mayday: [prMayday(c), '', `${c.amc || '[AMC]'}, THIS IS ${c.wing}, ${c.cs} ${c.type} EJECTED AT ${totClock(c.time)} DUE TO ${c.cause.toUpperCase()}. ${c.chutes} CHUTE${c.chutes > 1 ? 'S' : ''} SEEN. ${c.wx.toUpperCase()}. ${c.enemy.toUpperCase()}.`],
+    eleven: prElevenLine(c).map(([n, k, v]) => `${n}. ${k}: ${v}`), brief: prBrief(c), osc: prOscBrief(c).map(([k, v]) => `${k}: ${v}`),
+    spins: [`WORD ${a.wod} · LETTER ${a.lod} · NUMBER ${a.nod} · COLOR ${a.cod}`, `CHALLENGE ${a.challenge} / PASSWORD ${a.password}`, `DURESS WORD ${a.duress}`, `SARNEG ${a.sarneg} (0-9)`, `${c.sardot.name} ${prLoc(c.sardot.pos)}`, 'CSAR A / CSAR B: frequencies from the database'],
+    codes: Object.entries(c.codes).map(([e, w]) => `${e}: ${w}`) };
+}
+function renderPR() {
+  if (!GEN()) return `<h2>CSAR / MEDEVAC</h2><div class="warn">Prima genera lo scenario.</div>`;
+  if (!S.pr) return `<h2>CSAR / MEDEVAC</h2><p class="muted">Prepara gli scenari di recupero personale e MEDEVAC prima degli iscritti.</p><button class="b primary" id="prregen">Genera scenari CSAR / MEDEVAC</button>`;
+  const cfg = prCfg(), o = (v, list) => list.map(([k, l]) => `<option value="${k}" ${String(v) === String(k) ? 'selected' : ''}>${esc(l)}</option>`).join(''), fcs = id => esc((prFlight(id) || {}).cs || '');
+  return `<h2>CSAR / MEDEVAC</h2>
+  <div class="intro">Scenari di recupero personale (CSAR) e MEDEVAC militare preparati in anticipo, secondo il manuale IVAO Personnel Recovery e Mil MEDEVAC. Per ogni CSAR: personale isolato, LZ, RV, rotte, SARDOT, autenticazione (SPINS), MAYDAY, PR 11-line, briefing CSARTF e briefing OSC. Per ogni MEDEVAC: 9-line MEDEVAC e struttura sanitaria (MTF). Il <b>PR pack</b> è per staff, AMC, OSC e per chi interpreta il personale isolato: non va ai piloti.</div>
+  <div class="row"><div><label>Scenari CSAR</label><input data-prg="nCsar" type="number" min="0" max="6" value="${cfg.nCsar}"></div><div><label>Scenari MEDEVAC</label><input data-prg="nMed" type="number" min="0" max="6" value="${cfg.nMed}"></div>
+  <div><label>Formato coordinate</label><select data-prg="fmt">${o(cfg.fmt, Object.entries(CAS_FMT_LBL))}</select></div></div>
+  <div class="row" style="margin:6px 0 10px;flex-wrap:wrap"><button class="b sm shrink" id="prregen">↻ Rigenera scenari</button><button class="b sm shrink primary" data-prpack="ALL">Scarica PR pack (tutti)</button></div>
+  ${S.pr.csar.map(c => { const T = prTexts(c); return `<div class="card" style="margin-bottom:10px"><div class="row" style="align-items:flex-end;flex-wrap:wrap">
+    <div><label>CSAR ${c.id} – personale isolato</label><input data-prc="${c.id}" data-cf="cs" value="${esc(c.cs)}"></div><div><label>Velivolo abbattuto</label><select data-prc="${c.id}" data-cf="type">${o(c.type, PR_AC.map(x => [x, x]))}</select></div>
+    <div style="max-width:100px"><label>Quota LZ ft</label><input data-prc="${c.id}" data-cf="elev" value="${esc(c.elev)}" placeholder="sim"></div>
+    <label class="chip shrink"><input type="checkbox" data-prc="${c.id}" data-cf="located" ${c.located ? 'checked' : ''}>Posizione nota</label><button class="b sm shrink" data-prpack="${c.id}">PR pack</button></div>
+    <div class="muted" style="font-size:12px;margin:4px 0">Minaccia: <b>${c.threat}</b> · ${esc(c.cause)} · ${c.pob} POB · ${esc(c.inj)} · soccorso: ${c.rescue.map(fcs).join(', ') || 'nessun flight'} · RESCORT: ${c.rescort.map(fcs).join(', ') || '—'}</div>
+    ${prPre(`MAYDAY e rilancio – ${c.cs}`, T.mayday)}${prPre('PR 11-line', T.eleven)}${prPre(`Briefing CSARTF (information ${c.info})`, T.brief)}${prPre('Briefing OSC per il recupero', T.osc)}${prPre('SPINS – autenticazione', T.spins)}${prPre('Code words', T.codes)}</div>`; }).join('')}
+  ${S.pr.med.map(m => `<div class="card" style="margin-bottom:10px"><div class="row" style="align-items:flex-end;flex-wrap:wrap">
+    <div><label>MEDEVAC ${m.id} – unità richiedente</label><input data-prm="${m.id}" data-cf="unit" value="${esc(m.unit)}"></div><div style="max-width:110px"><label>Freq.</label><input data-prm="${m.id}" data-cf="freq" value="${esc(m.freq)}" placeholder="DB"></div>
+    <div><label>Sicurezza (line 6)</label><select data-prm="${m.id}" data-cf="sec">${o(m.sec, Object.entries(MED_SEC).map(([k, v]) => [k, k + ' – ' + v.toLowerCase()]))}</select></div>
+    <div><label>Equipaggiamento (line 4)</label><select data-prm="${m.id}" data-cf="equip">${o(m.equip, Object.entries(MED_EQ).map(([k, v]) => [k, k + ' – ' + v.toLowerCase()]))}</select></div></div>
+    <div class="muted" style="font-size:12px;margin:4px 0">MTF: ${esc(m.mtf.name)} · elicottero: ${fcs(m.flight) || 'nessun flight'}${m.escort.length ? ' · scorta: ' + m.escort.map(fcs).join(', ') : ''}</div>
+    ${prPre(`9-line MEDEVAC – ${m.unit}`, [...med9(m).map(([n, k, v]) => `LINE ${n}: ${v}`), '', `Lines 1-5 first; lines 6-9 when the aircraft is airborne. Destination MTF: ${m.mtf.name}.`])}</div>`).join('')}`;
+}
+
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
@@ -1589,7 +1750,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t);
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -1598,7 +1759,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t);
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -1715,6 +1876,14 @@ function drawMap(fit) {
   const add = l => l.addTo(LAYERS);
   const drag = (m, setter) => { m.on('dragend', e => { const ll = e.target.getLatLng(); setter([+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); save(); renderPanel(); drawMap(); }); return m; };
   const showZones = TAB === 'scenario' || !S.t;
+  if (S.pr && REL().pr && TAB === 'pr') { for (const c of S.pr.csar) {
+      if (!c.located) { add(L.circle(c.surv, { radius: 3704, color: '#ea580c', weight: 1.5, dashArray: '6 6', fillOpacity: .06 })).bindTooltip(`${c.id} search area (2 NM)`); const sq = [c.surv]; let p = c.surv, k = 1; for (let i = 0; i < 8; i++) { p = dest(p, (i * 90) % 360, 0.9 * Math.ceil(k / 2)); k++; sq.push(p); } add(L.polyline(sq, { color: '#ea580c', weight: 1.5 })).bindTooltip('Expanding square'); }
+      add(L.polyline([c.rv, c.wpIn, c.lz], { color: '#d97706', weight: 3 })).bindTooltip(`${c.id} ingress`); add(L.polyline([c.lz, c.wpOut, c.rv], { color: '#16a34a', weight: 2.5, dashArray: '8 6' })).bindTooltip(`${c.id} egress`);
+      add(L.marker(c.surv, { icon: icon('#ea580c', 'S', `${c.id} ${c.cs}`, 'circle', 14) })).bindTooltip(`${c.cs} – isolated personnel`);
+      add(L.marker(c.lz, { icon: icon('#16a34a', 'LZ', `LZ ${c.id}`, 'circle', 14) })); add(L.marker(c.rv, { icon: icon('#0891b2', 'RV', `RV ${c.id}`, 'circle', 14) }));
+      add(L.marker(c.sardot.pos, { icon: icon('#7c3aed', '◎', c.sardot.name, 'circle', 14) })).bindTooltip(c.sardot.name); }
+    for (const m of S.pr.med) { add(L.polyline([m.poi, m.mtf.pos], { color: '#dc2626', weight: 2, dashArray: '4 6' })).bindTooltip(`${m.id} to ${m.mtf.name}`);
+      add(L.marker(m.poi, { icon: icon('#dc2626', '+', `${m.id} ${m.unit}`, 'circle', 14) })).bindTooltip(`MEDEVAC pick-up ${m.unit}`); add(L.marker(m.mtf.pos, { icon: icon('#dc2626', 'H', 'MTF ' + m.mtf.name, 'circle', 14) })); } }
   if (S.cas && REL().cas && ['cas', 'tailor', 'roster'].includes(TAB)) for (const J of S.cas.jtacs) {
     add(L.circle(J.echo, { radius: 4000, color: '#f59e0b', weight: 1.5, dashArray: '6 6', fill: false })).bindTooltip(`${J.cs} – CAS sector (ECHO)`);
     add(L.marker(J.jtacPos, { icon: icon('#16a34a', 'J', J.cs, 'circle', 14) })).bindTooltip(`JTAC ${J.cs}`);
@@ -2061,19 +2230,21 @@ function renderExport() {
   <div class="row" style="margin-top:8px"><button class="b" id="pubpreview">👁 Anteprima</button><button class="b primary" id="pubpublish">Pubblica sulla pagina pubblica</button></div>
   <div class="row" style="margin-top:6px"><button class="b" id="pubhtml">Scarica pagina pubblica (.html)</button></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>
+  ${REL().pr ? `<div class="card"><b>PR pack (CSAR / MEDEVAC) – solo staff, AMC e OSC</b><p class="muted" style="margin:4px 0">Per ogni scenario: mappa, MAYDAY, PR 11-line, briefing CSARTF e OSC, SPINS, code words, scheda per il personale isolato e 9-line MEDEVAC.</p>
+    <div class="row" style="flex-wrap:wrap">${[...S.pr.csar.map(c => c.id), ...S.pr.med.map(m => m.id)].map(id => `<button class="b shrink" data-prpack="${id}">${id}</button>`).join('')}<button class="b primary shrink" data-prpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().cas ? `<div class="card"><b>JTAC pack (CAS) – solo staff e JTAC</b><p class="muted" style="margin:4px 0">PDF con mappa del settore, situation update, check-in atteso, game plan e 9-line di ogni flight. Le 9-line si vedono anche nella linguetta CAS / JTAC.</p>
     <div class="row" style="flex-wrap:wrap">${S.cas.jtacs.map(J => `<button class="b shrink" data-jpack="${J.id}">${esc(J.cs)}</button>`).join('')}<button class="b primary shrink" data-jpack="ALL">Tutti i JTAC</button></div></div>` : ''}
   <div class="card"><b>Salvare e riaprire l'evento</b><p class="muted" style="margin:4px 0">Usa <b>📁 Eventi salvati</b> in alto: salva, riapri, duplica, esporta o importa un evento.</p><button class="b" id="evbtn2">📁 Apri eventi salvati</button></div>`;
 }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop;
-  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
+  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
     `<datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist>`;
   p.scrollTop = top;
 }
 function renderAll(fit) {
   if (typeof renderEvBadge === 'function') renderEvBadge();
-  { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; }
+  { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; const tp = document.getElementById('tabpr'); if (tp) tp.hidden = !(GEN() && prWanted()); if (TAB === 'pr' && !(GEN() && prWanted())) TAB = 'scenario'; }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
   renderPanel(); renderMapTools(); drawMap(fit);
 }
@@ -2124,6 +2295,9 @@ document.addEventListener('change', e => {
   if (t.id === 'aspfile' && t.files[0]) { t.files[0].text().then(txt => { try { const d = parseAirspace(JSON.parse(txt)); if (!d.zones.length && !d.freqs.length) throw 0; setAirspace(d, 'file', { file: t.files[0].name }); renderAll(); toast(`Importate ${d.zones.length} zone e ${d.freqs.length} frequenze`); } catch (err) { toast('File non riconosciuto (vedi formato in DB_INTERFACE.md)'); } }); return; }
   if (t.dataset.mp) { mpGet()[t.dataset.mp] = t.value; save(); return; }
   if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (t.dataset.prg) { const c = prCfg(); c[t.dataset.prg] = t.dataset.prg === 'fmt' ? t.value : Math.max(0, +t.value || 0); save(); renderPanel(); return; }
+  if (t.dataset.prc && S.pr) { const c = S.pr.csar.find(x => x.id === t.dataset.prc); if (!c) return; const f = t.dataset.cf; c[f] = f === 'located' ? t.checked : t.value; if (f === 'pob') c.pob = +t.value; if (f === 'type') { c.pob = t.value === 'Tornado IDS' ? 2 : 1; c.chutes = c.pob; } save(); if (f !== 'cs') renderPanel(); drawMap(); return; }
+  if (t.dataset.prm && S.pr) { const m = S.pr.med.find(x => x.id === t.dataset.prm); if (!m) return; m[t.dataset.cf] = t.value; save(); if (!['unit', 'freq'].includes(t.dataset.cf)) renderPanel(); return; }
   if (t.dataset.casg) { const c = casCfg(); c[t.dataset.casg] = t.dataset.casg === 'fmt' ? t.value : (+t.value || 0); save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cas && S.cas) { const J = S.cas.jtacs.find(x => x.id === t.dataset.cas); if (!J) return; const f = t.dataset.cf;
     J[f] = f === 'night' ? t.checked : t.value; if (f === 'night') J.tasks.forEach(T => { if (t.checked && T.mark !== 'NONE') T.mark = 'IR'; if (!t.checked && T.mark === 'IR') T.mark = /GBU-1[26]|Paveway|Hellfire|Spike/.test(T.wpn) ? 'LASER' : 'WP'; });
@@ -2164,6 +2338,7 @@ document.addEventListener('click', e => {
   if (t.dataset.sub) { SUBTAB = t.dataset.sub; renderPanel(); return; }
   if (t.dataset.copy !== undefined) { try { navigator.clipboard.writeText(t.dataset.copy).then(() => toast('Copiato')); } catch (err) { toast('Copia non disponibile'); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
+  if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
   if (t.dataset.c2del) { S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
   if (t.dataset.del) {
     const k = t.dataset.del, id = t.dataset.id;
@@ -2185,6 +2360,7 @@ document.addEventListener('click', e => {
     case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
+    case 'prregen': genPR(); if (S.t) applyPR(S.t); save(); renderAll(); toast('Scenari CSAR / MEDEVAC generati'); return;
     case 'casregen': genCAS(); if (S.t) applyCAS(S.t); save(); renderAll(); toast('Scenari CAS generati'); return;
     case 'c2add': c2Sel().push({ id: uid(), key: 'X', real: false, on: true, role: 'Nuova postazione', cs: '', freq: '' }); save(); renderPanel(); return;
     case 'c2reset': S.c2sel = proposeC2(); save(); renderPanel(); return;
@@ -2305,6 +2481,10 @@ async function renderMap(mode, opt = {}) {
     for (const o of S.t.objectives) { if (o.r) circle(o.pos, o.r, K2('#60a5fa'), 'rgba(59,130,246,.12)', [8, 6]); }
     for (const o of S.t.objectives) { dot(o.pos, '#2563eb', 8); const [x, y] = P(o.pos); label(`${o.id} ${o.name}`, x + 11, y + 4, K2('#bfdbfe'), 17); }
   }
+  if (opt.pr) { const c = opt.pr.c, m = opt.pr.m;
+    if (c) { if (!c.located) circle(c.surv, 3.7, '#ea580c', 'rgba(234,88,12,.08)', [8, 6]); line([c.rv, c.wpIn, c.lz], '#d97706', 4); line([c.lz, c.wpOut, c.rv], '#16a34a', 3.5, [12, 8]);
+      [[c.surv, '#ea580c', c.cs], [c.lz, '#16a34a', 'LZ'], [c.rv, '#0891b2', 'RV ' + c.id], [c.wpIn, '#d97706', 'WP IN'], [c.wpOut, '#16a34a', 'WP OUT'], [c.sardot.pos, '#7c3aed', c.sardot.name]].forEach(([q, col, l]) => { dot(q, col, 7); const [a, b] = P(q); label(l, a + 9, b + 4, col, 15); }); }
+    if (m) { line([m.poi, m.mtf.pos], '#dc2626', 3, [8, 6]); [[m.poi, '#dc2626', 'PICK-UP ' + m.unit], [m.mtf.pos, '#dc2626', 'MTF ' + m.mtf.name]].forEach(([q, col, l]) => { dot(q, col, 7); const [a, b] = P(q); label(l, a + 9, b + 4, col, 15); }); } }
   if (opt.jtac) { const J = opt.jtac; circle(J.echo, 4, K2('#f59e0b'), 'rgba(245,158,11,.06)', [8, 6]);
     const fpoly = (pts2, col) => { c.beginPath(); pts2.forEach((p, k) => { const [x, y] = P(p); k ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.fillStyle = col; c.fill(); };
     if (J.tasks.some(T => !T.rw) && (!opt.casTask || !opt.casTask.rw)) casHoldShape(J).forEach(l => line(l, '#0891b2', 2.5, [6, 5]));
@@ -2490,6 +2670,9 @@ async function deckBrief() {
       lines.push({ text: ' ', options: { fontSize: 6, breakLine: true } }); });
     s.addText(lines, { x: 0.5, y: 1.2, w: 4.9, h: 3.9, color: K.TEXT, fontFace: FONT, valign: 'top', margin: 0, isTextBox: true, fit: 'shrink' });
   }
+  // CSAR (pilot side)
+  if (REL().pr && S.pr && S.pr.csar.length && mpOn('pr')) { s = slideT(p, 'Personnel recovery – CSAR RV & SARDOT', 'MAYDAY on GUARD, then CSAR A; positions from the SARDOT only');
+    table(s, ['Scenario', 'CSAR RV', 'SARDOT', 'Assets'], S.pr.csar.map(c => [{ text: c.id, options: { bold: true, color: K.AMBER } }, prLoc(c.rv), `${c.sardot.name}\n${prLoc(c.sardot.pos)}`, [...c.rescort, ...c.rescue].map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join('\n') || '—']), { colW: [1.1, 2.6, 3.0, 2.3], fontSize: 9 }); }
   // CAS (pilot side)
   if (REL().cas && S.cas && mpOn('cas')) { s = slideT(p, 'Close air support – JTACs & control points', 'Check in at the CP; the 9-line comes from the JTAC on frequency');
     table(s, ['JTAC', 'Freq', 'Control points', 'IP / BP', 'Flights (mission no. · laser codes)'], S.cas.jtacs.map(J => [{ text: J.cs, options: { bold: true, color: K.AMBER } }, J.freq || 'TBD', J.cps.map(c => c.name).join('\n'), J.ips.map(c => c.name).join('\n'),
@@ -2580,7 +2763,7 @@ const GLOSSARY = {
   AAR: 'Air-to-Air Refuelling', AEW: 'Airborne Early Warning', GCI: 'Ground-Controlled Interception', 'DZ / LZ': 'Drop zone / Landing zone',
   'LOW & SLOW': 'Interception of slow, low-flying targets such as helicopters', ASuW: 'Anti-Surface Warfare', MPA: 'Maritime Patrol Aircraft'
 };
-Object.assign(GLOSSARY, { JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
+Object.assign(GLOSSARY, { AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
 const ROLE_DESC = {
   SEAD: 'Locate and neutralise SAM sites and radars to open the corridor for the strike package.',
   STRIKE: 'Destroy the assigned high-value targets at the briefed TOT.',
@@ -2622,7 +2805,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const { PDFDocument, rgb, StandardFonts, PDFName, PDFString } = PDFLib;
   const mp = mpGet(), t = S.t, th = theatre(), g = geom();
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${S.meta.op} – ${jsel ? 'JTAC pack' : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
+  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
   let F = {};
   if (assets.fonts && window.fontkit) { pdf.registerFontkit(window.fontkit); for (const k of Object.keys(assets.fonts)) F[k] = await pdf.embedFont(assets.fonts[k], { subset: false }); }
   else { F.reg = await pdf.embedFont(StandardFonts.Helvetica); F.bold = await pdf.embedFont(StandardFonts.HelveticaBold); F.ital = await pdf.embedFont(StandardFonts.HelveticaOblique); F.head = F.bold; F.xb = F.bold; }
@@ -2651,7 +2834,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   draw(cover, event, 76, 530, F.head, 15, WHITE);
   draw(cover, division, 76, 553, F.reg, 11, WHITE);
   draw(cover, date + (S.meta.hHour ? ` · H-hour ${S.meta.hHour}` : '') + ` · ${revLabel()}${curRev() ? ' (' + curRev().date + ')' : ''}`, 76, 572, F.reg, 9, WHITE);
-  draw(cover, jsel ? 'JTAC PACK – staff and JTACs only, do not distribute to pilots' : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
+  draw(cover, jsel ? (jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
   const cx = (txt, f, s, y) => draw(cover, txt, (PW - W(txt, f, s)) / 2, y, f, s, WHITE);
   cx('Special Operations Department', F.ital, 12, 765); cx('International Virtual Aviation Organisation', F.reg, 12, 783);
   // ---------- inner page machinery ----------
@@ -2720,6 +2903,34 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     }
     y += o.after ?? 10;
   };
+  if (jsel && jsel.kind === 'pr') { // ---------- PR pack (CSAR / MEDEVAC) ----------
+    const cs = id => (prFlight(id) || {}).cs;
+    for (const c of jsel.csar) { const T = prTexts(c);
+      newPage(); h1(`CSAR ${c.id} – ${c.cs}`);
+      para(`${c.type}, ${c.pob} POB, ${c.cause} at ${totClock(c.time)}. Survivor ${c.inj}. Threat level ${c.threat.toLowerCase()}. AMC ${c.amc || 'TBD'} · OSC ${c.osc || c.wing} · rescue ${c.rescue.map(cs).join(', ') || 'to be assigned'} · RESCORT ${c.rescort.map(cs).join(', ') || 'to be assigned'}.`);
+      const png = jsel.maps[c.id]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4; para('Amber: ingress RV – WP IN – LZ. Green dashed: egress LZ – WP OUT – RV. Orange: isolated personnel' + (c.located ? '.' : ' and 2 NM search area.'), { size: 7.5 }); } catch (e) { } }
+      h6('Key points'); table([{ h: 'Point', w: .26 }, { h: 'Location', w: .74 }], [['Isolated personnel', prLoc(c.surv) + (c.located ? '' : ' (approximate)')], ['Landing zone', prLoc(c.lz)], [`CSAR RV ${c.id}`, prLoc(c.rv)], ['WP IN / WP OUT', `${prLoc(c.wpIn)} / ${prLoc(c.wpOut)}`], [c.sardot.name, prLoc(c.sardot.pos)]].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      h6('Incident – MAYDAY and relay'); bullets(T.mayday.filter(Boolean));
+      h6('PR 11-line report'); table([{ h: 'Line', w: .07 }, { h: 'Item', w: .3 }, { h: 'Data', w: .63 }], prElevenLine(c).map(([a, b, d]) => [{ t: a, bold: true }, b, d]), { size: 8 });
+      h1(`CSARTF briefing – information ${c.info}`); bullets(T.brief);
+      h6('OSC – recovery brief to the helicopters'); table([{ h: 'Item', w: .3 }, { h: 'Data', w: .7 }], prOscBrief(c).map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      h6('SPINS – authentication'); table([{ h: 'Item', w: .3 }, { h: 'Value', w: .7 }], [['Word / letter / number / color', `${c.auth.wod} / ${c.auth.lod} / ${c.auth.nod} / ${c.auth.cod}`], ['Challenge / password', `${c.auth.challenge} / ${c.auth.password}`], ['Duress word', c.auth.duress], ['SARNEG', `${c.auth.sarneg}  (${[...c.auth.sarneg].map((ch, i) => ch + '=' + i).join(' ')})`], ['SARDOT', `${c.sardot.name} ${prLoc(c.sardot.pos)}`], ['CSAR frequencies', 'CSAR A / CSAR B – from the database; GUARD 243.000']].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      h6('Code words'); table([{ h: 'Event', w: .5 }, { h: 'Code word', w: .5 }], Object.entries(c.codes).map(([a, b]) => [a, { t: b, bold: true }]), { size: 8 });
+      newPage(); h1(`Isolated personnel card – ${c.cs}`);
+      para('Give this page only to the player acting as the isolated personnel. Do not transmit coordinates in the clear: use the SARDOT or the SARNEG.', { font: F.ital });
+      table([{ h: 'Item', w: .3 }, { h: 'Value', w: .7 }], [['Your callsign / aircraft', `${c.cs} / ${c.type} (${c.pob} POB)`], ['Your position', prLoc(c.surv)], ['From the SARDOT', `${c.sardot.name} ${magHdg(bearing(c.sardot.pos, c.surv))} / ${(dist(c.sardot.pos, c.surv) / 1.852).toFixed(1)} NM`], ['Position in SARNEG', sarneg(c.auth.sarneg, c.surv)], ['Condition', c.inj], ['Nearest LZ', prLoc(c.lz)], ['Authentication', `word ${c.auth.wod}, letter ${c.auth.lod}, number ${c.auth.nod}, color ${c.auth.cod}; challenge ${c.auth.challenge} → password ${c.auth.password}; duress word ${c.auth.duress}`], ['Radio', 'MAYDAY on GUARD 243.000, then listen on CSAR A'], ['Signals', 'Smoke or flare only on request of the rescue forces']].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8.5 });
+      h6('Your MAYDAY call'); para(T.mayday[0]);
+    }
+    for (const m of jsel.med) {
+      newPage(); h1(`MEDEVAC ${m.id} – ${m.unit}`);
+      para(`Requesting unit ${m.unit} (${m.freq || 'frequency TBD'}). Helicopter ${cs(m.flight) || 'to be assigned'}${m.escort.length ? ', escort ' + m.escort.map(cs).join(', ') : ''}. Destination MTF ${m.mtf.name} ${prLoc(m.mtf.pos)}. Request at ${totClock(m.time)}.`);
+      const png = jsel.maps[m.id]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 8; } catch (e) { } }
+      h6('9-line MEDEVAC'); table([{ h: 'Line', w: .08 }, { h: 'Item', w: .32 }, { h: 'Transmit', w: .6 }], med9(m).map(([a, b, d]) => [{ t: a, bold: true }, b, { t: d, bold: true }]), { size: 8.5 });
+      para('Lines 1-5 are passed first; lines 6-9 can follow once the aircraft is airborne. Lines are passed with numbers and letters only, e.g. "LINE 3, 1 ALPHA – 2 CHARLIE".');
+    }
+    h1('Brevity reminder'); table([{ h: 'Call', w: .3 }, { h: 'Meaning', w: .7 }], [['AJAX', 'LZ / PZ clear of threats'], ['ANCHOR(ED)', 'Orbit at a specific point'], ['BINGO', 'Fuel for recovery reached, bug out'], ['BUGOUT', 'Leave with no intent to re-engage'], ['FENCE IN / OUT', 'Set switches entering / leaving the combat area'], ['MARSHALLING', 'Establish at a specific point'], ['PLAYTIME', 'Time left for the mission'], ['POPEYE', 'Flying in reduced visibility'], ['SAUNTER', 'Fly for maximum endurance'], ['TUMBLEWEED', 'Lost situational awareness, request information'], ['WHAT LUCK', 'Request results of the mission'], ['WINCHESTER', 'Out of ammunition']].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+    return { pdf, tocMap: {}, custom: !!assets.fonts };
+  }
   if (jsel) { // ---------- JTAC pack ----------
     const brev = [['ABORT (code)', 'Stop the attack, no release; include the abort code'], ['CLEARED HOT', 'Release authorised (type 1 and 2 control)'], ['CLEARED TO ENGAGE', 'Type 3: attacks allowed within the JTAC restrictions'], ['CONTINUE', 'Continue the manoeuvre, release not yet authorised'], ['CONTINUE DRY', 'Continue without release (training / show of force)'],
       ['TEN SECONDS', 'Laser on in about ten seconds'], ['LASER ON', 'Start designation'], ['SPOT', 'Aircraft has the laser spot'], ['CEASE LASER', 'Stop designation'], ['SPARKLE / SNAKE / STEADY', 'IR pointer marking calls (night)'], ['VISUAL / TALLY / CONTACT', 'Friendly in sight / target in sight / reference in sight']];
@@ -2772,7 +2983,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const used = new Set(['GAT', 'OAT', 'AO', 'H-hour', ...(PROF().sober ? [] : ['ROE']), 'SPINS']);
   const txtAll = JSON.stringify([S.cats, t && t.flights.map(f => f.task), t && t.threats.map(x => x.type), t && t.airspace.map(a => a.type)]);
   const has = re => re.test(txtAll);
-  if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k));
+  if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k)); if (REL().pr) ['AMC', 'OSC', 'SARDOT', 'CSARTF', 'LZ'].forEach(k => used.add(k));
   if (has(/SEAD|IADS/)) { used.add('SEAD'); used.add('DEAD'); used.add('SAM'); used.add('EWR'); } if (has(/MANPADS|SHORAD/)) { used.add('MANPADS'); used.add('AAA'); }
   if (has(/DCA|AIR/)) used.add('DCA'); if (has(/OCA|ESCORT/)) used.add('OCA'); if (has(/QRA|RENEGADE/)) { used.add('QRA'); used.add('RENEGADE'); }
   if (has(/CAS|GROUND/)) { used.add('CAS'); used.add('JTAC'); used.add('KILL BOX'); } if (has(/STRIKE|HVT/)) { used.add('HVT'); used.add('TOT'); }
@@ -2873,6 +3084,9 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     para('Contact the JTAC on its frequency at the control point. Check in with mission number, number and type of aircraft, position and block, ordnance and laser codes, playtime and abort code. The JTAC then passes situation update, game plan and the 9-line briefing; read back lines 4, 6, 8 and the restrictions.');
     table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], S.cas.jtacs.map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
     if (t && S.cas.jtacs.some(J => J.tasks.some(T => T.flight))) table([{ h: 'Flight', w: .2 }, { h: 'Mission no.', w: .14 }, { h: 'JTAC', w: .18 }, { h: 'Laser codes', w: .24 }, { h: 'Block', w: .24 }], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [{ t: (t.flights.find(f => f.id === T.flight) || {}).cs || '', bold: true }, T.missionNo, J.cs, T.codes.join(' / '), T.block ? T.block + ' (x1000 ft)' : 'low level'])), { size: 7.5 }); }
+  if (mpOn('pr') && REL().pr && S.pr && S.pr.csar.length) { h6('Personnel recovery (CSAR) and MEDEVAC');
+    para('An isolated crew calls MAYDAY on GUARD and then listens on CSAR A; positions are passed from the SARDOT, never as coordinates in the clear. CSARTF assets join at the CSAR RV and contact the AMC and the OSC before entering the objective area. Authentication data are passed by the AMC.');
+    table([{ h: 'Scenario', w: .14 }, { h: 'CSAR RV', w: .43 }, { h: 'SARDOT', w: .43 }], S.pr.csar.map(c => [{ t: c.id, bold: true }, prLoc(c.rv), `${c.sardot.name}  ${prLoc(c.sardot.pos)}`]), { size: 7.5 }); }
   if (t) { if (mpOn('rules')) { h6(PROF().sober ? 'Exercise rules' : 'Rules of engagement'); bullets(t.roe); } if (mpOn('spins')) { h6('Special instructions (SPINS)'); bullets(t.spins); }
     if (mpOn('words')) { h6('Code words'); table([{ h: 'Code word', w: .3 }, { h: 'Meaning', w: .7 }], t.codewords.map(([a, b]) => [{ t: a, bold: true }, b])); } }
   else if (mpOn('rules') || mpOn('spins') || mpOn('words')) para(PROF().sober ? 'Exercise rules, SPINS and code words are published with the mission briefing after sign-ups.' : 'Detailed ROE, SPINS and code words are published with the mission briefing after sign-ups.');
@@ -2894,6 +3108,21 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec(null);
   const tocMap = Object.fromEntries(toc.filter(([n]) => n !== 'Content'));
   return { pdf, tocMap, custom: !!assets.fonts };
+}
+async function exportPrPack(which, btn) {
+  if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
+  if (!S.pr) return toast('Nessuno scenario CSAR / MEDEVAC');
+  const csar = S.pr.csar.filter(c => which === 'ALL' || c.id === which), med = S.pr.med.filter(m => which === 'ALL' || m.id === which);
+  if (btn) btn.disabled = true; toast('Generazione PR pack…');
+  try {
+    const assets = await mpAssets(), maps = {};
+    for (const c of csar) { const im = await renderMap('brief', { light: true, w: 1300, h: 800, focus: [c.surv, c.lz, c.rv, c.wpIn, c.wpOut, c.sardot.pos], pr: { c }, minPad: 0.03 }); if (im) maps[c.id] = dataUrlBytes(im); }
+    for (const m of med) { const im = await renderMap('brief', { light: true, w: 1300, h: 760, focus: [m.poi, m.mtf.pos], pr: { m }, minPad: 0.03 }); if (im) maps[m.id] = dataUrlBytes(im); }
+    const r = await buildMasterplanPdf(null, assets, null, { kind: 'pr', csar, med, maps });
+    await download(`${fileBase()}_PR_${which}.pdf`, new Blob([await r.pdf.save()], { type: 'application/pdf' }));
+    toast('PR pack generato');
+  } catch (err) { console.error(err); toast('Errore: ' + err.message); }
+  if (btn) btn.disabled = false;
 }
 async function exportJtacPack(which, btn) {
   if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
@@ -3018,7 +3247,7 @@ function buildPayload(includeBrief) {
   const sc = JSON.parse(JSON.stringify(S));
   // public material never carries people's names or VIDs
   sc.roster = { pilots: (sc.roster.pilots || []).map(p => ({ id: p.id, typeRaw: p.typeRaw })), controllers: (sc.roster.controllers || []).map(c => ({ id: c.id, pref: c.pref })) };
-  sc.cas = casPublic(sc.cas);
+  sc.cas = casPublic(sc.cas); sc.pr = prPublic(sc.pr);
   if (sc.t) { delete sc.t.cas; sc.t.warnings = []; sc.t.flights.forEach(f => f.pilots = []); sc.t.c2.forEach(c => { c.controller = /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) ? 'Open' : 'Assigned'; }); }
   if (sc.asp) sc.asp = { source: sc.asp.source, loaded: sc.asp.loaded, zones: RES(), freqs: [], bullseyes: bulSel(), tracks: TRK() }; // only the reserved areas and the event bullseye
   if (!includeBrief) sc.t = null;
@@ -3066,6 +3295,7 @@ function renderPublic() {
   const brief = t ? `
     <section class="pcard"><h2>Flights &amp; tasking</h2>
       ${tbl(['Callsign', 'Aircraft', 'Base', 'Task', 'Package', 'Freq'], t.flights.map(f => [`<b class="blue">${esc(f.cs)}</b>`, `${f.size} × ${esc(f.type)}`, esc(f.base || '-'), esc(ROLES[f.task] || f.task), esc(PKG[f.pkg] || f.pkg), esc(f.freq || 'TBD')]))}</section>
+    ${S.pr && REL().pr && S.pr.csar.length ? `<section class="pcard"><h2>Personnel recovery</h2><p class="muted">Isolated crews call MAYDAY on GUARD and then listen on CSAR A. Positions are passed from the SARDOT only.</p>${tbl(['Scenario', 'CSAR RV', 'SARDOT'], S.pr.csar.map(c => [`<b>${esc(c.id)}</b>`, esc(prLoc(c.rv)), esc(c.sardot.name + '  ' + prLoc(c.sardot.pos))]))}</section>` : ''}
     ${S.cas && REL().cas ? `<section class="pcard"><h2>Close air support</h2><p class="muted">Check in with the JTAC at the control point. Targets and the 9-line are passed on frequency.</p>${tbl(['JTAC', 'Frequency', 'Control points', 'IP / BP'], S.cas.jtacs.map(J => [`<b>${esc(J.cs)}</b>`, esc(J.freq || 'TBD'), J.cps.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>'), J.ips.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>')]))}
       ${tbl(['Flight', 'Mission no.', 'JTAC', 'Laser codes', 'Block'], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [`<b>${esc((t.flights.find(f => f.id === T.flight) || {}).cs || '')}</b>`, esc(T.missionNo), esc(J.cs), esc(T.codes.join(' / ')), esc(T.block || 'low level')])))}</section>` : ''}
     ${(t.serials || []).length ? `<section class="pcard"><h2>Serials</h2>${tbl(['Serial', 'Flights', 'Task', 'Success criteria'], t.serials.map(r => [`<b>${esc(r.id)}</b>`, esc(r.flights.map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join(', ')), `<b>${esc(r.title)}</b><br>${esc(r.text)}`, esc(r.success)]))}</section>` : ''}
