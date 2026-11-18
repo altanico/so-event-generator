@@ -15,6 +15,7 @@
 - Consider splitting `index.html` into modules.
 
 ## CAS – possible next steps
+- **Terrain data (DEM)** once hosted on the division site (e.g. Open Topo Data SRTM 30 m): fill line 4 automatically and choose final attack headings along valleys / away from high ground.
 - Talk-on text generator (needs photoreal references, so probably staff-written).
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
 - RAMROD abort codes instead of "abort in the clear".

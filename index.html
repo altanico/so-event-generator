@@ -1432,7 +1432,7 @@ function genCAS() {
     const echo = snapRes(dest(dest(g.front, g.dir + 90, (j - (nJ - 1) / 2) * 28), g.dir + 180, 3));
     const threat = casAA(echo).length ? 'HIGH' : 'LOW';
     const J = { id: 'J' + (j + 1), cs: csPool[j % csPool.length] + (j >= csPool.length ? ' ' + (j + 1) : ''), controller: ctrlJ[j] ? (ctrlJ[j].name || 'JTAC') : '', freq: '', echo, jtacPos: echo, threat,
-      night: !!cfg.night, laser: String(1688 - j * 11), sit: NATO[j % 26], friendlies: [], cps: [0, 1].map(k => ({ name: uniq(CAS_CP), pos: snapRes(dest(echo, g.dir + (k ? 35 : -35), 45 + Math.random() * 10)) })),
+      night: !!cfg.night, laser: String(1688 - j * 11), sit: NATO[j % 26], friendlies: [], cps: [0, 1].map(k => ({ name: uniq(CAS_CP), pos: snapRes(dest(echo, g.dir + (k ? 35 : -35), 30 + Math.random() * 8)) })),
       ips: [], targets: [], tasks: [], hold: threat === 'HIGH' ? 'RACETRACK' : 'WHEEL' };
     for (let k = 0; k < per; k++) casSlot(J, k, rwShare > 0 && (k + 1) % Math.round(100 / rwShare) === 0, g, used, uniq);
     const fr = shuffle(CAS_FRIEND);
@@ -1556,6 +1556,27 @@ function casPublic(cas) {
     tasks: J.tasks.map(T => ({ flight: T.flight, missionNo: T.missionNo, codes: T.codes, block: T.block, ip: T.ip, rw: T.rw })), targets: [], friendlies: [], echo: null, jtacPos: null })) };
 }
 
+// --- CAS geometry for the maps: holding patterns, run-in with final attack heading sector, egress ---
+const NMK = 1.852;
+function casHoldShape(J) { // closed polyline(s) of the JTAC's holding pattern
+  const g = geom(), ax = g.dir + 90, cp = J.cps[0].pos, out = [];
+  const loc = (c, x, y) => dest(dest(c, ax, x), ax + 90, y); // x along the front, y across (km)
+  if (J.hold === 'WHEEL') { const r = 5 * NMK, pts = []; for (let a = 0; a <= 360; a += 10) pts.push(dest(J.echo, a, r)); out.push(pts); }
+  else if (J.hold === 'FIGURE8') { const a = 5 * NMK, pts = []; for (let k = 0; k <= 72; k++) { const t = k / 72 * 2 * Math.PI; pts.push(loc(cp, a * Math.cos(t), a * Math.sin(t) * Math.cos(t))); } out.push(pts); }
+  else { const L = 5 * NMK, r = 3 * NMK, pts = []; // racetrack: 10 NM legs, 3 NM turn radius, legs parallel to the front
+    for (let a = -90; a <= 90; a += 10) pts.push(loc(cp, L + r * Math.cos(a * Math.PI / 180), r * Math.sin(a * Math.PI / 180)));
+    for (let a = 90; a <= 270; a += 10) pts.push(loc(cp, -L + r * Math.cos(a * Math.PI / 180), r * Math.sin(a * Math.PI / 180)));
+    pts.push(pts[0]); out.push(pts); }
+  return out;
+}
+function casAttackGeom(J, T) {
+  const tgt = J.targets.find(x => x.id === T.target) || J.targets[0], ip = J.ips.find(x => x.name === T.ip) || J.ips[0], cp = J.cps[0];
+  const h = bearing(ip.pos, tgt.pos), back = (h + 180) % 360, R = Math.min(dist(ip.pos, tgt.pos), T.rw ? 3 : 12);
+  const wedge = [tgt.pos]; for (let a = -15; a <= 15; a += 5) wedge.push(dest(tgt.pos, back + a, R)); wedge.push(tgt.pos);
+  const egress = T.rw ? [tgt.pos, dest(tgt.pos, (bearing(tgt.pos, ip.pos) + 40) % 360, 1.2), ip.pos] : [tgt.pos, dest(tgt.pos, h, 3), cp.pos];
+  const arrow = (a, b, km) => { const br = bearing(b, a); return [dest(b, br - 25, km), b, dest(b, br + 25, km)]; };
+  return { tgt, ip, cp, runin: [ip.pos, tgt.pos], wedge, egress, runArrow: arrow(ip.pos, tgt.pos, T.rw ? 0.25 : 1.2), egArrow: arrow(egress[egress.length - 2], egress[egress.length - 1], T.rw ? 0.25 : 1.2) };
+}
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
@@ -1699,6 +1720,11 @@ function drawMap(fit) {
     add(L.marker(J.jtacPos, { icon: icon('#16a34a', 'J', J.cs, 'circle', 14) })).bindTooltip(`JTAC ${J.cs}`);
     J.friendlies.forEach(x => add(L.circleMarker(x.pos, { radius: 6, color: '#1d4ed8', weight: 2, fillColor: '#93c5fd', fillOpacity: 1 })).bindTooltip(x.desc));
     J.targets.forEach(x => add(L.marker(x.pos, { icon: icon('#b91c1c', '✕', x.id, 'circle', 14) })).bindTooltip(`${x.id} ${x.desc}`));
+    if (TAB === 'cas') { if (J.tasks.some(T => !T.rw)) casHoldShape(J).forEach(l => add(L.polyline(l, { color: '#0891b2', weight: 2, dashArray: '4 4' })).bindTooltip(`${J.cs} holding – ${J.hold === 'WHEEL' ? 'wheel orbit 5 NM' : J.hold === 'FIGURE8' ? 'figure eight' : 'racetrack 10 NM legs'}`));
+      J.tasks.forEach(T => { const a = casAttackGeom(J, T);
+        add(L.polygon(a.wedge, { color: '#d97706', weight: 1, fillColor: '#f59e0b', fillOpacity: .15 })).bindTooltip(`${T.id} final attack heading sector`);
+        add(L.polyline(a.runin, { color: '#d97706', weight: 3 })).bindTooltip(`${T.id} run-in ${a.ip.name} → ${a.tgt.id}`); add(L.polyline(a.runArrow, { color: '#d97706', weight: 3 }));
+        add(L.polyline(a.egress, { color: '#16a34a', weight: 2.5, dashArray: '8 6' })).bindTooltip(`${T.id} egress`); add(L.polyline(a.egArrow, { color: '#16a34a', weight: 2.5 })); }); }
     if (!S.t || TAB === 'cas') { J.cps.forEach(c => add(L.marker(c.pos, { icon: icon('#0284C7', 'C', c.name, 'circle', 14) })).bindTooltip('CP ' + c.name)); J.ips.forEach(c => add(L.marker(c.pos, { icon: icon('#0284C7', 'I', c.name, 'circle', 14) })).bindTooltip((c.heli ? '' : 'IP ') + c.name)); }
   }
   { const bd = borderGeom(); if (bd) { add(L.polygon(bd.red, { stroke: false, fillColor: '#ef4444', fillOpacity: .07, interactive: false })); add(L.polygon(bd.blue, { stroke: false, fillColor: '#3b82f6', fillOpacity: .05, interactive: false }));
@@ -2221,7 +2247,7 @@ async function renderMap(mode, opt = {}) {
   if (!pts.length) pts = [g.redC];
   let la = pts.map(p => p[0]), lo = pts.map(p => p[1]);
   let minLa = Math.min(...la), maxLa = Math.max(...la), minLo = Math.min(...lo), maxLo = Math.max(...lo);
-  const padLa = Math.max((maxLa - minLa) * 0.12, 0.15), padLo = Math.max((maxLo - minLo) * 0.12, 0.2);
+  const mp0 = opt.minPad ?? 0.15, padLa = Math.max((maxLa - minLa) * 0.12, mp0), padLo = Math.max((maxLo - minLo) * 0.12, mp0 * 1.33);
   minLa -= padLa; maxLa += padLa; minLo -= padLo; maxLo += padLo;
   // fractional zoom so the content fills the image; tiles of the integer zoom are scaled
   const [bx1, by1] = mercator(maxLa, minLo, 0), [bx2, by2] = mercator(minLa, maxLo, 0);
@@ -2280,6 +2306,12 @@ async function renderMap(mode, opt = {}) {
     for (const o of S.t.objectives) { dot(o.pos, '#2563eb', 8); const [x, y] = P(o.pos); label(`${o.id} ${o.name}`, x + 11, y + 4, K2('#bfdbfe'), 17); }
   }
   if (opt.jtac) { const J = opt.jtac; circle(J.echo, 4, K2('#f59e0b'), 'rgba(245,158,11,.06)', [8, 6]);
+    const fpoly = (pts2, col) => { c.beginPath(); pts2.forEach((p, k) => { const [x, y] = P(p); k ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.fillStyle = col; c.fill(); };
+    if (J.tasks.some(T => !T.rw) && (!opt.casTask || !opt.casTask.rw)) casHoldShape(J).forEach(l => line(l, '#0891b2', 2.5, [6, 5]));
+    (opt.casTask ? [opt.casTask] : J.tasks).forEach(T => { const a = casAttackGeom(J, T), w = opt.casTask ? 4 : 2.5;
+      fpoly(a.wedge, 'rgba(245,158,11,.22)'); line(a.wedge, '#d97706', 1.5); line(a.runin, '#d97706', w); line(a.runArrow, '#d97706', w);
+      line(a.egress, '#16a34a', w, [12, 8]); line(a.egArrow, '#16a34a', w);
+      if (opt.casTask) { const [x, y] = P(a.ip.pos); label(a.ip.name, x + 9, y + 4, '#92400e', 16); const [x2, y2] = P(a.egress[a.egress.length - 1]); if (!T.rw) label('EGRESS → ' + a.cp.name, x2 + 9, y2 + 18, '#166534', 15); } });
     J.friendlies.forEach(x => { dot(x.pos, '#1d4ed8', 7); const [a, b] = P(x.pos); label('FRIENDLY', a + 9, b + 4, K2('#bfdbfe'), 14); });
     J.targets.forEach(x => { const [a, b] = P(x.pos); c.strokeStyle = '#b91c1c'; c.lineWidth = 3; c.beginPath(); c.moveTo(a - 7, b - 7); c.lineTo(a + 7, b + 7); c.moveTo(a + 7, b - 7); c.lineTo(a - 7, b + 7); c.stroke(); label(x.id, a + 10, b + 4, K2('#fecaca'), 15); });
     dot(J.jtacPos, '#16a34a', 7); { const [a, b] = P(J.jtacPos); label('JTAC ' + J.cs, a + 9, b + 4, K2('#bbf7d0'), 14); }
@@ -2706,6 +2738,8 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
         h6('Routing / holding'); para(casHold(J, T));
         h6('Expected check-in'); bullets(casCheckIn(J, T));
         h6('Game plan'); para(casGamePlan(J, T));
+        { const png2 = jsel.maps[J.id + ':' + T.id]; if (png2) { try { const img = await pdf.embedPng(png2); const w = CW, hh = w * img.height / img.width; ensure(hh + 40); h6('Attack geometry'); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4;
+          para('Amber: run-in from the ' + (T.rw ? 'BP' : 'IP') + ' and final attack heading sector. Green dashed: egress. Cyan dashed: holding. Blue dots: friendlies.', { size: 7.5 }); } catch (e) { } } }
         h6('9-line'); table([{ h: 'Line', w: .08 }, { h: 'Item', w: .26 }, { h: 'Transmit', w: .66 }], n.lines.map(([a, b, c]) => [{ t: a, bold: true }, b, { t: c, bold: true }]), { size: 8.5 });
         h6('Remarks'); bullets(n.remarks);
         h6('Restrictions (mandatory)'); bullets(n.restr);
@@ -2868,7 +2902,8 @@ async function exportJtacPack(which, btn) {
   if (btn) btn.disabled = true; toast('Generazione JTAC pack…');
   try {
     const assets = await mpAssets(), maps = {};
-    for (const J of jtacs) { const focus = [J.echo, J.jtacPos, ...J.ips.map(c => c.pos), ...J.targets.map(x => x.pos), ...J.friendlies.map(x => x.pos)]; const m = await renderMap('brief', { light: true, w: 1400, h: 900, focus, jtac: J }); if (m) maps[J.id] = dataUrlBytes(m); }
+    for (const J of jtacs) { const focus = [J.echo, J.jtacPos, ...J.cps.map(c => c.pos), ...J.ips.map(c => c.pos), ...J.targets.map(x => x.pos), ...J.friendlies.map(x => x.pos)]; const m = await renderMap('brief', { light: true, w: 1400, h: 900, focus, jtac: J }); if (m) maps[J.id] = dataUrlBytes(m);
+      for (const T of J.tasks) { const a = casAttackGeom(J, T), f2 = [a.ip.pos, a.tgt.pos, a.egress[1], ...J.friendlies.map(x => x.pos)]; const m2 = await renderMap('brief', { light: true, w: 1300, h: 760, focus: f2, jtac: J, casTask: T, minPad: 0.025 }); if (m2) maps[J.id + ':' + T.id] = dataUrlBytes(m2); } }
     const r = await buildMasterplanPdf(null, assets, null, { jtacs, maps });
     const bytes = await r.pdf.save();
     await download(`${fileBase()}_JTAC_${which === 'ALL' ? 'ALL' : jtacs[0].cs.replace(/\W+/g, '_')}.pdf`, new Blob([bytes], { type: 'application/pdf' }));
