@@ -1,0 +1,35 @@
+const ENV = require('./_env.js');
+// CAS: JTAC sectors, 9-lines in the JTAC pack only, pilot-side info in masterplan/public page
+const { chromium } = require(ENV.PW); const { execSync } = require('child_process');
+(async()=>{const b=await chromium.launch({executablePath:ENV.CHROME,args:['--no-sandbox']});
+const ctx=await b.newContext({acceptDownloads:true,viewport:{width:1300,height:900}});const page=await ctx.newPage();const errs=[];
+page.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+await page.route('**/*',r=>{const u=r.request().url();
+ if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK});
+ if(u.includes('pptxgen'))return r.fulfill({path:ENV.PPTX});
+ if(u.includes('pdf-lib.min.js'))return r.fulfill({path:ENV.PDFLIB});
+ if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
+await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(800);
+const info=await page.evaluate(()=>{ APP.S=JSON.parse(JSON.stringify(APP.S)); APP.S.roster={pilots:[],controllers:[]}; APP.S.t=null;
+  APP.setEvents(['CAS']); APP.generateGeneric(); APP.parseLines('4x AMX\n2x F-16\n2x AH-64 Apache\n1x JTAC Mario Rossi\n1x JTAC Luigi Bianchi'); APP.tailor(); APP.renderAll();
+  const t=APP.S.t; return { nJ:t.cas&&t.cas.jtacs.length, tasks:t.cas&&t.cas.jtacs.map(J=>J.tasks.length), c2:t.c2.map(c=>c.role+'|'+c.cs), cp:t.airspace.filter(a=>a.type==='CP').length,
+    pub:JSON.stringify(APP.buildPayload(true).scenario.t.cas) }; });
+console.log(JSON.stringify({nJ:info.nJ,tasks:info.tasks,cp:info.cp,c2:info.c2}));
+let fail=[];
+if(!(info.nJ>=1)) fail.push('no JTAC');
+if(/BTR|T-72|ZU-23|tents|technicals|farmhouse|BMP|supply trucks|Radio relay|Mortar position/.test(info.pub)) fail.push('target leaked to public payload');
+await page.click('[data-tab="tailor"]'); await page.waitForTimeout(200);
+await page.selectOption('[data-casg="fmt"]','MGRS'); await page.waitForTimeout(200);
+const [d1]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('[data-jpack="ALL"]')]); await d1.saveAs('cas_jtac.pdf');
+await page.click('[data-tab="export"]'); await page.waitForTimeout(200);
+const [d2]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('#mpdf')]); await d2.saveAs('cas_mp.pdf');
+const [d3]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('#pptbrief')]); await d3.saveAs('cas_br.pptx');
+const jt=execSync('pdftotext cas_jtac.pdf -').toString(), mp=execSync('pdftotext cas_mp.pdf -').toString();
+if(!/FINAL ATTACK HEADING/.test(jt)||!/Situation update/.test(jt)||!/Expected check-in/.test(jt)) fail.push('JTAC pack incomplete');
+if(!/\d{2}[A-Z] [A-Z]{2} \d{4} \d{4}/.test(jt)) fail.push('MGRS not found');
+if(/FINAL ATTACK HEADING|EGRESS, |TYPE [123], BOMB|SHOW OF FORCE,/.test(mp)) fail.push('9-line leaked to masterplan');
+if(!/Close air support/.test(mp)) fail.push('CAS section missing in masterplan');
+if(/Mario|Rossi|Luigi|Bianchi/.test(mp)) fail.push('names in masterplan');
+if(/ricerca|bersaglio|quota|minaccia|settore/i.test(jt)) fail.push('Italian text in JTAC pack');
+console.log(fail.length?'"err": '+fail.join('; '):'checks ok');
+console.log(errs.join('\n')||'no errors'); await b.close();})();

@@ -14,7 +14,13 @@
 - Public page per event as a site route.
 - Consider splitting `index.html` into modules.
 
+## CAS – possible next steps
+- Talk-on text generator (needs photoreal references, so probably staff-written).
+- Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
+- RAMROD abort codes instead of "abort in the clear".
+
 ## Assumptions to verify
+- CAS: magnetic variation fixed per event (default 3.5° E); target elevation left to the JTAC (no terrain model).
 - Sectorfile format (SCT sections VOR/NDB/FIXES/VFR, coordinates `N043.20.10.000`) – tested only on a synthetic file.
 - India (AEW) area floors interpreted as lower limits.
 - Contact e-mail inferred.
