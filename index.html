@@ -265,17 +265,17 @@ const AC = [
   ['F/A-18','FIGHTER',['SEAD','STRIKE','CAS','ANTISHIP','DCA','OCA','ESCORT','QRA'],['FA18','F18','FA18C','FA18E','FA18F','F18E','HORNET','SUPERHORNET']],
   ['EA-18G Growler','FIGHTER',['SEAD','ESCORT'],['EA18G','EA18','GROWLER']],
   ['F-15E','FIGHTER',['STRIKE','CAS','DCA','OCA','ESCORT'],['F15E','F15EX','STRIKEEAGLE']],
-  ['F-15C','FIGHTER',['DCA','OCA','ESCORT','QRA'],['F15','F15C','EAGLE']],
-  ['F-22','FIGHTER',['OCA','DCA','ESCORT'],['F22','RAPTOR']],
+  ['F-15C','FIGHTER',['DCA','OCA','ESCORT','QRA','CAS'],['F15','F15C','EAGLE']],
+  ['F-22','FIGHTER',['OCA','DCA','ESCORT','CAS'],['F22','RAPTOR']],
   ['Rafale','FIGHTER',['SEAD','STRIKE','CAS','ANTISHIP','DCA','OCA','ESCORT','QRA'],['RAFALE','RAFALEM','RAFALEC','RAFALEB']],
-  ['Gripen','FIGHTER',['STRIKE','ANTISHIP','DCA','OCA','ESCORT','QRA','LOWSLOW'],['JAS39','GRIPEN']],
+  ['Gripen','FIGHTER',['STRIKE','ANTISHIP','DCA','OCA','ESCORT','QRA','LOWSLOW','CAS'],['JAS39','GRIPEN']],
   ['Tornado ECR','FIGHTER',['SEAD','RECCE'],['TORNADOECR','ECR','EA200']],
-  ['Tornado IDS','FIGHTER',['STRIKE','ANTISHIP','RECCE'],['TORNADO','TORNADOIDS','PA200','A200','IDS']],
+  ['Tornado IDS','FIGHTER',['STRIKE','ANTISHIP','RECCE','CAS'],['TORNADO','TORNADOIDS','PA200','A200','IDS']],
   ['AMX','ATTACK',['CAS','STRIKE','RECCE'],['AMX','A11','GHIBLI']],
   ['A-10','ATTACK',['CAS','RESCORT'],['A10','A10C','WARTHOG','THUNDERBOLT']],
   ['AV-8B Harrier','ATTACK',['CAS','STRIKE'],['AV8B','AV8','HARRIER']],
   ['M-346','ATTACK',['LOWSLOW','CAS'],['M346','T346','MASTER']],
-  ['MB-339','ATTACK',['LOWSLOW'],['MB339','T339']],
+  ['MB-339','ATTACK',['LOWSLOW','CAS'],['MB339','T339']],
   ['HH-101','HELO',['CSAR','INSERT'],['HH101','AW101','EH101','CAESAR','MERLIN']],
   ['HH-139','HELO',['CSAR','INSERT'],['HH139','AW139']],
   ['NH90','HELO',['INSERT','CSAR','AIRLIFT'],['NH90','UH90','TTH90','NFH90']],
@@ -1359,7 +1359,7 @@ const CAS_TGT = [
 const CAS_FRIEND = ['Platoon on the high ground', 'Company in a blocking position', 'Observation post (OP 2)', 'Mechanised platoon at the farm', 'Patrol in the olive grove'];
 const CAS_FMARK = ['VS-17 orange panels', 'IR strobe', 'none', 'orange smoke on request'];
 const CAS_WPN = { // ordnance by aircraft type (first = default)
-  'F-35A': ['GBU-12', 'GBU-31', 'GBU-32'], 'F-35B': ['GBU-12', 'GBU-32'], 'EF-2000 Typhoon': ['GBU-16', 'Paveway IV'], 'Tornado IDS': ['GBU-16', 'GBU-32'], 'F-16': ['GBU-12', 'GBU-38'], 'F/A-18': ['GBU-12', 'GBU-38'], 'F-15E': ['GBU-12', 'GBU-38'], 'Rafale': ['GBU-12', 'AASM'],
+  'F-35A': ['GBU-12', 'GBU-31', 'GBU-32'], 'F-15C': ['20 mm gun'], 'F-22': ['GBU-32', '20 mm gun'], 'Gripen': ['GBU-12', '27 mm gun'], 'MB-339': ['gun pods', '2.75 in rockets'], 'F-104': ['20 mm gun'], 'F-35B': ['GBU-12', 'GBU-32'], 'EF-2000 Typhoon': ['GBU-16', 'Paveway IV'], 'Tornado IDS': ['GBU-16', 'GBU-32'], 'F-16': ['GBU-12', 'GBU-38'], 'F/A-18': ['GBU-12', 'GBU-38'], 'F-15E': ['GBU-12', 'GBU-38'], 'Rafale': ['GBU-12', 'AASM'],
   'AMX': ['GBU-12', 'Mk-82'], 'A-10': ['GBU-12', 'GBU-38', 'AGM-65 Maverick', '30 mm gun'], 'AV-8B Harrier': ['GBU-12', 'GBU-38'], 'M-346': ['GBU-12', 'Mk-82'],
   'AH-129 Mangusta': ['Spike ER', '70 mm rockets', '20 mm gun'], 'AH-64 Apache': ['AGM-114 Hellfire', '70 mm rockets', '30 mm gun'],
 };
@@ -1480,8 +1480,8 @@ function casNine(J, T, t) {
 function casGamePlan(J, T) {
   const f = S.t.flights.find(x => x.id === T.flight) || {};
   const fmtWord = { DD: 'DECIMAL DEGREES', DMM: 'DEGREES DECIMAL MINUTES', DMS: 'DEGREES MINUTES SECONDS', MGRS: '8-DIGIT GRID' }[casCfg().fmt];
-  return [`TYPE ${T.control}`, { BOC: 'BOMB ON COORDINATE', BOT: 'BOMB ON TARGET', SHOF: 'SHOW OF FORCE' }[T.method] + (T.method === 'SHOF' ? '' : `, ONE ${T.wpn}`),
-    ...(T.method === 'SHOF' ? [] : [`${T.fuze} FUZING`]), ...(T.seq ? [`${T.seq}${T.seq === 'SHOOTER-SHOOTER' ? ', ' + T.spacing + ' SECONDS' : ''}`] : []),
+  return [`TYPE ${T.control}`, { BOC: 'BOMB ON COORDINATE', BOT: 'BOMB ON TARGET', SHOF: 'SHOW OF FORCE' }[T.method] + (T.method === 'SHOF' ? '' : /gun/i.test(T.wpn) ? `, GUNS (${T.wpn})` : `, ONE ${T.wpn}`),
+    ...(T.method === 'SHOF' || /gun|rocket/i.test(T.wpn) ? [] : [`${T.fuze} FUZING`]), ...(T.seq ? [`${T.seq}${T.seq === 'SHOOTER-SHOOTER' ? ', ' + T.spacing + ' SECONDS' : ''}`] : []),
     ...(T.method === 'BOC' ? [`${fmtWord} TO FOLLOW`] : []), ...(T.control === 3 ? ['CLEARED TO ENGAGE WITHIN THE RESTRICTIONS'] : [])].join(', ');
 }
 function casCheckIn(J, T) {
