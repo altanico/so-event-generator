@@ -20,6 +20,11 @@
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
 - RAMROD abort codes instead of "abort in the clear".
 
+## Confirmed by the staff (2026-11-19)
+- CSAR A / CSAR B frequencies come from the database (not invented); LZ elevation read in the sim.
+- AMC = event GCI/AWACS; OSC = first RESCORT, otherwise the downed pilot's wingman.
+- 9-line MEDEVAC: line 8 always "A – military"; line 9 = terrain description (as in the manual example).
+
 ## Assumptions to verify
 - CAS: magnetic variation fixed per event (default 3.5° E); target elevation left to the JTAC (no terrain model).
 - Sectorfile format (SCT sections VOR/NDB/FIXES/VFR, coordinates `N043.20.10.000`) – tested only on a synthetic file.
