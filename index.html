@@ -172,6 +172,7 @@ details summary{cursor:pointer;margin:6px 0}
     <button data-tab="cas" id="tabcas" hidden>CAS / JTAC</button>
     <button data-tab="pr" id="tabpr" hidden>CSAR / MEDEVAC</button>
     <button data-tab="sar" id="tabsar" hidden>SAR civile</button>
+    <button data-tab="aib" id="tabaib" hidden>AIB</button>
     <button data-tab="roster">2 · Partecipanti</button>
     <button data-tab="tailor">3 · Adattamento</button>
     <button data-tab="export">4 · Export</button>
@@ -1017,7 +1018,7 @@ function REL() { // what is pertinent to this event
   return {
     threats: combat, factions: combat, bull: combat || ids.includes('ID'),
     aar: t ? (has('AAR') || has('RECEIVER')) : want('AAR'), aew: t ? has('AEW') : want('AEW'),
-    cas: casWanted() && !!S.cas, pr: prWanted() && !!S.pr, sar: sarWanted() && !!S.sar, routes: t ? routesOf(t).length > 0 : (ids.includes('NAVI') || ids.includes('NAVL')), points: ids.includes('NAVI') || ids.includes('NAVL'),
+    cas: casWanted() && !!S.cas, pr: prWanted() && !!S.pr, sar: sarWanted() && !!S.sar, aib: aibWanted() && !!S.aib, routes: t ? routesOf(t).length > 0 : (ids.includes('NAVI') || ids.includes('NAVL')), points: ids.includes('NAVI') || ids.includes('NAVL'),
   };
 }
 const MPSEC = [ // fixed template structure; each item can be switched off (empty section -> NIL)
@@ -1028,7 +1029,7 @@ const MPSEC = [ // fixed template structure; each item can be switched off (empt
     ['map', 'Mappa', () => true], ['acm', 'Misure di controllo dello spazio aereo', () => true], ['routes', 'Rotte di navigazione', () => REL().routes], ['threats', 'Aree di minaccia', () => REL().threats]]],
   ['Timeline', [['tl', 'Timeline', () => true]]],
   ['Roles', [['flights', 'Flight e task', () => true], ['airframes', 'Ruoli e velivoli ammessi', () => true], ['c2', 'Postazioni ATC / C2', () => true]]],
-  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Serial', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['sar', 'SAR civile – procedura, nominativi e piano di volo', () => REL().sar], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
+  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Serial', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['sar', 'SAR civile – procedura, nominativi e piano di volo', () => REL().sar], ['aib', 'AIB – incendi, DOS, fonti idriche e procedura', () => REL().aib], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
   ['Resources', [['resources', 'Risorse e link', () => true]]],
   ['Contact', [['contact', 'Contatti', () => true]]],
 ];
@@ -1118,6 +1119,7 @@ function generateGeneric() {
   if (casWanted()) genCAS(); else S.cas = null;
   if (prWanted()) genPR(); else S.pr = null;
   if (sarWanted()) genSAR(); else S.sar = null;
+  if (aibWanted()) genAIB(); else S.aib = null;
   save(); renderAll(true); toast('Scenario generico creato');
 }
 
@@ -1761,7 +1763,7 @@ const sarCfg = () => { S.sarCfg = Object.assign({ n: 2, units: 2, env: 'AUTO', f
 const sarWanted = () => evIds().includes('SAR');
 const sarLoc = p => casLoc(p, sarCfg().fmt);
 const landRings = () => { try { return LAND; } catch (e) { return null; } };
-const onLand = p => { const L0 = landRings(); return !!(L0 && L0.some(r => pip(p, r))); };
+const onLand = p => { const L0 = landRings(); return !!(L0 && L0.some(r => pip(p, r.pts || r))); };
 const lxy = (c, x, y) => dest(dest(c, 90, x), 0, y); // local km east / north
 const sarFlight = id => (S.t && id && S.t.flights.find(f => f.id === id)) || null;
 const sarLetter = i => NATO[i % 26];
@@ -1876,6 +1878,177 @@ function renderSAR() {
     ${prPre('Chiamata di soccorso', T.distress)}${prPre('Search action plan', T.plan)}${prPre('Solo staff – soluzione', T.truth)}</div>`; }).join('')}`;
 }
 
+// ===================== AIB (aerial firefighting) scenario generator – IVAO "Guida alle operazioni BAT-AIB" v2.0 =====================
+// All generated text in English. Terms: COAU air support request, DOS (fire suppression operations director), TBT (ground-air-ground radio),
+// mission types suppression / containment / mop-up / reconnaissance-surveillance / armed reconnaissance, fire status, STS/FFR + OPAREA/.
+const AIB_REQ = { SUPPRESSION: 'Suppression', CONTAINMENT: 'Containment', MOPUP: 'Mop-up' };
+const AIB_MIS = { SUPPRESSION: 'Suppression', CONTAINMENT: 'Containment', MOPUP: 'Mop-up', RECCE: 'Reconnaissance / surveillance', ARMED: 'Armed reconnaissance' };
+const AIB_STATUS = { ACTIVE: 'In progress (active fire)', CONTROL: 'Under control', MOPUP: 'Mop-up in progress', OUT: 'Extinguished' };
+const AIB_VEG = ['Scrub and Mediterranean maquis', 'Pine forest', 'Oak and broadleaf woodland', 'Grass and stubble', 'Chestnut woodland', 'Olive groves and farmland'];
+const AIB_TERRAIN = { FLAT: 'Flat', HILLY: 'Hilly', MOUNTAIN: 'Mountainous', RUGGED: 'Rugged / inaccessible' };
+// scooping lakes (approximate centre; check the scooping run in the sim)
+const AIB_LAKES = [['Lake Garda', 45.60, 10.63], ['Lake Maggiore', 45.93, 8.62], ['Lake Como', 45.99, 9.26], ['Lake Iseo', 45.72, 10.07], ['Lake Trasimeno', 43.14, 12.10], ['Lake Bolsena', 42.59, 11.93],
+  ['Lake Bracciano', 42.12, 12.23], ['Lake Vico', 42.32, 12.17], ['Lake Omodeo', 40.13, 8.93], ['Lake Varano', 41.88, 15.75], ['Lake Lesina', 41.88, 15.43], ['Lake Arvo', 39.24, 16.53], ['Lake Ampollino', 39.20, 16.62], ['Lake Monte Cotugno', 40.13, 16.25]];
+const aibCfg = () => { S.aibCfg = Object.assign({ n: 2, req: 'AUTO', fmt: 'DMS' }, S.aibCfg || {}); return S.aibCfg; };
+const aibWanted = () => evIds().includes('AIB');
+const aibLoc = p => casLoc(p, aibCfg().fmt);
+const aibFlight = id => (S.t && id && S.t.flights.find(f => f.id === id)) || null;
+const AIB_CIV = () => { const i = AC.findIndex(a => /^AW109/.test(a.type)); return new Set(AC.slice(i < 0 ? AC.length : i).map(a => a.type)); };
+const aibIsCL = f => /CL-415|Canadair/.test(f.type);
+const aibTraffic = f => (aibIsCL(f) || AIB_CIV().has(f.type)) ? 'BAT' : 'OAT';
+const pad3 = n => String(Math.round(n) % 360).padStart(3, '0');
+const hdg3 = n => String(Math.round(n) % 360 || 360).padStart(3, '0');
+function aibEll(c, dw, aKm, bKm, from = 0, to = 360, step = 15) { // ellipse around c, major axis along the downwind bearing dw
+  const out = [], r = Math.PI / 180;
+  for (let t = from; t <= to; t += step) { const x = aKm * Math.cos(t * r), y = bKm * Math.sin(t * r);
+    out.push(lxy(c, x * Math.sin(dw * r) + y * Math.sin((dw + 90) * r), x * Math.cos(dw * r) + y * Math.cos((dw + 90) * r))); }
+  return out;
+}
+function aibGeom(sc) {
+  const dw = (sc.windDir + 180) % 360, A = sc.burned / 100, a = Math.max(0.15, Math.sqrt(2 * A / Math.PI)), b = a / 2;
+  const R2 = sc.atRisk / 100, ar = Math.max(a * 1.2, Math.sqrt(2 * R2 / Math.PI)), rc = lxy(sc.pos, (a + ar * 0.8) * Math.sin(dw * Math.PI / 180), (a + ar * 0.8) * Math.cos(dw * Math.PI / 180));
+  const perim = aibEll(sc.pos, dw, a, b), head = aibEll(sc.pos, dw, a * 1.02, b * 1.02, -60, 60, 10);
+  const fronts = [head]; if (sc.frontN > 1) fronts.push(aibEll(sc.pos, dw, a * 1.02, b * 1.02, 70, 120, 10)); if (sc.frontN > 2) fronts.push(aibEll(sc.pos, dw, a * 1.02, b * 1.02, 240, 290, 10));
+  const opR = sc.opR * NMK, toW = sc.water ? bearing(sc.pos, sc.water.pos) : sc.windDir;
+  return { dw, a, perim, fronts, risk: aibEll(rc, dw, ar, ar / 2), opR, entry: dest(sc.pos, toW, opR), dos: dest(sc.pos, sc.windDir, a + 0.8), helo: dest(sc.pos, (toW + 40) % 360, opR * 0.6) };
+}
+function aibWater(pos, heli) {
+  const lakes = AIB_LAKES.map(([n, la, lo]) => ({ name: n, pos: [la, lo], kind: 'lake', d: dist(pos, [la, lo]) }));
+  let sea = null; if (landRings()) for (let km = 2; km <= 90 && !sea; km += 2) for (let b = 0; b < 360; b += 10) { const q = dest(pos, b, km); if (!onLand(q)) { sea = { name: 'Sea scooping area', pos: q, kind: 'sea', d: km }; break; } }
+  const best = [...lakes, ...(sea ? [sea] : [])].sort((x, y) => x.d - y.d)[0];
+  if (heli && (!best || best.d > 12)) { const q = dest(pos, Math.random() * 360, 1.5 + Math.random() * 1.5); return { name: 'Portable tank (basin) set up by the ground teams', pos: q, kind: 'tank', d: dist(pos, q) }; }
+  return best || { name: 'Water source TBC', pos: dest(pos, 0, 10), kind: 'tbc', d: 10 };
+}
+function genAIB() {
+  const cfg = aibCfg(), out = [], z = zoneOf('AIB'), g = geom(), yy = String(new Date().getFullYear()).slice(2);
+  const nearAp = p => Object.entries(AIRPORTS).map(([k, v]) => [k, v[0], [v[1], v[2]]]).sort((a, b) => dist(a[2], p) - dist(b[2], p))[0];
+  const usedDos = new Set();
+  for (let i = 0; i < cfg.n; i++) {
+    let pos = null; for (let k = 0; k < 60 && !pos; k++) { const p = z ? sampleRes(z.center, z.r * 0.8) : sampleRes(g.front, 30); if (!landRings() || onLand(p)) pos = p; }
+    if (!pos) pos = z ? z.center : g.front; pos = [+pos[0].toFixed(5), +pos[1].toFixed(5)];
+    const req = cfg.req === 'AUTO' ? pick(['SUPPRESSION', 'SUPPRESSION', 'CONTAINMENT', 'CONTAINMENT', 'MOPUP']) : cfg.req;
+    const ap = nearAp(pos), brg = bearing(ap[2], pos), dn = dist(ap[2], pos) / NMK;
+    const windDir = Math.floor(Math.random() * 36) * 10 || 360, windKt = pick([4, 7, 10, 13, 16, 20, 24]);
+    const burned = req === 'MOPUP' ? pick([40, 80, 120, 200]) : pick([2, 3, 5, 8, 12, 20, 35]), atRisk = req === 'MOPUP' ? Math.max(10, Math.round(burned * 0.3 / 10) * 10) : Math.round(burned * (15 + Math.random() * 60) / 50) * 50 || 50;
+    const frontN = req === 'MOPUP' ? 1 : pick([1, 1, 2, 3]);
+    let dos; do { dos = `DOS ${String(1 + Math.floor(Math.random() * 30)).padStart(2, '0')}`; } while (usedDos.has(dos)); usedDos.add(dos);
+    const sc = { id: 'F' + (i + 1), reqNo: `${String(i + 11).padStart(2, '0')}/${yy}`, req, pos, ap: ap[0], apName: ap[1], ref: `${Math.round(dn)} NM ${card8(brg)} of ${ap[1]} (${ap[0]})`,
+      oparea: `${ap[0]}${pad3(brg)}${String(Math.round(dn)).padStart(3, '0')}`, locality: '', municipality: '', province: '',
+      vegB: pick(AIB_VEG), burned, vegR: pick(AIB_VEG), atRisk, frontN, frontM: pick([300, 500, 800, 1000, 1500]),
+      windDir, windKt, terrain: pick(Object.keys(AIB_TERRAIN)), elev: '',
+      infra: pick(['No', 'Yes – road along one flank of the fire', 'Yes – railway line near the tail of the fire']),
+      settle: pick(['No', 'Yes – scattered houses downwind (identify them in the sim)', 'Yes – built-up area about 2 km downwind (identify it in the sim)']),
+      power: pick(['To be determined', 'To be determined', 'Yes – reported by the DOS', 'No']), cable: pick(['To be determined', 'No']),
+      dos, retardant: req !== 'MOPUP', opR: 3, time: 10 + i * 25, status: 'ACTIVE', flights: [], cs: {}, mis: {} };
+    sc.waterH = aibWater(pos, true); sc.water = aibWater(pos, false);
+    const t = sc.time, side = pick(['right', 'left']);
+    sc.injects = [
+      [t, `Fire reported by the regional operations room; the COAU issues air support request ${sc.reqNo} (${AIB_REQ[req].toLowerCase()}).`, 'ACTIVE'],
+      [t + 15, 'First aircraft on scene: reconnaissance pass, check-in with the DOS on TBT, first drops assigned (retardant if loaded).', 'ACTIVE'],
+      [t + 35, pick([`Wind shift: the wind backs 40° and strengthens to ${windKt + 8} kt; the head of the fire turns towards the settlements.`, `Spot fire across the road on the ${side} flank, about 300 m ahead of the front.`, 'Flare-up on the ridge: the fire runs uphill and a second front opens.', `The ${side} flank breaks through the containment line made with retardant.`]), 'ACTIVE'],
+      [t + 50, pick(['One aircraft loses TBT contact with the DOS: it must leave the operations area, hold outside, ask the ATS unit about other AIB traffic and try a radio relay through another firefighting aircraft.', 'Non-AIB traffic (a light helicopter / a drone) reported near the operations area: the DOS stops the drops until it is clear.', 'Boats in the scooping area: it is unusable for 15 minutes; the DOS sends the aircraft to the alternative water source.', 'Smoke reduces visibility on the drop run: the DOS changes the run direction.']), 'ACTIVE'],
+      [t + 75, 'Status UNDER CONTROL: the DOS releases the heavy aircraft one by one; regional resources stay on scene.', 'CONTROL'],
+      [t + 95, 'Status MOP-UP: ground teams with regional helicopters on the last hot spots along the inner perimeter; state aircraft return to base.', 'MOPUP']];
+    out.push(sc);
+  }
+  S.aib = { list: out, made: Date.now() };
+  return S.aib;
+}
+function aibCsFor(sc, f, n) { // callsigns per the manual: CL-415 "CAN" + aircraft number; civil operators registration + "BAT"; military aircraft keep their OAT callsign
+  if (aibIsCL(f)) { const a = []; for (let k = 0; k < (f.size || 1); k++) a.push(`CAN ${n.can++}`); return a.join(' / '); }
+  if (AIB_CIV().has(f.type)) { const a = []; for (let k = 0; k < (f.size || 1); k++) { let r; do { r = 'I-' + Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join(''); } while (n.reg.has(r)); n.reg.add(r); a.push(`${r} BAT`); } return a.join(' / '); }
+  return f.cs;
+}
+function assignAIB(t) {
+  if (!S.aib) genAIB();
+  const ids = new Set(t.flights.map(f => f.id)); S.aib.list.forEach(sc => sc.flights = sc.flights.filter(id => ids.has(id)));
+  const taken = new Set(S.aib.list.flatMap(sc => sc.flights));
+  t.flights.filter(f => f.task === 'AIB' && !taken.has(f.id)).forEach(f => { const sc = S.aib.list.slice().sort((a, b) => a.flights.length - b.flights.length)[0]; sc.flights.push(f.id); });
+  const n = { can: 15, reg: new Set(S.aib.list.flatMap(sc => Object.values(sc.cs || {}).join(' / ').split(' / ').filter(x => /^I-/.test(x)).map(x => x.split(' ')[0]))) };
+  S.aib.list.forEach(sc => { const cs = {}, mis = {};
+    sc.flights.forEach((id, k) => { const f = aibFlight(id); if (!f) return; const old = (sc.cs || {})[id];
+      cs[id] = old && !(aibIsCL(f)) ? old : aibCsFor(sc, f, n);
+      const light = /AS350|Bell 412/.test(f.type);
+      mis[id] = sc.req === 'MOPUP' ? 'MOPUP' : light && sc.flights.length > 1 && !Object.values(mis).includes('ARMED') ? 'ARMED' : sc.req; });
+    sc.cs = cs; sc.mis = mis; });
+}
+const aibCs = (sc, id) => (sc.cs || {})[id] || (aibFlight(id) || {}).cs || '[UNIT]';
+function aibSector(sc, id, k) { const m = sc.mis[id]; const dir = card8(aibGeom(sc).dw).toLowerCase();
+  if (m === 'ARMED') return 'Reconnaissance of the whole fire, then drops where the DOS asks';
+  if (m === 'MOPUP') return 'Hot spots along the inner perimeter';
+  if (m === 'CONTAINMENT') return k % 2 ? `Left flank – line towards the ${dir}` : `Right flank – line towards the ${dir}`;
+  return k === 0 ? `Head of the fire (${dir})` : ['Right flank', 'Left flank', 'Head of the fire'][k % 3]; }
+function applyAIB(t) {
+  if (!aibWanted() || !t.flights.some(f => f.task === 'AIB')) return;
+  assignAIB(t);
+  const af = new Set(t.flights.filter(f => f.task === 'AIB').map(f => f.id));
+  t.objectives = t.objectives.filter(o => !['FIRE', 'WATER'].includes(o.type));
+  let on = Math.max(0, ...t.objectives.map(o => +String(o.id).replace(/\D/g, '') || 0));
+  const serials = (t.serials || []).filter(r => r.kind !== 'AIB');
+  S.aib.list.filter(sc => sc.flights.length).forEach(sc => { const G = aibGeom(sc);
+    const fo = { id: 'O' + (++on), type: 'FIRE', name: `Fire ${sc.id}`, pos: sc.pos, r: Math.max(1, G.a), flight: null, note: `${sc.ref}. OPAREA/${sc.oparea}. DOS ${sc.dos.replace('DOS ', '')} on TBT.` };
+    const wo = { id: 'O' + (++on), type: 'WATER', name: `Water ${sc.id} – ${sc.water.name}`, pos: sc.water.pos, flight: null, note: sc.water.kind === 'sea' || sc.water.kind === 'lake' ? 'Scooping area' : '' };
+    t.objectives.push(fo, wo);
+    sc.flights.forEach((id, k) => { const f = aibFlight(id); if (f) { f.objective = fo.id; f.fire = fo.id; }
+      serials.push({ id: '', kind: 'AIB', title: `Fire ${sc.id} – ${aibCs(sc, id)}`, flights: [id],
+        text: `Fire ${sc.id} (${sc.ref}): fly as ${aibCs(sc, id)} (${f ? aibTraffic(f) : 'BAT'}, flight plan item 18 STS/FFR OPAREA/${sc.oparea}). Mission: ${AIB_MIS[sc.mis[id]].toLowerCase()}, ${aibSector(sc, id, k).toLowerCase()}. Report the start of operations to the ATS unit, check in with ${sc.dos} on TBT, drop only when the DOS clears you and refill at ${(f && f.cat === 'HELO' ? sc.waterH : sc.water).name}.`,
+        success: 'Check-in with the DOS; drops on the assigned sector; ATS reports (start, operations normal every 30 min, leaving the area); separation and sequence kept.' }); }); });
+  serials.forEach((r, i) => r.id = 'S' + (i + 1)); t.serials = serials;
+}
+// --- texts (English) ---
+function aibTbt() { let r = null; try { r = c2Sel().find(x => x.on && x.key === 'DOS'); } catch (e) { } return r && r.freq ? r.freq : 'TBD'; }
+function aibCard(sc) { const f = sc.flights.map(id => aibFlight(id)).filter(Boolean), st = f.filter(x => aibTraffic(x) === 'OAT' || aibIsCL(x)), rg = f.filter(x => !(aibTraffic(x) === 'OAT' || aibIsCL(x)));
+  return [['Date', S.meta.date || 'TBD'], ['Request no.', sc.reqNo], ['Request for', AIB_REQ[sc.req]], ['Geographic coordinates', casLoc(sc.pos, 'DMS')],
+    ['Location', `Locality: ${sc.locality || 'TBC'} · Municipality: ${sc.municipality || 'TBC'} · Province: ${sc.province || 'TBC'} (${sc.ref})`],
+    ['Burned vegetation', `${sc.burned} ha – ${sc.vegB}`], ['Vegetation at risk', `${sc.atRisk} ha – ${sc.vegR}`],
+    ['Fire front', sc.frontN > 1 ? `Multiple: ${sc.frontN}` : `Single: ${sc.frontM} m`], ['Wind', `${sc.windKt < 10 ? 'Light' : sc.windKt < 20 ? 'Moderate' : 'Strong'} – ${hdg3(sc.windDir)}°/${sc.windKt} kt`],
+    ['Terrain', `Elevation ${sc.elev ? sc.elev + ' m' : 'TBC (read in the sim)'} – ${AIB_TERRAIN[sc.terrain]}`], ['Infrastructure', sc.infra], ['Settlements', sc.settle],
+    ['Other obstacles', `Overhead power lines: ${sc.power} · Cableways / telephone lines: ${sc.cable}`],
+    ['Water source', `Helicopters: ${sc.waterH.name} ${aibLoc(sc.waterH.pos)} · Fixed wing: ${sc.water.name} ${aibLoc(sc.water.pos)} (${(sc.water.d / NMK).toFixed(0)} NM)`],
+    ['Personnel and assets on the fire', `DOS: yes, callsign ${sc.dos}, radio TBT ${aibTbt()} · Regional aircraft: ${rg.length ? rg.map(x => aibCs(sc, x.id)).join('; ') : 'no'} · State aircraft: ${st.length ? `${st.reduce((a, x) => a + (x.size || 1), 0)} – ${st.map(x => aibCs(sc, x.id)).join('; ')}` : 'no'}`],
+    ['Retardant', sc.retardant ? 'Yes – first drop with the retardant loaded at departure, then foam / retardant as available' : 'No']]; }
+function aibAircraft(sc) { return sc.flights.map((id, k) => { const f = aibFlight(id); return f ? [aibCs(sc, id), `${f.type}${f.size > 1 ? ' x' + f.size : ''}`, aibTraffic(f), AIB_MIS[sc.mis[id]], aibSector(sc, id, k), (f.cat === 'HELO' ? sc.waterH : sc.water).name] : null; }).filter(Boolean); }
+function aibDosBrief(sc) { const G = aibGeom(sc);
+  return [`Initial status: ${AIB_STATUS.ACTIVE.toLowerCase()}; ${sc.burned} ha burned (${sc.vegB.toLowerCase()}), ${sc.atRisk} ha at risk downwind (${card8(G.dw).toLowerCase()}).`,
+    `Priorities: ${sc.req === 'CONTAINMENT' ? 'build containment lines on the flanks to steer the fire away from the settlements' : sc.req === 'MOPUP' ? 'last hot spots along the inner perimeter with the ground teams' : 'stop the head of the fire, then the flanks'}.`,
+    `Operations area: ${sc.opR} NM around ${aibLoc(sc.pos)}; entry point ${aibLoc(G.entry)} on the side of the water source. Aircraft without TBT contact stay outside.`,
+    'Sequence: one aircraft (or one pair of CL-415) on the drop run at a time; helicopters and fixed wing never in the same sector at the same time.',
+    `Default separation (the DOS may change it): fixed wing hold at the entry point 1500-2000 ft AGL, helicopters hold at ${aibLoc(G.helo)} below 1000 ft AGL.`,
+    `Drop runs along the front, into wind where terrain allows (about ${hdg3(sc.windDir)}°), escape away from the head of the fire; ground teams clear of the drop line before each drop.`,
+    sc.retardant ? 'Retardant: first CL-415 drop with the retardant loaded at departure, then foam / retardant as available.' : 'No retardant: water drops only.',
+    `TBT: ${aibTbt()}. Phraseology examples: "${sc.dos}, CAN 15, two CL-415 at the entry point, ready for instructions" – "CAN 15, ${sc.dos}, drop on the head of the fire, run ${hdg3(sc.windDir)}, ground teams clear, report on the run" – "CAN 15 on the run" – "CAN 15, drop complete, leaving the area for scooping".`]; }
+function aibCrewBrief(sc) {
+  return ['Flight plan: VFR, item 18 STS/FFR OPAREA/' + sc.oparea + ' (exempt from flow measures). Civil-registered aircraft fly as BAT, military aircraft as OAT.',
+    'Callsigns: CL-415 "CAN" + aircraft number; civil operators the registration + "BAT"; military aircraft their own callsign.',
+    'Missions over the fire only in VMC and in daylight; transit, take-off and landing may be at night.',
+    'On target: report the start of operations to the ATS unit; it gives the end time and asks for "operations normal" reports every 30 minutes, or when leaving the area. Re-contact the ATS unit every time you leave the area (e.g. to scoop).',
+    `Check in with ${sc.dos} on TBT before entering the operations area; drop only when cleared by the DOS.`,
+    'No TBT contact: stay outside the operations area, ask the ATS unit about other AIB aircraft in the area and try a radio relay through them. With no other traffic you may enter and fly a reconnaissance; without clearance to operate, or if unsafe, leave and return to base or wait for a new fire.',
+    `Water: helicopters – ${sc.waterH.name} ${aibLoc(sc.waterH.pos)}; fixed wing – ${sc.water.name} ${aibLoc(sc.water.pos)}.`]; }
+function aibTexts(sc) { return { card: aibCard(sc).map(([a, b]) => `${a.toUpperCase()}: ${b}`), dos: aibDosBrief(sc), crew: aibCrewBrief(sc), script: sc.injects.map(([t, e, s]) => `${totClock(t)} [${AIB_STATUS[s]}] ${e}`) }; }
+function aibPublic(aib) { return aib ? { list: aib.list.filter(sc => sc.flights.length).map(sc => ({ id: sc.id, pos: sc.pos, ref: sc.ref, oparea: sc.oparea, dos: sc.dos, flights: sc.flights, cs: sc.cs, water: { name: sc.water.name, pos: sc.water.pos }, waterH: { name: sc.waterH.name, pos: sc.waterH.pos } })) } : null; }
+function renderAIB() {
+  if (!GEN()) return `<h2>AIB – antincendio</h2><div class="warn">Prima genera lo scenario.</div>`;
+  if (!S.aib) return `<h2>AIB – antincendio</h2><p class="muted">Prepara gli incendi prima degli iscritti.</p><button class="b primary" id="aibregen">Genera scenari AIB</button>`;
+  const cfg = aibCfg(), o = (v, list) => list.map(([k, l]) => `<option value="${k}" ${String(v) === String(k) ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  const inp = (sc, f, lbl, w, type = 'text', extra = '') => `<div style="max-width:${w}px"><label>${lbl}</label><input data-aib="${sc.id}" data-cf="${f}" type="${type}" ${extra} value="${esc(String(sc[f] ?? ''))}"></div>`;
+  return `<h2>AIB – antincendio</h2>
+  <div class="intro">Scenari di incendio boschivo secondo la guida IVAO BAT-AIB: richiesta di concorso aereo del COAU (scheda missione), tipo di intervento (soppressione, contenimento, bonifica, ricognizione armata), DOS e TBT, fonte idrica per elicotteri e velivoli, nominativi CAN / marche + BAT / OAT, piano di volo STS/FFR e OPAREA. L'<b>evoluzione dell'incendio (inject)</b> è solo per lo staff (AIB pack). Puoi trascinare l'incendio e la fonte idrica sulla mappa. Località, comune, provincia e quota li completi tu leggendo il simulatore.</div>
+  <div class="row"><div><label>Incendi</label><input data-aibg="n" type="number" min="1" max="6" value="${cfg.n}"></div>
+  <div><label>Richiesta</label><select data-aibg="req">${o(cfg.req, [['AUTO', 'misto'], ['SUPPRESSION', 'soppressione'], ['CONTAINMENT', 'contenimento'], ['MOPUP', 'bonifica']])}</select></div><div><label>Coordinate</label><select data-aibg="fmt">${o(cfg.fmt, Object.entries(CAS_FMT_LBL))}</select></div></div>
+  <div class="row" style="margin:6px 0 10px;flex-wrap:wrap"><button class="b sm shrink" id="aibregen">↻ Rigenera scenari AIB</button><button class="b sm shrink primary" data-aibpack="ALL">Scarica AIB pack (tutti)</button></div>
+  ${S.aib.list.map(sc => { const T = aibTexts(sc); return `<div class="card" style="margin-bottom:10px"><b>Incendio ${sc.id}</b> <span class="muted">– ${esc(sc.ref)} · richiesta ${esc(sc.reqNo)}</span>
+    <div class="row" style="align-items:flex-end;flex-wrap:wrap">
+    <div style="max-width:150px"><label>Richiesta</label><select data-aib="${sc.id}" data-cf="req">${o(sc.req, [['SUPPRESSION', 'soppressione'], ['CONTAINMENT', 'contenimento'], ['MOPUP', 'bonifica']])}</select></div>
+    ${inp(sc, 'locality', 'Località', 150)}${inp(sc, 'municipality', 'Comune', 150)}${inp(sc, 'province', 'Prov.', 70)}${inp(sc, 'elev', 'Quota (m)', 90, 'number')}
+    <div style="max-width:150px"><label>Orografia</label><select data-aib="${sc.id}" data-cf="terrain">${o(sc.terrain, [['FLAT', 'pianura'], ['HILLY', 'collina'], ['MOUNTAIN', 'montagna'], ['RUGGED', 'impervio']])}</select></div></div>
+    <div class="row" style="align-items:flex-end;flex-wrap:wrap">${inp(sc, 'burned', 'Bruciati (ha)', 100, 'number', 'min="1"')}${inp(sc, 'atRisk', 'A rischio (ha)', 100, 'number', 'min="1"')}${inp(sc, 'windDir', 'Vento da (°)', 90, 'number', 'min="10" max="360" step="10"')}${inp(sc, 'windKt', 'Vento (kt)', 80, 'number', 'min="0"')}${inp(sc, 'frontN', 'Fronti', 70, 'number', 'min="1" max="3"')}${inp(sc, 'dos', 'Nominativo DOS', 110)}
+    <div style="max-width:110px"><label>Ritardante</label><select data-aib="${sc.id}" data-cf="retardant">${o(sc.retardant ? '1' : '', [['1', 'sì'], ['', 'no']])}</select></div>
+    <button class="b sm shrink" data-aibpack="${sc.id}">AIB pack</button></div>
+    <div class="muted" style="font-size:12px;margin:4px 0">Aeromobili: ${aibAircraft(sc).map(r => esc(`${r[0]} (${r[1]}, ${r[2]}, ${r[3].toLowerCase()})`)).join('; ') || 'nessun flight (arrivano con gli iscritti)'} · OPAREA/${esc(sc.oparea)}</div>
+    ${prPre('Richiesta di concorso aereo (COAU) – in inglese', T.card)}${prPre('Briefing DOS', T.dos)}${prPre('Solo staff – evoluzione e inject', T.script)}</div>`; }).join('')}`;
+}
+
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
@@ -1888,7 +2061,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t);
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -1897,7 +2070,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t);
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -2014,6 +2187,16 @@ function drawMap(fit) {
   const add = l => l.addTo(LAYERS);
   const drag = (m, setter) => { m.on('dragend', e => { const ll = e.target.getLatLng(); setter([+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); save(); renderPanel(); drawMap(); }); return m; };
   const showZones = TAB === 'scenario' || !S.t;
+  if (S.aib && REL().aib && TAB === 'aib') for (const sc of S.aib.list) { const G = aibGeom(sc);
+    add(L.circle(sc.pos, { radius: G.opR * 1000, color: '#b45309', weight: 1, dashArray: '4 6', fill: false })).bindTooltip(`Fire ${sc.id} – operations area ${sc.opR} NM`);
+    add(L.polygon(G.risk, { color: '#f59e0b', weight: 1, dashArray: '3 5', fillColor: '#fbbf24', fillOpacity: .12 })).bindTooltip(`Vegetation at risk ${sc.atRisk} ha`);
+    add(L.polygon(G.perim, { color: '#7f1d1d', weight: 1, fillColor: '#111827', fillOpacity: .35 })).bindTooltip(`Burned ${sc.burned} ha`);
+    G.fronts.forEach(l => add(L.polyline(l, { color: '#dc2626', weight: 4 })));
+    drag(add(L.marker(sc.pos, { draggable: true, icon: icon('#dc2626', '🔥', `Fire ${sc.id}`, 'circle', 16) })), p => { sc.pos = p; }).bindTooltip(`Incendio ${sc.id} – trascina per spostarlo`);
+    drag(add(L.marker(sc.water.pos, { draggable: true, icon: icon('#0284c7', 'W', sc.water.name, 'circle', 14) })), p => { sc.water.pos = p; sc.water.d = dist(sc.pos, p); }).bindTooltip('Fonte idrica velivoli – trascinabile');
+    if (sc.waterH.kind === 'tank') drag(add(L.marker(sc.waterH.pos, { draggable: true, icon: icon('#0ea5e9', 'V', 'Tank', 'circle', 12) })), p => { sc.waterH.pos = p; }).bindTooltip('Vasca elicotteri – trascinabile');
+    add(L.marker(G.entry, { icon: icon('#b45309', 'E', `Entry ${sc.id}`, 'circle', 12) })); add(L.marker(G.dos, { icon: icon('#166534', 'D', sc.dos, 'circle', 12) }));
+  }
   if (S.sar && REL().sar && TAB === 'sar') for (const sc of S.sar.list) {
     add(L.circle(sc.datum, { radius: sc.R * NMK * 1000, color: '#0369a1', weight: 1, dashArray: '4 6', fill: false }));
     sarAreas(sc).forEach((a, k) => { add(L.polygon(a.poly, { color: '#0369a1', weight: 1.5, fillColor: '#38bdf8', fillOpacity: .06 })).bindTooltip(`Sub-area ${a.id} – ${sarCs(sc, k).split(' (')[0]}`);
@@ -2379,6 +2562,8 @@ function renderExport() {
   <div class="row" style="margin-top:8px"><button class="b" id="pubpreview">👁 Anteprima</button><button class="b primary" id="pubpublish">Pubblica sulla pagina pubblica</button></div>
   <div class="row" style="margin-top:6px"><button class="b" id="pubhtml">Scarica pagina pubblica (.html)</button></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>
+  ${REL().aib ? `<div class="card"><b>AIB pack (antincendio) – solo staff e DOS</b><p class="muted" style="margin:4px 0">Per ogni incendio: mappa, richiesta di concorso aereo COAU, aeromobili assegnati, briefing DOS ed equipaggi, evoluzione dell'incendio con gli inject (solo staff), registro dello stato; in fondo la scheda vuota stampabile.</p>
+    <div class="row" style="flex-wrap:wrap">${S.aib.list.map(sc => `<button class="b shrink" data-aibpack="${sc.id}">${sc.id}</button>`).join('')}<button class="b primary shrink" data-aibpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().sar ? `<div class="card"><b>SAR pack (SAR civile) – solo staff e RCC</b><p class="muted" style="margin:4px 0">Per ogni scenario: mappa delle aree e degli schemi, chiamata di soccorso, search action plan, briefing SAR, SITREP, debriefing, scheda per chi interpreta i dispersi e, in fondo, le soluzioni.</p>
     <div class="row" style="flex-wrap:wrap">${S.sar.list.map(sc => `<button class="b shrink" data-sarpack="${sc.id}">${sc.id}</button>`).join('')}<button class="b primary shrink" data-sarpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().pr ? `<div class="card"><b>PR pack (CSAR / MEDEVAC) – solo staff, AMC e OSC</b><p class="muted" style="margin:4px 0">Per ogni scenario: mappa, MAYDAY, PR 11-line, briefing CSARTF e OSC, SPINS, code words, scheda per il personale isolato e 9-line MEDEVAC.</p>
@@ -2389,13 +2574,13 @@ function renderExport() {
 }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop;
-  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
+  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
     `<datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist>`;
   p.scrollTop = top;
 }
 function renderAll(fit) {
   if (typeof renderEvBadge === 'function') renderEvBadge();
-  { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; const tp = document.getElementById('tabpr'); if (tp) tp.hidden = !(GEN() && prWanted()); if (TAB === 'pr' && !(GEN() && prWanted())) TAB = 'scenario'; const ts = document.getElementById('tabsar'); if (ts) ts.hidden = !(GEN() && sarWanted()); if (TAB === 'sar' && !(GEN() && sarWanted())) TAB = 'scenario'; }
+  { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; const tp = document.getElementById('tabpr'); if (tp) tp.hidden = !(GEN() && prWanted()); if (TAB === 'pr' && !(GEN() && prWanted())) TAB = 'scenario'; const ts = document.getElementById('tabsar'); if (ts) ts.hidden = !(GEN() && sarWanted()); if (TAB === 'sar' && !(GEN() && sarWanted())) TAB = 'scenario'; const ta = document.getElementById('tabaib'); if (ta) ta.hidden = !(GEN() && aibWanted()); if (TAB === 'aib' && !(GEN() && aibWanted())) TAB = 'scenario'; }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
   renderPanel(); renderMapTools(); drawMap(fit);
 }
@@ -2446,6 +2631,10 @@ document.addEventListener('change', e => {
   if (t.id === 'aspfile' && t.files[0]) { t.files[0].text().then(txt => { try { const d = parseAirspace(JSON.parse(txt)); if (!d.zones.length && !d.freqs.length) throw 0; setAirspace(d, 'file', { file: t.files[0].name }); renderAll(); toast(`Importate ${d.zones.length} zone e ${d.freqs.length} frequenze`); } catch (err) { toast('File non riconosciuto (vedi formato in DB_INTERFACE.md)'); } }); return; }
   if (t.dataset.mp) { mpGet()[t.dataset.mp] = t.value; save(); return; }
   if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (t.dataset.aibg) { const c = aibCfg(); c[t.dataset.aibg] = ['req', 'fmt'].includes(t.dataset.aibg) ? t.value : Math.max(1, +t.value || 1); save(); renderPanel(); return; }
+  if (t.dataset.aib && S.aib) { const sc = S.aib.list.find(x => x.id === t.dataset.aib); if (!sc) return; const f = t.dataset.cf;
+    if (['burned', 'atRisk', 'windKt', 'frontN', 'windDir'].includes(f)) sc[f] = Math.max(f === 'windKt' ? 0 : 1, +t.value || 0); else if (f === 'elev') sc.elev = t.value === '' ? '' : Math.round(+t.value); else if (f === 'retardant') sc.retardant = !!t.value; else sc[f] = t.value;
+    if (f === 'frontN') sc.frontN = Math.min(3, sc.frontN); save(); if (!['locality', 'municipality', 'province', 'dos'].includes(f)) { renderPanel(); drawMap(); } return; }
   if (t.dataset.sarg) { const c = sarCfg(); c[t.dataset.sarg] = ['env', 'fmt'].includes(t.dataset.sarg) ? t.value : Math.max(1, +t.value || 1); save(); renderPanel(); return; }
   if (t.dataset.sar && S.sar) { const sc = S.sar.list.find(x => x.id === t.dataset.sar); if (!sc) return; const f = t.dataset.cf; sc[f] = ['R', 'S'].includes(f) ? Math.max(0.1, +t.value || 0.1) : t.value; save(); if (f !== 'desc') renderPanel(); drawMap(); return; }
   if (t.dataset.prg) { const c = prCfg(); c[t.dataset.prg] = t.dataset.prg === 'fmt' ? t.value : Math.max(0, +t.value || 0); save(); renderPanel(); return; }
@@ -2493,6 +2682,7 @@ document.addEventListener('click', e => {
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
   if (t.dataset.sarpack) { exportSarPack(t.dataset.sarpack, t); return; }
+  if (t.dataset.aibpack) { exportAibPack(t.dataset.aibpack, t); return; }
   if (t.dataset.c2del) { S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
   if (t.dataset.del) {
     const k = t.dataset.del, id = t.dataset.id;
@@ -2514,6 +2704,7 @@ document.addEventListener('click', e => {
     case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
+    case 'aibregen': genAIB(); if (S.t) { applyAIB(S.t); } save(); renderAll(true); toast('Scenari AIB generati'); return;
     case 'sarregen': genSAR(); if (S.t) applySAR(S.t); save(); renderAll(true); toast('Scenari SAR generati'); return;
     case 'prregen': genPR(); if (S.t) applyPR(S.t); save(); renderAll(); toast('Scenari CSAR / MEDEVAC generati'); return;
     case 'casregen': genCAS(); if (S.t) applyCAS(S.t); save(); renderAll(); toast('Scenari CAS generati'); return;
@@ -2582,7 +2773,7 @@ async function renderMap(mode, opt = {}) {
   minLa -= padLa; maxLa += padLa; minLo -= padLo; maxLo += padLo;
   // fractional zoom so the content fills the image; tiles of the integer zoom are scaled
   const [bx1, by1] = mercator(maxLa, minLo, 0), [bx2, by2] = mercator(minLa, maxLo, 0);
-  const z = Math.max(4, Math.min(11, Math.log2(W / (bx2 - bx1)), Math.log2(H / (by2 - by1))));
+  const z = Math.max(4, Math.min(opt.maxZ || 11, Math.log2(W / (bx2 - bx1)), Math.log2(H / (by2 - by1))));
   const zt = Math.floor(z), ts = 256 * 2 ** (z - zt);
   const [cx, cy] = mercator((minLa + maxLa) / 2, (minLo + maxLo) / 2, z); const ox = cx - W / 2, oy = cy - H / 2;
   const P = p => { const [x, y] = mercator(p[0], p[1], z); return [x - ox, y - oy]; };
@@ -2636,6 +2827,15 @@ async function renderMap(mode, opt = {}) {
     for (const o of S.t.objectives) { if (o.r) circle(o.pos, o.r, K2('#60a5fa'), 'rgba(59,130,246,.12)', [8, 6]); }
     for (const o of S.t.objectives) { dot(o.pos, '#2563eb', 8); const [x, y] = P(o.pos); label(`${o.id} ${o.name}`, x + 11, y + 4, K2('#bfdbfe'), 17); }
   }
+  if (opt.aib) { const sc = opt.aib, G = aibGeom(sc), poly = (pts2, stroke, fill, dash) => { c.beginPath(); pts2.forEach((p, k) => { const [x, y] = P(p); k ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.setLineDash(dash || []); c.fillStyle = fill; c.fill(); c.strokeStyle = stroke; c.lineWidth = 1.5; c.stroke(); c.setLineDash([]); };
+    circle(sc.pos, G.opR, '#b45309', null, [6, 6]); poly(G.risk, '#d97706', 'rgba(251,191,36,.18)', [5, 5]); poly(G.perim, '#7f1d1d', 'rgba(17,24,39,.45)'); G.fronts.forEach(l => line(l, '#dc2626', 5));
+    { const [x, y] = P(sc.pos); label(`FIRE ${sc.id}`, x + 10, y - 8, '#b91c1c', 15); }
+    { const u = dest(sc.pos, sc.windDir, G.opR * 0.9), v = dest(sc.pos, sc.windDir, G.opR * 0.55); line([u, v], '#334155', 2.5); const [x, y] = P(u); label(`WIND ${hdg3(sc.windDir)}/${sc.windKt}`, x + 6, y, '#334155', 13); }
+    dot(G.entry, '#b45309', 6); { const [x, y] = P(G.entry); label('ENTRY', x + 8, y + 4, '#b45309', 13); }
+    dot(G.dos, '#166534', 6); { const [x, y] = P(G.dos); label(sc.dos, x + 8, y + 4, '#166534', 13); }
+    dot(sc.water.pos, '#0284c7', 7); { const [x, y] = P(sc.water.pos); label(sc.water.name.toUpperCase(), x + 9, y + 4, '#0284c7', 13); } line([G.entry, sc.water.pos], '#0284c7', 1.5, [4, 6]);
+    { const [x, y] = P(dest(G.entry, bearing(G.entry, sc.water.pos), Math.min(G.opR * 0.4, dist(G.entry, sc.water.pos)))); label(`${sc.water.name} ${hdg3(bearing(G.entry, sc.water.pos))}° ${(sc.water.d / NMK).toFixed(0)} NM`, x + 6, y - 6, '#0284c7', 13); }
+    if (sc.waterH.kind === 'tank') { dot(sc.waterH.pos, '#0ea5e9', 5); const [x, y] = P(sc.waterH.pos); label('TANK', x + 7, y + 4, '#0284c7', 12); } }
   if (opt.sar) { const sc = opt.sar;
     circle(sc.datum, sc.R * NMK, '#0369a1', 'rgba(56,189,248,.04)', [6, 6]);
     sarAreas(sc).forEach((a, k) => { line(a.poly.concat([a.poly[0]]), '#0369a1', 2); const pt = sarPattern(sc, a, k); (pt.rings || [pt.pts]).forEach(l => line(l, '#0284c7', 1.8)); dot(pt.csp, '#facc15', 6); const [x, y] = P(a.poly[3]); label(a.id, x + 6, y + 16, '#0369a1', 15); });
@@ -2833,6 +3033,9 @@ async function deckBrief() {
       lines.push({ text: ' ', options: { fontSize: 6, breakLine: true } }); });
     s.addText(lines, { x: 0.5, y: 1.2, w: 4.9, h: 3.9, color: K.TEXT, fontFace: FONT, valign: 'top', margin: 0, isTextBox: true, fit: 'shrink' });
   }
+  // AIB (pilot side)
+  if (REL().aib && S.aib && mpOn('aib')) { s = slideT(p, 'Aerial firefighting', 'Every drop is cleared by the DOS on TBT');
+    bullets(s, ['Flight plan VFR, item 18 STS/FFR OPAREA/…; civil-registered aircraft BAT, military OAT', 'Callsigns: CL-415 "CAN" + number; civil operators registration + "BAT"', ...S.aib.list.filter(sc => sc.flights.length).map(sc => `Fire ${sc.id}: ${sc.ref}, OPAREA/${sc.oparea}, ${sc.dos} TBT ${aibTbt()}, water: ${sc.water.name}`), 'Report start of operations to ATS, "operations normal" every 30 min, re-contact ATS when leaving the area', 'No TBT contact: stay outside the area, ask ATS about other AIB traffic, try a relay'], { x: 0.6, y: 1.3, w: 8.8, h: 3.8 }); }
   // civil SAR (pilot side)
   if (REL().sar && S.sar && mpOn('sar')) { s = slideT(p, 'Search and rescue – procedure', 'The search action plan is passed by the RCC on frequency');
     bullets(s, ['Callsign RESCUE INDIA LIMA / MIKE + letter (e.g. RILA), flight plan item 18 STS/SAR', 'RCC passes datum, sub-area, pattern (SS, VS, TS, PS, OS), track spacing and CSP', 'First unit on scene acts as OSC; report to the OSC, SITREP on request', 'Search altitude 500-1000 ft over the sea, ~1000 ft AGL over land; common speed = slowest unit', 'Monitor 121.500; survivors to the designated hospital'], { x: 0.6, y: 1.3, w: 8.8, h: 3.8 }); }
@@ -2929,7 +3132,7 @@ const GLOSSARY = {
   AAR: 'Air-to-Air Refuelling', AEW: 'Airborne Early Warning', GCI: 'Ground-Controlled Interception', 'DZ / LZ': 'Drop zone / Landing zone',
   'LOW & SLOW': 'Interception of slow, low-flying targets such as helicopters', ASuW: 'Anti-Surface Warfare', MPA: 'Maritime Patrol Aircraft'
 };
-Object.assign(GLOSSARY, { DATUM: 'Reference point, line or area used to plan a search', CSP: 'Commence search point', SITREP: 'Situation report from the on-scene coordinator to the RCC', AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
+Object.assign(GLOSSARY, { COAU: 'Unified air operations centre – coordinates the state firefighting fleet and issues the air support requests', TBT: 'Ground-air-ground radio link between the DOS and the aircraft', BAT: 'Buster Air Traffic – state aircraft with civil registration on urgent public safety, customs or civil protection missions', OPAREA: 'Flight plan item 18 indicator giving the place of operations', DATUM: 'Reference point, line or area used to plan a search', CSP: 'Commence search point', SITREP: 'Situation report from the on-scene coordinator to the RCC', AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
 const ROLE_DESC = {
   SEAD: 'Locate and neutralise SAM sites and radars to open the corridor for the strike package.',
   STRIKE: 'Destroy the assigned high-value targets at the briefed TOT.',
@@ -2971,7 +3174,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const { PDFDocument, rgb, StandardFonts, PDFName, PDFString } = PDFLib;
   const mp = mpGet(), t = S.t, th = theatre(), g = geom();
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
+  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
   let F = {};
   if (assets.fonts && window.fontkit) { pdf.registerFontkit(window.fontkit); for (const k of Object.keys(assets.fonts)) F[k] = await pdf.embedFont(assets.fonts[k], { subset: false }); }
   else { F.reg = await pdf.embedFont(StandardFonts.Helvetica); F.bold = await pdf.embedFont(StandardFonts.HelveticaBold); F.ital = await pdf.embedFont(StandardFonts.HelveticaOblique); F.head = F.bold; F.xb = F.bold; }
@@ -3000,7 +3203,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   draw(cover, event, 76, 530, F.head, 15, WHITE);
   draw(cover, division, 76, 553, F.reg, 11, WHITE);
   draw(cover, date + (S.meta.hHour ? ` · H-hour ${S.meta.hHour}` : '') + ` · ${revLabel()}${curRev() ? ' (' + curRev().date + ')' : ''}`, 76, 572, F.reg, 9, WHITE);
-  draw(cover, jsel ? (jsel.kind === 'sar' ? 'SAR PACK – staff and RCC only, contains the solutions' : jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
+  draw(cover, jsel ? (jsel.kind === 'aib' ? 'AIB PACK – staff and DOS only, contains the fire evolution' : jsel.kind === 'sar' ? 'SAR PACK – staff and RCC only, contains the solutions' : jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
   const cx = (txt, f, s, y) => draw(cover, txt, (PW - W(txt, f, s)) / 2, y, f, s, WHITE);
   cx('Special Operations Department', F.ital, 12, 765); cx('International Virtual Aviation Organisation', F.reg, 12, 783);
   // ---------- inner page machinery ----------
@@ -3069,6 +3272,25 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     }
     y += o.after ?? 10;
   };
+  if (jsel && jsel.kind === 'aib') { // ---------- AIB pack ----------
+    const kv = rows => table([{ h: 'Item', w: .3 }, { h: 'Content', w: .7 }], rows.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+    for (const sc of jsel.list) { const T = aibTexts(sc), ac = aibAircraft(sc);
+      newPage(); h1(`Fire ${sc.id} – ${AIB_REQ[sc.req]}`);
+      para(`${sc.ref}. Operations area ${sc.opR} NM, OPAREA/${sc.oparea}. ${sc.dos} on TBT ${aibTbt()}. First report at ${totClock(sc.time)}.`);
+      const png = jsel.maps[sc.id]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4;
+        para('Dark: burned area; red: fire front(s); orange: vegetation at risk; dashed circle: operations area; E: entry point; DOS position; blue: water sources.', { size: 7.5 }); } catch (e) { } }
+      h1(`Air support request (COAU) – no. ${sc.reqNo}`); kv(aibCard(sc));
+      h6('Assigned aircraft'); if (ac.length) table([{ h: 'Callsign', w: .2 }, { h: 'Type', w: .16 }, { h: 'Traffic', w: .08 }, { h: 'Mission', w: .16 }, { h: 'Sector', w: .2 }, { h: 'Water', w: .2 }], ac, { size: 7.5 }); else para('NIL – aircraft are assigned when the participants are known.');
+      h1(`DOS brief – fire ${sc.id}`); bullets(T.dos);
+      h1(`Aircrew brief – fire ${sc.id}`); bullets(T.crew);
+      newPage(); h1(`Staff only – fire evolution and injects – fire ${sc.id}`); para('Play these events on TBT / ATS frequency at the times shown. The fire status is reported by the DOS.', { font: F.ital });
+      table([{ h: 'Time', w: .14 }, { h: 'Event', w: .66 }, { h: 'Fire status', w: .2 }], sc.injects.map(([t, e, st]) => [{ t: totClock(t), bold: true }, e, AIB_STATUS[st]]), { size: 8 });
+      h6('Fire status log (DOS)'); table([{ h: 'Time UTC', w: .16 }, { h: 'Status', w: .24 }, { h: 'Aircraft on scene', w: .3 }, { h: 'Notes', w: .3 }], Array.from({ length: 6 }, () => ['', '', '', '']), { size: 8 });
+    }
+    newPage(); h1('Air support request (COAU) – blank form');
+    kv(['Date', 'Request no.', 'Request for (suppression / containment / mop-up)', 'Geographic coordinates', 'Location (locality / municipality / province)', 'Burned vegetation (ha / type)', 'Vegetation at risk (ha / type)', 'Fire front (single, m / multiple, no.)', 'Wind (no / light / moderate / strong)', 'Terrain (elevation m / flat / hilly / mountainous / rugged)', 'Infrastructure', 'Settlements', 'Overhead power lines / cableways', 'Water source (helicopters / fixed wing)', 'DOS (callsign, TBT channel)', 'Regional aircraft (no., registrations)', 'State aircraft (no., registrations)', 'Retardant (yes / no)'].map(x => [x, '']));
+    return { pdf, tocMap: {}, custom: !!assets.fonts };
+  }
   if (jsel && jsel.kind === 'sar') { // ---------- SAR pack ----------
     for (const sc of jsel.list) { const P = sarPlan(sc), T = sarTexts(sc);
       newPage(); h1(`SAR ${sc.id} – ${sc.desc}`);
@@ -3172,7 +3394,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const used = new Set(['GAT', 'OAT', 'AO', 'H-hour', ...(PROF().sober ? [] : ['ROE']), 'SPINS']);
   const txtAll = JSON.stringify([S.cats, t && t.flights.map(f => f.task), t && t.threats.map(x => x.type), t && t.airspace.map(a => a.type)]);
   const has = re => re.test(txtAll);
-  if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k)); if (REL().pr) ['AMC', 'OSC', 'SARDOT', 'CSARTF', 'LZ'].forEach(k => used.add(k)); if (REL().sar) ['RCC', 'OSC', 'DATUM', 'CSP', 'SITREP'].forEach(k => used.add(k));
+  if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k)); if (REL().pr) ['AMC', 'OSC', 'SARDOT', 'CSARTF', 'LZ'].forEach(k => used.add(k)); if (REL().sar) ['RCC', 'OSC', 'DATUM', 'CSP', 'SITREP'].forEach(k => used.add(k)); if (REL().aib) ['COAU', 'DOS', 'TBT', 'BAT', 'OPAREA'].forEach(k => used.add(k));
   if (has(/SEAD|IADS/)) { used.add('SEAD'); used.add('DEAD'); used.add('SAM'); used.add('EWR'); } if (has(/MANPADS|SHORAD/)) { used.add('MANPADS'); used.add('AAA'); }
   if (has(/DCA|AIR/)) used.add('DCA'); if (has(/OCA|ESCORT/)) used.add('OCA'); if (has(/QRA|RENEGADE/)) { used.add('QRA'); used.add('RENEGADE'); }
   if (has(/CAS|GROUND/)) { used.add('CAS'); used.add('JTAC'); used.add('KILL BOX'); } if (has(/STRIKE|HVT/)) { used.add('HVT'); used.add('TOT'); }
@@ -3273,6 +3495,9 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     para('Contact the JTAC on its frequency at the control point. Check in with mission number, number and type of aircraft, position and block, ordnance and laser codes, playtime and abort code. The JTAC then passes situation update, game plan and the 9-line briefing; read back lines 4, 6, 8 and the restrictions.');
     table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], S.cas.jtacs.map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
     if (t && S.cas.jtacs.some(J => J.tasks.some(T => T.flight))) table([{ h: 'Flight', w: .2 }, { h: 'Mission no.', w: .14 }, { h: 'JTAC', w: .18 }, { h: 'Laser codes', w: .24 }, { h: 'Block', w: .24 }], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [{ t: (t.flights.find(f => f.id === T.flight) || {}).cs || '', bold: true }, T.missionNo, J.cs, T.codes.join(' / '), T.block ? T.block + ' (x1000 ft)' : 'low level'])), { size: 7.5 }); }
+  if (mpOn('aib') && REL().aib && S.aib) { const L2 = S.aib.list.filter(sc => sc.flights.length); h6('Aerial firefighting – procedure');
+    bullets(['Flight plan VFR, item 18 STS/FFR and OPAREA/ (place of operations); civil-registered aircraft fly as BAT, military aircraft as OAT. Callsigns: CL-415 "CAN" + aircraft number; civil operators the registration + "BAT".', 'Drops only in VMC and daylight, only when cleared by the DOS on TBT. No TBT contact: stay outside the operations area, ask the ATS unit about other AIB traffic, try a radio relay.', 'Report the start of operations to the ATS unit, "operations normal" every 30 minutes, and re-contact it every time you leave the area (e.g. to scoop).']);
+    if (L2.length) table([{ h: 'Fire', w: .08 }, { h: 'Location', w: .27 }, { h: 'OPAREA', w: .15 }, { h: 'DOS / TBT', w: .17 }, { h: 'Water', w: .33 }], L2.map(sc => [{ t: sc.id, bold: true }, sc.ref, sc.oparea, `${sc.dos} / ${aibTbt()}`, `Fixed wing: ${sc.water.name}; helicopters: ${sc.waterH.kind === 'tank' ? 'portable tank' : sc.waterH.name}`]), { size: 7.5 }); }
   if (mpOn('sar') && REL().sar && S.sar) { h6('Search and rescue – procedure');
     para('SAR units are tasked by the RCC (MRCC for maritime events), which passes the search action plan on frequency: datum, sub-area, search pattern, track spacing and commence search point. When two or more units operate together the first on scene acts as OSC: report to the OSC on the assigned frequency and send SITREPs as requested.');
     bullets(['Callsign: RESCUE + INDIA + LIMA (RCC) or MIKE (MRCC) + a letter in order of tasking, e.g. RESCUE INDIA LIMA ALPHA (RILA in the flight plan).', 'Flight plan: normal GAT flight plan with item 18 STS/SAR; HEMS and hospital flights STS/HOSP; MEDEVAC STS/MEDEVAC.', 'Search altitude 500-1000 ft over the sea, about 1000 ft AGL over land; all units search at the speed of the slowest unit.', 'Monitor 121.500; never report the medical condition of survivors to ATS.']); }
@@ -3300,6 +3525,21 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec(null);
   const tocMap = Object.fromEntries(toc.filter(([n]) => n !== 'Content'));
   return { pdf, tocMap, custom: !!assets.fonts };
+}
+async function exportAibPack(which, btn) {
+  if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
+  if (!S.aib) return toast('Nessuno scenario AIB');
+  const list = S.aib.list.filter(sc => which === 'ALL' || sc.id === which); if (!list.length) return;
+  if (btn) btn.disabled = true; toast('Generazione AIB pack…');
+  try {
+    const assets = await mpAssets(), maps = {};
+    for (const sc of list) { const G = aibGeom(sc), focus = [...G.risk, ...G.perim, dest(sc.pos, 0, G.opR), dest(sc.pos, 180, G.opR), dest(sc.pos, 90, G.opR), dest(sc.pos, 270, G.opR), ...(sc.water.d < 12 ? [sc.water.pos] : []), ...(sc.waterH.d < 12 ? [sc.waterH.pos] : [])];
+      const m = await renderMap('brief', { light: true, w: 1300, h: 820, focus, aib: sc, minPad: 0.02, maxZ: 13 }); if (m) maps[sc.id] = dataUrlBytes(m); }
+    const r = await buildMasterplanPdf(null, assets, null, { kind: 'aib', list, maps });
+    await download(`${fileBase()}_AIB_${which}.pdf`, new Blob([await r.pdf.save()], { type: 'application/pdf' }));
+    toast('AIB pack generato');
+  } catch (err) { console.error(err); toast('Errore: ' + err.message); }
+  if (btn) btn.disabled = false;
 }
 async function exportSarPack(which, btn) {
   if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
@@ -3455,7 +3695,7 @@ function buildPayload(includeBrief) {
   const sc = JSON.parse(JSON.stringify(S));
   // public material never carries people's names or VIDs
   sc.roster = { pilots: (sc.roster.pilots || []).map(p => ({ id: p.id, typeRaw: p.typeRaw })), controllers: (sc.roster.controllers || []).map(c => ({ id: c.id, pref: c.pref })) };
-  sc.cas = casPublic(sc.cas); sc.pr = prPublic(sc.pr); sc.sar = sarPublic(sc.sar);
+  sc.cas = casPublic(sc.cas); sc.pr = prPublic(sc.pr); sc.sar = sarPublic(sc.sar); sc.aib = aibPublic(sc.aib);
   if (sc.t) { delete sc.t.cas; sc.t.warnings = []; sc.t.flights.forEach(f => f.pilots = []); sc.t.c2.forEach(c => { c.controller = /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) ? 'Open' : 'Assigned'; }); }
   if (sc.asp) sc.asp = { source: sc.asp.source, loaded: sc.asp.loaded, zones: RES(), freqs: [], bullseyes: bulSel(), tracks: TRK() }; // only the reserved areas and the event bullseye
   if (!includeBrief) sc.t = null;
@@ -3503,6 +3743,7 @@ function renderPublic() {
   const brief = t ? `
     <section class="pcard"><h2>Flights &amp; tasking</h2>
       ${tbl(['Callsign', 'Aircraft', 'Base', 'Task', 'Package', 'Freq'], t.flights.map(f => [`<b class="blue">${esc(f.cs)}</b>`, `${f.size} × ${esc(f.type)}`, esc(f.base || '-'), esc(ROLES[f.task] || f.task), esc(PKG[f.pkg] || f.pkg), esc(f.freq || 'TBD')]))}</section>
+    ${S.aib && REL().aib ? `<section class="pcard"><h2>Aerial firefighting</h2><p class="muted">Flight plan VFR, item 18 STS/FFR and OPAREA/. CL-415 fly as CAN + number, civil operators as registration + BAT, military aircraft as OAT. Every drop is cleared by the DOS on TBT; report the start of operations to ATS and re-contact ATS when leaving the area.</p></section>` : ''}
     ${S.sar && REL().sar ? `<section class="pcard"><h2>Search and rescue</h2><p class="muted">The RCC passes the search action plan on frequency. Callsign RESCUE INDIA LIMA / MIKE + letter (e.g. RILA), flight plan item 18 STS/SAR. The first unit on scene acts as OSC; monitor 121.500.</p></section>` : ''}
     ${S.pr && REL().pr && S.pr.csar.length ? `<section class="pcard"><h2>Personnel recovery</h2><p class="muted">Isolated crews call MAYDAY on GUARD and then listen on CSAR A. Positions are passed from the SARDOT only.</p>${tbl(['Scenario', 'CSAR RV', 'SARDOT'], S.pr.csar.map(c => [`<b>${esc(c.id)}</b>`, esc(prLoc(c.rv)), esc(c.sardot.name + '  ' + prLoc(c.sardot.pos))]))}</section>` : ''}
     ${S.cas && REL().cas ? `<section class="pcard"><h2>Close air support</h2><p class="muted">Check in with the JTAC at the control point. Targets and the 9-line are passed on frequency.</p>${tbl(['JTAC', 'Frequency', 'Control points', 'IP / BP'], S.cas.jtacs.map(J => [`<b>${esc(J.cs)}</b>`, esc(J.freq || 'TBD'), J.cps.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>'), J.ips.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>')]))}

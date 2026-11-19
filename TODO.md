@@ -26,6 +26,8 @@
 - 9-line MEDEVAC: line 8 always "A – military"; line 9 = terrain description (as in the manual example).
 
 ## Assumptions to verify
+- AIB (v1.1): S-64 and other civil-operated types use registration + BAT (the manual gives CAN only for the CL-415); CL-415 numbers start at CAN 15; registrations are random I-XXXX; default separation (fixed wing 1500-2000 ft AGL at the entry point, helicopters below 1000 ft AGL) and phraseology examples are ours, since annex "M" is not in the manual; scooping lakes from a built-in list (approximate centres), sea scooping from the coastline; locality / municipality / province / elevation filled by the staff (no gazetteer / DEM).
+- Fixed: land/sea test (`onLand`) never worked with the loaded coastline rings (also affected civil SAR placement).
 - Civil SAR (v1.0): track spacing from the manual table at 1000 ft (helicopter / fixed wing); search radius from the area that the units can cover in ~90 min, at least 2 legs per unit; MRCC ROMA for sea, generic "RCC" over land; on-scene frequency from the RCCS position in the database, otherwise TBD; callsign letters assigned in order of tasking across all scenarios.
 - CAS: magnetic variation fixed per event (default 3.5° E); target elevation left to the JTAC (no terrain model).
 - Sectorfile format (SCT sections VOR/NDB/FIXES/VFR, coordinates `N043.20.10.000`) – tested only on a synthetic file.
