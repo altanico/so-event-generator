@@ -135,19 +135,29 @@ for c in OATC:
     'source':'aip','section':'ENR 5.2.2.4','poly':[[round(a,5),round(b,5)] for a,b in bufline(pts,c['half'])]})
 # Exercise areas and transit corridors of AIP SUP S56/26 (STEADFAST NOON 2026) not already in ENR 5: used as permanent training areas
 # (staff decision; dates / times ignored). Areas = TRA, corridors = COR.
-SUPD=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','sup_s56_26.json')))
 fix=lambda x: re.sub(r'(\d)FT',r'\1 FT',x)
-for it in SUPD:
+def tags_of(act):
+  a=act.lower(); t=[]
+  if 'military air' in a: t.append('AIR')
+  if 'firing' in a: t.append('FIRING')
+  if 'unmanned' in a: t.append('UAV')
+  return t or ['AIR']
+SUPS=[('sup_s56_26.json','SUP S56/26','STEADFAST NOON','TRA','treated as a TRA (danger area over the high seas)'),
+      ('sup_s64_26.json','SUP S64/26','POGGIO DART','TSA','treated as a temporary segregated area')]
+for fn,sec,ex,ztype,trt in SUPS:
+ for it in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src',fn))):
   nm=re.sub(r'\s+-\s+\w+$','',it['name']).strip(); code=re.sub(r'[^A-Z0-9]','',nm.upper())
-  base={'source':'aip','section':'SUP S56/26','amc':False,'hours':''}
+  act=it.get('activity') or 'Heavy military air activity, firing and Unmanned Aircraft activity'; act=act[0].upper()+act[1:].replace('Unmanned Aircraft','unmanned aircraft')
+  extra=f" ({it['note'].replace('LI-LD','D').replace('LIR','R').replace('viceversa','vice versa')})" if it.get('note') else ''
+  base={'source':'aip','section':sec,'amc':False,'hours':''}
   if it['kind']=='AREA':
-    zones.append({**base,'id':'LI-'+code,'name':nm,'type':'TRA','lower':fix(it['lower']),'upper':fix(it['upper']),'activity':'Heavy military air activity, firing and unmanned aircraft activity','use':['AIR','FIRING','UAV'],
-      'notes':'Exercise area (STEADFAST NOON): heavy military air activity, firing and unmanned aircraft activity; treated as a TRA (danger area over the high seas); activated on tactical basis upon MIL/CIV coordination. Source: AIP Italia SUP S56/26.','poly':it['pts']})
+    zones.append({**base,'id':'LI-'+code,'name':nm,'type':ztype,'lower':fix(it['lower']),'upper':fix(it['upper']),'activity':act,'use':tags_of(act),
+      'notes':f"Exercise area ({ex}): {act.lower()}; {trt}; activated on tactical basis upon MIL/CIV coordination. Source: AIP Italia {sec}.",'poly':it['pts']})
   else:
     pts=it['pts']
     zones.append({**base,'id':'LI-COR'+code,'name':'OAT corridor '+nm,'type':'COR','lower':fix(it['lower']),'upper':fix(it['upper']),'activity':'Transit corridor','use':['TRANSIT'],
       'axis':pts,'wpt':['']*len(pts),'half':it['half'],'radio':'MIL / CIV ATS units (tactical coordination)','pref':[],'excl':'',
-      'notes':f"Transit corridor (STEADFAST NOON): {it['half']:g} NM each side of the centre line. Levels: {fix(it['lower'])}-{fix(it['upper'])}. Activated on tactical basis upon MIL/CIV coordination. Source: AIP Italia SUP S56/26.",
+      'notes':f"Transit corridor ({ex}){extra}: {it['half']:g} NM each side of the centre line. Levels: {fix(it['lower'])}-{fix(it['upper'])}. Activity: {act.lower()}. Activated on tactical basis upon MIL/CIV coordination. Source: AIP Italia {sec}.",
       'poly':[[round(a,5),round(b,5)] for a,b in bufline(pts,it['half'])]})
 CONF=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','tsa_configs.json')))
 json.dump({'source':'AIP Italia ENR 5.1.2 / 5.1.3 / 5.1.4 – military areas only','sections':{sec:air for _,sec,air in INPUTS},'zones':zones,'configs':CONF},open(OUT,'w'),ensure_ascii=False,separators=(',',':'))

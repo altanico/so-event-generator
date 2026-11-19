@@ -1,0 +1,269 @@
+[
+ {
+  "name": "PLUS",
+  "kind": "AREA",
+  "half": null,
+  "lower": "FL140",
+  "upper": "FL325",
+  "activity": "Heavy military air activity",
+  "note": "",
+  "pts": [
+   [
+    44.52639,
+    11.87722
+   ],
+   [
+    44.89611,
+    12.175
+   ],
+   [
+    44.91139,
+    12.21278
+   ],
+   [
+    44.9,
+    12.34028
+   ],
+   [
+    44.26667,
+    11.93333
+   ]
+  ]
+ },
+ {
+  "name": "WEBER",
+  "kind": "AREA",
+  "half": null,
+  "lower": "FL130",
+  "upper": "FL210",
+  "activity": "Unmanned Aircraft activity",
+  "note": "",
+  "pts": [
+   [
+    44.89333,
+    12.66639
+   ],
+   [
+    44.88722,
+    12.51667
+   ],
+   [
+    44.80167,
+    12.46194
+   ],
+   [
+    44.80778,
+    12.31028
+   ],
+   [
+    44.73583,
+    12.27028
+   ],
+   [
+    44.66972,
+    12.28083
+   ],
+   [
+    44.57944,
+    12.30806
+   ],
+   [
+    44.44972,
+    12.32306
+   ],
+   [
+    44.27472,
+    12.37833
+   ],
+   [
+    44.19306,
+    12.44222
+   ],
+   [
+    44.09083,
+    12.59139
+   ],
+   [
+    43.99583,
+    12.76556
+   ],
+   [
+    43.92667,
+    12.96806
+   ],
+   [
+    43.85222,
+    13.07111
+   ],
+   [
+    43.77417,
+    13.21972
+   ],
+   [
+    43.80083,
+    13.51722
+   ],
+   [
+    43.80194,
+    13.52944
+   ],
+   [
+    44.67667,
+    12.84361
+   ]
+  ]
+ },
+ {
+  "name": "TC JULIET",
+  "kind": "COR",
+  "half": 5.0,
+  "lower": "FL200",
+  "upper": "FL240",
+  "activity": "Military air activity",
+  "note": "from LI-LD35B to LIR48 and viceversa",
+  "pts": [
+   [
+    43.81722,
+    14.09194
+   ],
+   [
+    43.75639,
+    14.13611
+   ],
+   [
+    43.67806,
+    14.13944
+   ],
+   [
+    43.56417,
+    14.12944
+   ],
+   [
+    42.82333,
+    13.6775
+   ]
+  ]
+ },
+ {
+  "name": "TC URBINO",
+  "kind": "COR",
+  "half": 5.0,
+  "lower": "FL200",
+  "upper": "FL240",
+  "activity": "Military air activity",
+  "note": "from LIR21A to LIR48 and viceversa",
+  "pts": [
+   [
+    43.91667,
+    13.0
+   ],
+   [
+    43.46667,
+    12.66667
+   ]
+  ]
+ },
+ {
+  "name": "TC JENNY 0",
+  "kind": "COR",
+  "half": 2.5,
+  "lower": "FL160",
+  "upper": "FL200",
+  "activity": "Unmanned Aircraft activity",
+  "note": "",
+  "pts": [
+   [
+    41.54139,
+    15.71806
+   ],
+   [
+    41.87583,
+    15.18472
+   ]
+  ]
+ },
+ {
+  "name": "TC JENNY 1",
+  "kind": "COR",
+  "half": 5.0,
+  "lower": "FL160",
+  "upper": "FL200",
+  "activity": "Unmanned Aircraft activity",
+  "note": "",
+  "pts": [
+   [
+    41.87583,
+    15.18472
+   ],
+   [
+    42.18944,
+    15.18944
+   ],
+   [
+    42.47833,
+    15.2025
+   ],
+   [
+    42.98694,
+    15.03778
+   ]
+  ]
+ },
+ {
+  "name": "TC JENNY 2",
+  "kind": "COR",
+  "half": 5.0,
+  "lower": "FL160",
+  "upper": "FL200",
+  "activity": "Unmanned Aircraft activity",
+  "note": "",
+  "pts": [
+   [
+    42.98694,
+    15.03778
+   ],
+   [
+    43.44111,
+    14.35583
+   ]
+  ]
+ },
+ {
+  "name": "TC JENNY 3",
+  "kind": "COR",
+  "half": 5.0,
+  "lower": "FL160",
+  "upper": "FL200",
+  "activity": "Unmanned Aircraft activity",
+  "note": "",
+  "pts": [
+   [
+    43.44111,
+    14.35583
+   ],
+   [
+    43.71806,
+    13.82028
+   ]
+  ]
+ },
+ {
+  "name": "TC JENNY 4",
+  "kind": "COR",
+  "half": 5.0,
+  "lower": "FL130",
+  "upper": "FL180",
+  "activity": "Unmanned Aircraft activity",
+  "note": "",
+  "pts": [
+   [
+    43.71806,
+    13.82028
+   ],
+   [
+    43.87194,
+    13.405
+   ]
+  ]
+ }
+]
