@@ -546,13 +546,14 @@ const DEF_BULLS = [['LEVIS','N0443239199','E0073655368','LEV'],['RHINO','N044044
   ['JULIA','N0460635190','E0122659580',''],['FROST','N0414741000','E0100253000','IBROS'],['NIKITA','N0441319000','E0134110000','NIKOL'],['NADIA','N0392631640','E0075130200',''],
   ['MARTA','N0445441690','E0104841000','']].map(([name, la, lo, ref]) => ({ name, pos: LL(la, lo, 3), ref, raw: `${la} ${lo}` }));
 const poly6 = a => a.map(x => LL(x.slice(0, 7), x.slice(7)));
-const IND = (n, pts, floor, notes = '') => ({ id: 'INDIA-' + n, name: 'INDIA ' + n, type: 'IND', lower: floor, upper: 'UNL', notes: ('AEW area (AIP). ' + notes).trim(), poly: poly6(pts), builtin: true });
-const BUILTIN_ZONES = [
-  IND(2, ['452800N0092200E', '452800N0111000E', '444300N0111000E', '444300N0092200E'], 'FL310'),
-  IND(5, ['434600N0125000E', '433500N0130700E', '423300N0135000E', '421700N0125600E', '424400N0121700E', '434000N0121100E'], 'FL310', 'FL310 or above.'),
-  IND(7, ['393300N0142200E', '384200N0154800E', '380000N0151000E', '384000N0135200E'], 'FL290'),
-  IND(8, ['380300N0160000E', '380300N0162600E', '371000N0165000E', '363500N0165000E', '363500N0153000E', '372000N0151500E'], 'FL290'),
-  IND(9, ['404500N0090000E', '404500N0094900E', '395500N0094200E', '395500N0090400E'], 'FL290', 'Too small for a standard track: racetrack only.')];
+const IND = (n, name, pts, lower, upper, levels, notes = '', blocks = null) => ({ id: 'INDIA-' + n, name: 'INDIA ' + n, type: 'IND', lower, upper, ...(blocks ? { blocks } : {}), notes: `AEW area – ${name}. AIP flight levels: ${levels}. ${notes}`.trim(), poly: poly6(pts), builtin: true });
+const BUILTIN_ZONES = [ // AIP Italia, AEW areas (lateral limits and flight levels)
+  IND(2, 'Po valley', ['452800N0092200E', '452800N0111000E', '444300N0111000E', '444300N0092200E'], 'FL310', 'FL310', 'FL 310'),
+  IND(5, 'Central Italy', ['434600N0125000E', '433500N0130700E', '423300N0135000E', '421700N0125600E', '424400N0121700E', '434000N0121100E'], 'FL310', 'UNL', 'FL 310 or above'),
+  IND(6, 'Gulf of Taranto', ['395800N0174700E', '395800N0183800E', '385800N0183800E', '385800N0174700E'], 'FL290', 'FL310', 'FL 310 or FL 290', 'No published AEW track: orbit as briefed.', [['FL310', 'FL310'], ['FL290', 'FL290']]),
+  IND(7, 'N Sicily', ['393300N0142200E', '384200N0154800E', '380000N0151000E', '384000N0135200E'], 'FL290', 'FL290', 'FL 290'),
+  IND(8, 'E Sicily', ['380300N0160000E', '380300N0162600E', '371000N0165000E', '363500N0165000E', '363500N0153000E', '372000N0151500E'], 'FL290', 'FL290', 'FL 290'),
+  IND(9, 'Barbagia', ['404500N0090000E', '404500N0094900E', '395500N0094200E', '395500N0090400E'], 'FL290', 'FL290', 'FL 290', 'Too small for a standard track: racetrack only.')];
 const AEWT = (n, c1, c2, floor, pattern, radius, sep, notes = '') => ({ id: 'INDIA ' + n, kind: 'AEW', zone: 'INDIA-' + n, c1: LL(c1[0], c1[1]), c2: LL(c2[0], c2[1]), radius, sep, pattern, floor, notes });
 const AARTK = (id, areas, a1, t1, a2, t2, ref, course, leg, width, lo, hi, notes = '') => ({ id, kind: 'AAR', areas, ap1: LL(...a1), tp1: LL(...t1), ap2: LL(...a2), tp2: LL(...t2), ref, course, leg, width, lo, hi, notes });
 const DEF_TRACKS = [
@@ -589,7 +590,7 @@ function pickTrack(kind, used) {
   c.sort((a, b) => (b.r - a.r) || a.d - b.d); return c.length ? c[0].t : null;
 }
 const flN = x => { const m = String(x).match(/\d+/); return m ? m[0] : ''; };
-const trkAlt = t => t.kind === 'AEW' ? `FL${flN(t.floor)}+` : `FL${t.lo}-FL${t.hi}`;
+const trkAlt = t => { if (t.kind !== 'AEW') return `FL${t.lo}-FL${t.hi}`; const z = (typeof trkZones === 'function' ? trkZones(t) : [])[0]; return `FL${flN(t.floor)}${!z || /UNL/i.test(z.upper) ? '+' : ''}`; }; // AIP: INDIA 5 "FL310 or above", the others a single level
 function orbitShapes(a) { const r = (a.rad || 15) * 1.852, out = a.pts.map(p => ring(p, r, 40).concat([dest(p, 0, r)]));
   if (a.pts.length > 1) { const b = bearing(a.pts[0], a.pts[1]); [90, -90].forEach(sg => out.push([dest(a.pts[0], b + sg, r), dest(a.pts[1], b + sg, r)])); }
   return out; }
