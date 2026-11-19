@@ -25,6 +25,9 @@
 - AMC = event GCI/AWACS; OSC = first RESCORT, otherwise the downed pilot's wingman.
 - 9-line MEDEVAC: line 8 always "A – military"; line 9 = terrain description (as in the manual example).
 
+## Reserved areas UI (v1.11)
+- Demo airspace removed. Before the first generation the staff chooses: areas proposed by the generator, or only the ticked ones (manual: the generator never changes them). "Deseleziona tutte" in the zone table; custom union uses the ticked areas.
+
 ## AIP data layer (v1.3)
 - Default reserved areas = military R / D / TRA / TSA areas of AIP ENR 5.1.2-5.1.4 + ENR 5.1.4 configurations. Remove at the site handover (docs/DB_INTERFACE.md).
 - Update at each AIRAC with tools/aip_*.py. ENR 5.2 (other military areas, e.g. CBA) can be added the same way if needed.
