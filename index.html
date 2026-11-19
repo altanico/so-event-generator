@@ -666,7 +666,7 @@ async function loadAirspaceApi(url, token) {
 function setAirspace(data, source, extra = {}) {
   S.asp = { source, loaded: new Date().toISOString(), zones: data.zones, freqs: data.freqs, bullseyes: data.bullseyes || [], tracks: data.tracks || [], configs: data.configs || [], ...extra };
   if ((data.positions || []).length) S.positions = data.positions;
-  S.reserved = S.resMode === 'manual' && !cusLocked() ? (S.reserved || []).filter(id => LIB().some(z => z.id === id)) : autoReserve(); S.cor = corPick(); S.c2sel = null; save();
+  S.reserved = S.resMode === 'auto' || cusLocked() ? autoReserve() : (S.reserved || []).filter(id => LIB().some(z => z.id === id)); S.cor = corPick(); S.c2sel = null; save();
 }
 // ---- geometry ----
 function pip(p, poly) { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [yi, xi] = poly[i], [yj, xj] = poly[j]; if (((yi > p[0]) !== (yj > p[0])) && (p[1] < (xj - xi) * (p[0] - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
@@ -678,7 +678,7 @@ const RES = () => LIB().filter(z => z.type !== 'COR' && (S.reserved || []).inclu
 // --- OAT corridors (AIP ENR 5.2.2.4): transit between bases and areas, or an airway-like reservation along a route
 const CORS = () => LIB().filter(z => z.type === 'COR' && (z.axis || []).length > 1);
 // manual mode: OAT corridors only as ticked by the staff (never proposed)
-const corPick = () => S.resMode === 'manual' && !cusLocked() ? (S.cor || []).filter(id => CORS().some(z => z.id === id)) : autoCor();
+const corPick = () => S.resMode === 'auto' || cusLocked() ? autoCor() : (S.cor || []).filter(id => CORS().some(z => z.id === id));
 const toManual = () => { if (S.resMode !== 'manual') S.cor = []; S.resMode = 'manual'; };
 const CORSEL = () => CORS().filter(z => (S.cor || []).includes(z.id));
 const corWpt = (z, k) => (z.wpt && z.wpt[k]) || `${z.name.replace(/^OAT corridor /, '').replace(/ \(.*\)$/, '')} ${k + 1}`;
@@ -1215,7 +1215,7 @@ function generateGeneric() {
   if (!thChosen()) { WOPEN = 'th'; renderAll(); return toast('Prima scegli il teatro (passo 3)'); }
   const th = theatre();
   defaultBases(th);
-  if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length && S.resMode !== 'manual') S.reserved = autoReserve();
+  if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length && S.resMode === 'auto') S.reserved = autoReserve();
   if (S.resMode === 'manual' && !(S.reserved || []).length && !cusLocked()) toast('Nessuna area riservata selezionata: selezionale nella lista e usa "Riporta tutto dentro le zone"');
   if (cusLocked()) S.reserved = cusLocked().map(c => c.id);
   S.cor = corPick();
@@ -2599,7 +2599,7 @@ function fullReset() {
   if (MAP) MAP.closePopup(); try { renderEvPanel(); } catch (e) { } save(); renderAll(true); toast('Reset fatto: nuovo evento vuoto');
 }
 function thDrawStart() { ADDMODE = 'th:draw'; S.thDraft = []; WOPEN = 'th'; renderPanel(); drawMap(); toast('Clic sulla mappa per i vertici del teatro, poi "Chiudi teatro"'); }
-function setTheatre(id) { if (ADDMODE === 'th:draw') { ADDMODE = ''; S.thDraft = []; } S.meta.theatre = id; S.border = null; BEDIT = false; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name;
+function setTheatre(id) { if (ADDMODE === 'th:draw') { ADDMODE = ''; S.thDraft = []; } S.meta.theatre = id; S.border = null; BEDIT = false; S.resMode = undefined; S.reserved = (S.custom || []).map(c => c.id); S.cor = []; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); S.meta.bullseye = nearestBull().name;
   if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); }
 function onMapClick(p) {
   if (!ADDMODE) return;
@@ -2628,7 +2628,7 @@ function aspIssuesHtml() {
 // map click on overlapping areas: list every area under the point instead of toggling the top one
 const polyArea = poly => Math.abs(poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[1] * q[0] - q[1] * p[0]; }, 0)) / 2;
 const zonesAt = p => mapZones().concat(CUS()).filter((z, i, a) => a.indexOf(z) === i && z.type !== 'COR' && pip(p, z.poly)).sort((a, b) => polyArea(a.poly) - polyArea(b.poly));
-function resToggle(id) { const set = new Set(S.reserved || []); set.has(id) ? set.delete(id) : set.add(id); S.reserved = [...set]; save(); renderPanel(); drawMap(); }
+function resToggle(id) { if (!S.resMode) S.resMode = 'manual'; const set = new Set(S.reserved || []); set.has(id) ? set.delete(id) : set.add(id); S.reserved = [...set]; save(); renderPanel(); drawMap(); }
 function zonePickHtml(zs) { const res = new Set(S.reserved || []);
   return `<div style="min-width:220px"><b style="font-size:12px">${zs.length} aree sovrapposte qui</b><div class="muted" style="font-size:11px;margin-bottom:4px">Spunta quelle da riservare (dalla più piccola):</div>${zs.map(z => `<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0;cursor:pointer"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span><span>${esc(z.name)} <span class="muted">${esc(z.lower)}–${esc(z.upper)}</span></span></label>`).join('')}</div>`; }
 function zonePick(p, zs) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs)).openOn(MAP); }
@@ -2668,9 +2668,10 @@ function aspCard() {
   <div class="row" style="margin-top:6px;flex-wrap:wrap">${AIPDATA && S.asp && S.asp.source !== 'aip' ? '<button class="b sm shrink" id="aspaip">Torna alle zone AIP</button>' : ''}<label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label></div>
   <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div></details>
   <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center"><span style="font-size:13px"><b>Aree riservate</b> (${RES().length} selezionate):</span>
-    <button class="b sm shrink ${S.resMode !== 'manual' ? 'primary' : ''}" id="resauto" title="Il generatore propone le aree in base a teatro ed evento">Proponile tu</button>
+    <button class="b sm shrink ${S.resMode === 'auto' ? 'primary' : ''}" id="resauto" title="Il generatore propone le aree in base a teatro ed evento">Proponile tu</button>
     <button class="b sm shrink ${S.resMode === 'manual' ? 'primary' : ''}" id="resman" title="Selezioni tu le aree: il generatore non le cambia">Le scelgo io</button>
     <button class="b sm shrink" id="resnone">Deseleziona tutte</button></div>
+  ${!S.resMode && !cusLocked() ? '<p class="muted" style="font-size:12px;margin:4px 0">Nessuna area è attivata da sola: premi <b>Proponile tu</b> per farle scegliere al generatore, oppure spunta quelle che vuoi nella lista o sulla mappa.</p>' : ''}
   ${zoneTableHtml(near, res)}
   ${RES().filter(z => !z.custom).length >= 2 ? `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:6px"><span class="muted" style="font-size:12px;flex:1 1 220px">Unisci le aree selezionate in un'unica area custom con limiti verticali tuoi:</span>
     <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Unisci</button></div>` : ''}
@@ -2724,7 +2725,7 @@ function wSummary(id) {
     case 'ev': return evChosen() ? PROF().list.map(e => e.it).join(' + ') : 'nessuno scelto';
     case 'req': { const ts = reqTasks().filter(t => ROLES[t]); return `${ts.filter(t => !offT(t)).length} di ${ts.length} ruoli`; }
     case 'th': return thChosen() ? `${S.meta.op} · ${th.name}` : 'teatro da scegliere';
-    case 'asp': return !aspNeeded() && !S.showAsp ? 'non serve per eventi civili' : `${RES().length} aree · ${cusLocked() ? 'solo aree custom' : S.resMode === 'manual' ? 'scelte da te' : 'proposte dal generatore'}${(S.cor || []).length ? ` · ${S.cor.length} corridoi OAT` : ''}`;
+    case 'asp': return !aspNeeded() && !S.showAsp ? 'non serve per eventi civili' : `${RES().length} aree · ${cusLocked() ? 'solo aree custom' : S.resMode === 'manual' ? 'scelte da te' : S.resMode === 'auto' ? 'proposte dal generatore' : 'non ancora scelte'}${(S.cor || []).length ? ` · ${S.cor.length} corridoi OAT` : ''}`;
     case 'pts': return POINTS.items.length ? `${POINTS.items.length} punti` : 'punti sintetici';
     case 'thr': return `${S.factions.blue} vs ${S.factions.red} · ${S.cats.filter(c => !CATS[c].evt).length} tipi di minaccia`;
     case 'c2': return `${(S.c2sel || []).length} postazioni`;
@@ -3031,14 +3032,14 @@ document.addEventListener('change', e => {
     save(); return;
   }
   if (['zftype', 'zfsel', 'zfsort', 'zfall'].includes(t.id)) { const k = t.id.slice(2); ZF[k] = k === 'all' ? !!t.value : t.value; renderPanel(); drawMap(k === 'all' && !ZF.all); if (k === 'all') zfFit(); return; }
-  if (t.dataset.res !== undefined) { const set = new Set(S.reserved || []); t.checked ? set.add(t.dataset.res) : set.delete(t.dataset.res); S.reserved = [...set]; save(); renderPanel(); drawMap(); return; }
+  if (t.dataset.res !== undefined) { if (!S.resMode) S.resMode = 'manual'; const set = new Set(S.reserved || []); t.checked ? set.add(t.dataset.res) : set.delete(t.dataset.res); S.reserved = [...set]; save(); renderPanel(); drawMap(); return; }
   if (t.id === 'ptsurl') { lsSet('ivao-so-pts-url', t.value.trim()); return; }
   if (t.id === 'ptsfile' && t.files[0]) { t.files[0].text().then(txt => { try { const it = /^\s*[\[{]/.test(txt) && /"(points|fixes|lat|name)"/.test(txt.slice(0, 400)) ? parsePointsJson(JSON.parse(txt)) : parseSector(txt); if (!it.length) throw 0; setPoints(it, t.files[0].name); renderAll(); toast(`Importati ${it.length} punti`); } catch (err) { toast('File non riconosciuto: serve un sectorfile .sct o un JSON di punti'); } }); return; }
   if (t.id === 'aspurl') { lsSet('ivao-so-asp-url', t.value.trim()); return; }
   if (t.id === 'asptoken') { lsSet('ivao-so-asp-token', t.value); return; }
   if (t.id === 'aspfile' && t.files[0]) { t.files[0].text().then(txt => { try { const d = parseAirspace(JSON.parse(txt)); if (!d.zones.length && !d.freqs.length) throw 0; setAirspace(d, 'file', { file: t.files[0].name }); renderAll(); toast(`Importate ${d.zones.length} zone e ${d.freqs.length} frequenze`); } catch (err) { toast('File non riconosciuto (vedi formato in DB_INTERFACE.md)'); } }); return; }
   if (t.dataset.mp) { mpGet()[t.dataset.mp] = t.value; save(); return; }
-  if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); WOPEN = 'ev'; if (!GEN() && S.resMode !== 'manual' && !cusLocked()) { S.reserved = autoReserve(); S.cor = corPick(); } if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); WOPEN = 'ev'; if (!GEN() && S.resMode === 'auto' && !cusLocked()) { S.reserved = autoReserve(); S.cor = corPick(); } if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (t.id === 'cuslock') { S.cusLock = t.checked; if (S.cusLock) S.reserved = cusLocked() ? cusLocked().map(c => c.id) : S.reserved; save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cus) { const c = CUS().find(x => x.id === t.dataset.cus); if (c) { c[t.dataset.cf] = t.dataset.cf === 'name' ? t.value.toUpperCase() : t.value.trim(); save(); drawMap(); } return; }
   if (t.dataset.ncfg) { const c = notamCfg(); c[t.dataset.ncfg] = ['series', 'fir'].includes(t.dataset.ncfg) ? t.value.toUpperCase().trim() : +t.value; save(); renderPanel(); return; }
@@ -4125,7 +4126,7 @@ Stefano R.; ATC; APP
 Irene S.; ATC; JTAC`;
 function loadDemo() {
   S = newScenario();
-  S.meta.events = ['MIX']; Object.assign(S.meta, { op: 'OPERATION SILENT TRIDENT', theatre: 'SA', difficulty: 'MEDIUM', date: '12 DEC 2026', hHour: '19:00Z' });
+  S.meta.events = ['MIX']; S.resMode = 'auto'; Object.assign(S.meta, { op: 'OPERATION SILENT TRIDENT', theatre: 'SA', difficulty: 'MEDIUM', date: '12 DEC 2026', hHour: '19:00Z' });
   S.factions = { blue: 'Aurelian Coalition', red: 'Volkar Federation' };
   S.cats = ['IADS', 'AIR', 'GROUND', 'HVT', 'PERSONNEL', 'SHORAD', 'RENEGADE', 'LOGISTICS'];
   S.asp = null; generateGeneric(); issueRevision('Initial issue – published before sign-ups'); parseLines(DEMO_ROSTER); tailor(); issueRevision();

@@ -29,4 +29,9 @@ await page.click('#fullreset'); await page.waitForTimeout(80); if(!(await page.e
 await page.click('#fullreset'); await page.waitForTimeout(150);
 r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, border:APP.S.border||null, th:APP.S.thCustom||null, q:APP.ZF.q, pts:APP.POINTS().items.length, open:APP.wOpen(), asp:APP.S.asp&&APP.S.asp.source, thr:APP.S.meta.theatre, bases:APP.S.blueBases.length, res:APP.RES().length, cur:localStorage.getItem('ivao-so-current')?JSON.parse(localStorage.getItem('ivao-so-current')).meta.events.length:-1}));
 if(r.ev||r.gen||r.border||r.th||r.q||r.pts||r.open!=='ev'||r.cur||r.thr||r.bases||r.res) fail.push('reset left '+JSON.stringify(r)); if(r.asp!=='aip') fail.push('reset: AIP zones not loaded ('+r.asp+')');
+
+// drawing / choosing a theatre never selects areas by itself; "Proponile tu" does
+r=await page.evaluate(()=>{ APP.fullReset(); APP.fullReset(); APP.setEvents(['AAR']); APP.S.thCustom=APP.mkTheatre([[43.95,12.35],[43.95,13.6],[43.15,13.95],[42.95,12.9]],''); APP.setTheatre('CUSTOM'); const a=APP.RES().length, c=(APP.S.cor||[]).length;
+  APP.setTheatre('CT'); const b=APP.RES().length; APP.WOPEN='asp'; APP.renderAll(); document.querySelector('#resauto').click(); return {a,c,b,auto:APP.RES().length}; });
+if(r.a||r.c||r.b) fail.push('areas selected without asking '+JSON.stringify(r)); if(!r.auto) fail.push('"Proponile tu" proposed nothing');
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
