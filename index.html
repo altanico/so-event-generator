@@ -596,17 +596,31 @@ const bulSel = () => { const sel = String(S.meta.bullseye || '').toUpperCase(), 
 const nearestBull = () => { const f = geom().front; return BUL().slice().sort((a, b) => dist(f, a.pos) - dist(f, b.pos))[0]; };
 const normK = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const trkCenter = t => t.kind === 'AEW' ? [(t.c1[0] + t.c2[0]) / 2, (t.c1[1] + t.c2[1]) / 2] : centroid([t.ap1, t.tp1, t.ap2, t.tp2]);
-const zoneByName = n => { const k = normK(n); return k ? LIB().find(z => normK(z.id) === k || normK(z.name) === k || (k.length >= 3 && normK(z.name).endsWith(k))) : null; };
-const trkZones = t => (t.kind === 'AEW' ? [t.zone] : t.areas || []).map(zoneByName).filter(Boolean);
+const zoneByName = n => { const k = normK(n); return k ? LIB().find(z => normK(z.id) === k || normK(z.id) === 'LI' + k || normK(z.name) === k || (k.length >= 3 && normK(z.name).endsWith(k))) : null; };
+// areas of a track; when the AIP splits an area into sub-areas (R48 -> R48A / R48B) take the sub-areas that hold the track levels
+const trkZones = t => (t.kind === 'AEW' ? [t.zone] : t.areas || []).flatMap(n => { const z = zoneByName(n); if (z) return [z]; const k = normK(n);
+  const subs = LIB().filter(q => q.type !== 'COR' && new RegExp('^(LI)?' + k + '([A-Z]|BIS)$').test(normK(q.id))); return t.kind === 'AAR' ? subs.filter(q => zLo(q.lower) < t.hi && zLimit(q.upper) > t.lo) : subs; });
 const TRK_RANGE = { AEW: 450, AAR: 350 };
 function trkInArea(kind) { const f = geom().front; return TRK().filter(t => t.kind === kind && dist(f, trkCenter(t)) <= TRK_RANGE[kind]).sort((a, b) => dist(f, trkCenter(a)) - dist(f, trkCenter(b))); }
 function pickTrack(kind, used) {
   if (cusLocked()) return null;
+  { const ch = TRK().find(t => t.kind === kind && (S.trkSel || []).includes(t.id) && !used.has(t.id)); if (ch) return ch; } // tracks chosen by the staff come first
   if (manualRes()) { const res = new Set(S.reserved || []), c = TRK().filter(t => t.kind === kind && !used.has(t.id) && trkZones(t).length && trkZones(t).every(z => res.has(z.id))); return c.sort((a, b) => dist(geom().front, trkCenter(a)) - dist(geom().front, trkCenter(b)))[0] || null; }
   const res = new Set(S.reserved || []), f = geom().front;
   const c = TRK().filter(t => t.kind === kind && !used.has(t.id)).map(t => ({ t, d: dist(f, trkCenter(t)), r: trkZones(t).some(z => res.has(z.id)) })).filter(x => x.d <= TRK_RANGE[kind]);
   c.sort((a, b) => (b.r - a.r) || a.d - b.d); return c.length ? c[0].t : null;
 }
+// AAR tracks shown in phase 1 (only when the event refuels): the staff can choose them; choosing one reserves its areas
+const trkShape = t => [t.ap1, t.tp1, t.ap2, t.tp2];
+const aarNear = () => thChosen() ? TRK().filter(t => t.kind === 'AAR' && dist(geom().front, trkCenter(t)) <= TRK_RANGE.AAR).sort((a, b) => dist(geom().front, trkCenter(a)) - dist(geom().front, trkCenter(b))) : [];
+const aarWanted = () => REL().aar;
+function trkToggle(id) { const t = TRK().find(x => x.id === id); if (!t) return; const sel = new Set(S.trkSel || []), res = new Set(S.reserved || []);
+  if (sel.has(id)) { sel.delete(id); const keep = new Set(TRK().filter(x => sel.has(x.id)).flatMap(x => trkZones(x).map(z => z.id))); trkZones(t).forEach(z => { if (!keep.has(z.id)) res.delete(z.id); }); }
+  else { sel.add(id); trkZones(t).forEach(z => res.add(z.id)); if (!S.resMode) S.resMode = 'manual'; }
+  S.trkSel = [...sel]; S.reserved = fixConfigs([...res]); save(); renderPanel(); drawMap(); }
+function trkHtml() { const ts = aarNear(); if (!aarWanted() || !ts.length) return '';
+  return `<div style="margin-top:8px"><b style="font-size:13px">Track AAR</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Racetrack pubblicate per il rifornimento (in arancione sulla mappa). Sceglile qui o cliccandole sulla mappa: il tanker userà quelle scelte e le loro aree diventano riservate. Se non ne scegli, il generatore usa la più vicina o un corridoio AAR.</p>
+  ${ts.map(t => `<button class="b sm shrink ${(S.trkSel || []).includes(t.id) ? 'primary' : ''}" data-trk="${esc(t.id)}" title="${esc(`Aree ${t.areas.join(', ')} · rotta ${t.course} · leg ${t.leg} NM · ${t.ref.join(' / ')}`)}">${esc(t.id)} <span style="font-weight:400">FL${t.lo}–${t.hi}</span></button>`).join(' ')}</div>`; }
 const flN = x => { const m = String(x).match(/\d+/); return m ? m[0] : ''; };
 const trkAlt = t => { if (t.kind !== 'AEW') return `FL${t.lo}-FL${t.hi}`; const z = (typeof trkZones === 'function' ? trkZones(t) : [])[0]; return `FL${flN(t.floor)}${!z || /UNL/i.test(z.upper) ? '+' : ''}`; }; // AIP: INDIA 5 "FL310 or above", the others a single level
 function orbitShapes(a) { const r = (a.rad || 15) * 1.852, out = a.pts.map(p => ring(p, r, 40).concat([dest(p, 0, r)]));
@@ -2487,6 +2501,9 @@ function drawMap(fit) {
     add(L.polygon(z.poly, { color: '#9333EA', weight: on ? 2 : 1, dashArray: '6 4', fillOpacity: on ? .08 : .01, opacity: on ? .9 : .45 })).bindTooltip(`${z.name} · ${corLevels(z)}${on ? ' · IN USO' : ''}`, { sticky: true }).on('click', () => { if (TAB !== 'scenario' || ADDMODE) return; const st = new Set(S.cor || []); st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); });
     if (on) add(L.polyline(z.axis, { color: '#7e22ce', weight: 1.5 })); });
   if ((S.thDraft || []).length) { add(L.polyline(S.thDraft.concat(S.thDraft.length > 2 ? [S.thDraft[0]] : []), { color: '#0f172a', weight: 2, dashArray: '6 4' })); S.thDraft.forEach(p => add(L.circleMarker(p, { radius: 4, color: '#0f172a' }))); }
+  if (TAB === 'scenario' && aarWanted()) aarNear().forEach(t => { const on = (S.trkSel || []).includes(t.id);
+    const pl = add(L.polygon(trkShape(t), { color: '#EA580C', weight: on ? 3 : 1.5, dashArray: on ? null : '8 5', fillOpacity: on ? .12 : .03 })).bindTooltip(`Track AAR ${t.id} · FL${t.lo}–FL${t.hi} · aree ${t.areas.join(', ')}${on ? ' · SCELTA' : ' · clic per sceglierla'}`, { sticky: true });
+    pl.on('click', () => { if (!ADDMODE) trkToggle(t.id); }); });
   if (theatre().poly && ADDMODE !== 'th:draw') add(L.polygon(theatre().poly, { color: '#0f172a', weight: 1.5, dashArray: '10 6', fill: false, interactive: false }));
   if ((S.cusDraft || []).length) { add(L.polyline(S.cusDraft.concat(S.cusDraft.length > 2 ? [S.cusDraft[0]] : []), { color: '#db2777', weight: 2, dashArray: '5 4' })); S.cusDraft.forEach(p => add(L.circleMarker(p, { radius: 4, color: '#db2777' }))); }
   mapZones().forEach(z => { const r = (S.reserved || []).includes(z.id), col = ZCOL[z.type] || '#475569';
@@ -2599,7 +2616,7 @@ function fullReset() {
   if (MAP) MAP.closePopup(); try { renderEvPanel(); } catch (e) { } save(); renderAll(true); toast('Reset fatto: nuovo evento vuoto');
 }
 function thDrawStart() { ADDMODE = 'th:draw'; S.thDraft = []; WOPEN = 'th'; renderPanel(); drawMap(); toast('Clic sulla mappa per i vertici del teatro, poi "Chiudi teatro"'); }
-function setTheatre(id) { if (ADDMODE === 'th:draw') { ADDMODE = ''; S.thDraft = []; } S.meta.theatre = id; S.border = null; BEDIT = false; S.resMode = undefined; S.reserved = (S.custom || []).map(c => c.id); S.cor = []; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); S.meta.bullseye = nearestBull().name;
+function setTheatre(id) { if (ADDMODE === 'th:draw') { ADDMODE = ''; S.thDraft = []; } S.meta.theatre = id; S.border = null; BEDIT = false; S.resMode = undefined; S.reserved = (S.custom || []).map(c => c.id); S.cor = []; S.trkSel = []; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); S.meta.bullseye = nearestBull().name;
   if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); }
 function onMapClick(p) {
   if (!ADDMODE) return;
@@ -2677,6 +2694,7 @@ function aspCard() {
     <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Unisci</button></div>` : ''}
   ${cusHtml()}
   ${CORS().length ? `<div style="margin-top:8px"><b style="font-size:13px">Corridoi OAT (AIP ENR 5.2.2.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Per il trasferimento fra base e aree o come "aerovia" lungo una rotta. ${S.resMode === 'manual' && !cusLocked() ? 'Con "Le scelgo io" sono spenti: accendi solo quelli che ti servono' : 'Proposti in automatico'}; clic per aggiungerli o toglierli (anche sulla mappa).</p>${CORS().map(z => `<button class="b sm shrink ${(S.cor || []).includes(z.id) ? 'primary' : ''}" data-cor="${esc(z.id)}" title="${esc(corLevels(z))}">${esc(z.name.replace(/^OAT corridor /, ''))}</button>`).join(' ')}</div>` : ''}
+  ${trkHtml()}
   ${CFG().length ? `<div style="margin-top:8px"><b style="font-size:13px">Configurazioni di attivazione simultanea (AIP ENR 5.1.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Le zone di questi gruppi si attivano da sole o solo nelle combinazioni elencate. Una combinazione non prevista viene corretta in automatico alla generazione.</p>
     ${cfgGroups().map(g => `<div style="margin:4px 0"><span class="muted" style="font-size:12px">${esc(g)}:</span> ${CFG().filter(c => c.group === g).map(c => `<button class="b sm shrink ${activeConfigs().includes(c) ? 'primary' : ''}" data-cfg="${esc(c.id)}" title="${esc(c.zones.map(z => z.replace('LI-', '')).join(' + '))}${c.sup ? ' – richiede un Supplemento AIP' : ''}">${esc(c.id)}${c.sup ? ' *' : ''}</button>`).join(' ')}</div>`).join('')}
     ${cfgIssues().length ? `<div class="warn" style="margin-top:6px">${cfgIssues().map(esc).join('<br>')}</div>` : ''}</div>` : ''}
@@ -3104,6 +3122,7 @@ document.addEventListener('click', e => {
   if (t.id === 'cusclose') { const c = cusFinishDraw(); toast(c ? `${c.name} creata` : 'Servono almeno 3 vertici'); renderPanel(); drawMap(); return; }
   if (t.id === 'cusscen') { const c = cusFromScenario(); toast(c ? `${c.name} creata attorno a tutto lo scenario` : 'Scenario vuoto'); renderPanel(); drawMap(); return; }
   if (t.id === 'notamtxt') { download(`${fileBase()}_NOTAM.txt`, new Blob([notamList().map(n => n.text).join('\n\n') + '\n'], { type: 'text/plain' })); return; }
+  if (t.dataset.trk) { trkToggle(t.dataset.trk); return; }
   if (t.dataset.cor) { const z = CORS().find(x => x.id === t.dataset.cor), st = new Set(S.cor || []); if (z) { st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
@@ -3140,7 +3159,7 @@ document.addEventListener('click', e => {
     case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
       S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); toManual(); save(); renderAll(); return; }
     case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); drawMap(); return;
-    case 'resnone': S.resMode = 'manual'; S.cor = []; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
+    case 'resnone': S.resMode = 'manual'; S.cor = []; S.trkSel = []; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
     case 'genauto': S.resMode = 'auto'; WOPEN = 'gen'; generateGeneric(); return;
     case 'genman': toManual(); WOPEN = 'gen'; generateGeneric(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
@@ -4406,7 +4425,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
