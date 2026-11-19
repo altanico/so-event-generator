@@ -107,3 +107,23 @@ Il generatore non inventa più callsign ATC. Le postazioni reali arrivano dal da
 CSV: intestazione `callsign,name,frequency,type,fir`. Se `type` manca viene ricavato dal suffisso del callsign (`_APP`, `_TWR`, `_CTR`), l'ICAO dal prefisso.
 I ruoli di evento (GCI, RCC, dispatch EMS, DOS, cella soccorsi) restano callsign di esercitazione modificabili; la frequenza viene dal pool `frequencies` del database.
 
+
+## v1.3 – AIP layer (temporary, removable)
+
+Until the division database is connected, the default reserved areas are the **military** restricted areas of AIP Italia ENR 5.1.2
+(AIRAC 09 JUL 2026), with their real vertical limits.
+
+| File | Content |
+|---|---|
+| `data/aip_src/LI-ENR_5.1.2.pdf` | Source AIP section |
+| `tools/aip_extract.py`, `tools/aip_build.py` | `python3 tools/aip_extract.py data/aip_src/LI-ENR_5.1.2.pdf /tmp/raw.json && python3 tools/aip_build.py /tmp/raw.json data/aip_zones.json "09 JUL 2026"` (needs pdfplumber) |
+| `data/aip_zones.json` | 120 areas (`source: "aip"`, ids `LI-R…`), extra fields `activity` (English), `use` tags (`AIR`, `FIRING`, `A2G`, `PARA`, `HELO`, `UAV`, `TOW`), `hours` (Italian/English, staff only) |
+
+* Kept: areas whose activity is military (military air activity, firing, State aircraft, Army helicopters, military parachuting, military UA).
+  Skipped: security overflight bans, archaeological areas, gliding / free flight / VDS, captive balloon, civil UA testing, company test flights, U-space.
+* Lines along a coastline or border are drawn as straight segments; circles and arcs are computed from centre and radius.
+* Selection: areas at the front / red area or within 60 km; for CAS / strike / SEAD also firing ranges within 150 km, for airdrop parachuting areas,
+  for CSAR / MEDEVAC helicopter areas. CAP / tracks / orbits with no reserved area at their level get the nearest area that has it (max 250 km).
+  Civil-only events do not use these military areas.
+* No frequencies (stay TBD). Load order: database API / imported file → AIP file if present → demo data.
+* **To remove the layer**: delete `data/aip_zones.json`, `data/aip_src/` and `tools/aip_*.py`.
