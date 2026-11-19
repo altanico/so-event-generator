@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **AAR tracks follow the level filter of their areas** (staff 19 Nov): in phase 1, an AAR track whose areas are all hidden by the mission level band disappears from the map and from the "Track AAR" buttons, live while the sliders move (same as the areas). A track already chosen by the staff stays visible (like reserved areas), with the out-of-band warning. Tracks with no area in the database follow their own levels (lo–hi). Test.
 - [x] **AAR corridors (ENR 5.2.2.1): no holding pattern** (v1.17.1). Staff 19 Nov: in an AAR corridor the tanker flies the corridor like an airway and the receivers follow / join en route. When a tanker is given a corridor: draw its element as a route along the corridor axis (entry point → exit point, direction arrows, block level), not as a racetrack; AAR card: AR ENTRY / EXIT POINT = corridor ends, AAR TRK = corridor, pattern NA, ARIP / ARCP at the entry; serial text and phraseology "en route". Published tracks (AURORA, TERRA…) keep the holding. Phase-1 map unchanged (corridors are areas). Test: no TRACK racetrack on a corridor.
   - RV type in a corridor (staff OK): RV ALPHA if a GCI is staffed, otherwise RV GOLF (en route); ECHO chosen by hand becomes GOLF in a corridor.
 - Still open with the staff: list of variants for the other event types (proposed ones implemented: ID QRA/CAP, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
