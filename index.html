@@ -2543,8 +2543,9 @@ function zonePickHtml(zs) { const res = new Set(S.reserved || []);
 function zonePick(p, zs) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs)).openOn(MAP); }
 // zone list: filter by name/id, type, selection, range; sort by distance, name, type or lower limit
 const ZF = { q: '', type: '', sel: '', all: false, sort: 'dist' };
-const zfMatch = (z, res) => { const q = ZF.q.trim().toLowerCase();
-  return (!q || (z.name + ' ' + z.id + ' ' + (z.activity || '')).toLowerCase().includes(q)) && (!ZF.type || (ZF.type === 'custom' ? z.custom : z.type === ZF.type && !z.custom)) && (!ZF.sel || (ZF.sel === 'on') === res.has(z.id)); };
+const zfNorm = x => String(x || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+const zfMatch = (z, res) => { const q = zfNorm(ZF.q);
+  return (!q || zfNorm(z.name + z.id).includes(q) || String(z.activity || '').toLowerCase().includes(ZF.q.trim().toLowerCase())) && (!ZF.type || (ZF.type === 'custom' ? z.custom : z.type === ZF.type && !z.custom)) && (!ZF.sel || (ZF.sel === 'on') === res.has(z.id)); };
 function zfList(near) { const L0 = ZF.all ? LIB().filter(z => z.type !== 'COR') : near.concat(CUS().filter(c => !near.includes(c))), c = theatre().red.center;
   const k = { dist: z => dist(c, centroid(z.poly)), name: z => z.name.toLowerCase(), type: z => (z.custom ? 'ZZ' : z.type) + ' ' + z.name.toLowerCase(), lo: z => zLo(z.lower) };
   const f = k[ZF.sort] || k.dist; return L0.slice().sort((a, b) => { const x = f(a), y = f(b); return x < y ? -1 : x > y ? 1 : 0; }); }
@@ -2555,14 +2556,14 @@ function zoneTableHtml(near, res) {
   const list = zfList(near), types = [...new Set(list.filter(z => !z.custom).map(z => z.type))].sort(), shown = list.filter(z => zfMatch(z, res)).length;
   const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`;
   return `<div class="row" style="flex-wrap:wrap;align-items:flex-end;margin-top:6px;gap:6px">
-    <div style="flex:2 1 160px"><label>Cerca (nome o sigla)</label><input id="zfq" value="${esc(ZF.q)}" placeholder="es. R49, Salto di Quirra, INDIA"></div>
+    <div style="flex:2 1 160px"><label>🔍 Cerca area (nome, sigla o attività)</label><input id="zfq" type="search" value="${esc(ZF.q)}" placeholder="es. R49, Quirra, INDIA, TSA 73" autocomplete="off"></div>
     <div style="flex:1 1 90px"><label>Tipo</label><select id="zftype">${opt('', 'Tutti', ZF.type)}${types.map(t => opt(t, t, ZF.type)).join('')}${CUS().length ? opt('custom', 'Custom', ZF.type) : ''}</select></div>
     <div style="flex:1 1 110px"><label>Stato</label><select id="zfsel">${opt('', 'Tutte', ZF.sel)}${opt('on', 'Selezionate', ZF.sel)}${opt('off', 'Non selezionate', ZF.sel)}</select></div>
     <div style="flex:1 1 120px"><label>Ordina per</label><select id="zfsort">${opt('dist', 'Distanza dal teatro', ZF.sort)}${opt('name', 'Nome', ZF.sort)}${opt('type', 'Tipo', ZF.sort)}${opt('lo', 'Limite inferiore', ZF.sort)}</select></div>
     <div style="flex:1 1 120px"><label>Elenco</label><select id="zfall">${opt('', 'Vicino al teatro', ZF.all ? 'x' : '')}${opt('1', 'Tutta Italia', ZF.all ? '1' : '')}</select></div></div>
   <div class="row" style="flex-wrap:wrap;align-items:center;margin-top:4px"><span class="muted" style="font-size:12px" id="zfcount">${shown} di ${list.length} mostrate</span>
     <button class="b sm shrink" id="zfon">Seleziona le mostrate</button><button class="b sm shrink" id="zfoff">Deseleziona le mostrate</button>${ZF.q || ZF.type || ZF.sel ? '<button class="b sm shrink" id="zfreset">Togli filtri</button>' : ''}</div>
-  ${list.length ? `<div style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
+  ${list.length ? `<div data-keep="zlist" id="zlist" style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
 }
 function aspCard() {
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
@@ -2834,10 +2835,10 @@ function renderExport() {
   <div class="card"><b>Salvare e riaprire l'evento</b><p class="muted" style="margin:4px 0">Usa <b>📁 Eventi salvati</b> in alto: salva, riapri, duplica, esporta o importa un evento.</p><button class="b" id="evbtn2">📁 Apri eventi salvati</button></div>`;
 }
 function renderPanel() {
-  const p = $('#panel'), top = p.scrollTop;
+  const p = $('#panel'), top = p.scrollTop, wy = window.scrollY, keep = {}; p.querySelectorAll('[data-keep]').forEach(el => keep[el.dataset.keep] = el.scrollTop);
   p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
     `<datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist>`;
-  p.scrollTop = top;
+  p.scrollTop = top; p.querySelectorAll('[data-keep]').forEach(el => { if (keep[el.dataset.keep] != null) el.scrollTop = keep[el.dataset.keep]; }); if (window.scrollY !== wy) window.scrollTo(0, wy);
 }
 function renderAll(fit) {
   if (typeof renderEvBadge === 'function') renderEvBadge();

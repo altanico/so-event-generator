@@ -45,4 +45,13 @@ if(!r.length||r.some(t=>t!=='TSA')) fail.push('type filter: '+r.slice(0,5));
 await page.selectOption('#zfall','1'); await page.selectOption('#zfsort','name'); await page.waitForTimeout(100);
 r=await page.evaluate(()=>({n:document.querySelectorAll('tr[data-zrow]').length, names:[...document.querySelectorAll('tr[data-zrow]:not([hidden]) td:nth-child(3)')].map(t=>t.firstChild.textContent)}));
 if(r.n<200) fail.push('all-Italy list '+r.n); if(r.names.join('|')!==r.names.slice().sort((a,b)=>a.toLowerCase()<b.toLowerCase()?-1:1).join('|')) fail.push('sort by name');
+
+// ticking an area keeps the list where it was; search ignores spaces and dashes
+await page.selectOption('#zftype',''); await page.fill('#zfq',''); await page.waitForTimeout(100);
+await page.evaluate(()=>{document.querySelector('#zlist').scrollTop=600;}); const before=await page.evaluate(()=>document.querySelector('#zlist').scrollTop);
+await page.evaluate(()=>{ const rows=[...document.querySelectorAll('#zlist input[data-res]')]; const el=rows.find(i=>{const r=i.getBoundingClientRect(), b=document.querySelector('#zlist').getBoundingClientRect(); return r.top>b.top+5&&r.bottom<b.bottom-5;}); el.click(); });
+await page.waitForTimeout(150); const after=await page.evaluate(()=>document.querySelector('#zlist').scrollTop);
+if(!(before>0)||Math.abs(after-before)>2) fail.push(`list scroll ${before} -> ${after}`);
+await page.fill('#zfq','tsa 73'); await page.waitForTimeout(100);
+r=await page.evaluate(()=>[...document.querySelectorAll('tr[data-zrow]:not([hidden])')].map(t=>t.dataset.zrow)); if(!r.length||r.some(id=>!/TSA.?73/i.test(id))) fail.push('normalised search: '+r.slice(0,5));
 console.log(fail.length?'"err": '+fail.join('; '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
