@@ -61,4 +61,11 @@ await page.selectOption('#zfall','1'); await page.waitForTimeout(100); const nAl
 if(!(nAll>nNear)) fail.push(`map all-Italy ${nNear} -> ${nAll}`);
 await page.fill('#zfq','R49'); await page.waitForTimeout(100); r=await page.evaluate(()=>APP.mapZones().filter(z=>!APP.S.reserved.includes(z.id)).map(z=>z.id)); if(r.some(id=>!/R49/i.test(id))) fail.push('map search filter '+r.slice(0,4));
 await page.fill('#zfq',''); await page.selectOption('#zfall','');
+
+// manual mode: OAT corridors off unless ticked; auto mode proposes them
+r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.S.meta.theatre='SA'; APP.setEvents(['MIX']); APP.renderAll();
+  APP.S.resMode='auto'; APP.S.reserved=[]; APP.generateGeneric(); APP.parseLines('4x F-35A\n1x KC-767'); APP.tailor(); o.auto=(APP.S.cor||[]).length;
+  document.querySelector('#resman').click(); o.afterSwitch=(APP.S.cor||[]).length;
+  APP.generateGeneric(); APP.parseLines('4x F-35A\n1x KC-767'); APP.tailor(); o.manual=(APP.S.cor||[]).length; return o; });
+if(!r.auto) fail.push('auto mode: no corridors proposed (SA)'); if(r.afterSwitch||r.manual) fail.push('manual mode corridors on: '+JSON.stringify(r));
 console.log(fail.length?'"err": '+fail.join('; '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();

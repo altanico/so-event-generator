@@ -653,7 +653,7 @@ async function loadAirspaceApi(url, token) {
 function setAirspace(data, source, extra = {}) {
   S.asp = { source, loaded: new Date().toISOString(), zones: data.zones, freqs: data.freqs, bullseyes: data.bullseyes || [], tracks: data.tracks || [], configs: data.configs || [], ...extra };
   if ((data.positions || []).length) S.positions = data.positions;
-  S.reserved = S.resMode === 'manual' && !cusLocked() ? (S.reserved || []).filter(id => LIB().some(z => z.id === id)) : autoReserve(); S.cor = autoCor(); S.c2sel = null; save();
+  S.reserved = S.resMode === 'manual' && !cusLocked() ? (S.reserved || []).filter(id => LIB().some(z => z.id === id)) : autoReserve(); S.cor = corPick(); S.c2sel = null; save();
 }
 // ---- geometry ----
 function pip(p, poly) { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [yi, xi] = poly[i], [yj, xj] = poly[j]; if (((yi > p[0]) !== (yj > p[0])) && (p[1] < (xj - xi) * (p[0] - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
@@ -664,6 +664,9 @@ const LIB = () => { const z = (S.asp && S.asp.zones) || [], cu = S.custom || [];
 const RES = () => LIB().filter(z => z.type !== 'COR' && (S.reserved || []).includes(z.id));
 // --- OAT corridors (AIP ENR 5.2.2.4): transit between bases and areas, or an airway-like reservation along a route
 const CORS = () => LIB().filter(z => z.type === 'COR' && (z.axis || []).length > 1);
+// manual mode: OAT corridors only as ticked by the staff (never proposed)
+const corPick = () => S.resMode === 'manual' && !cusLocked() ? (S.cor || []).filter(id => CORS().some(z => z.id === id)) : autoCor();
+const toManual = () => { if (S.resMode !== 'manual') S.cor = []; S.resMode = 'manual'; };
 const CORSEL = () => CORS().filter(z => (S.cor || []).includes(z.id));
 const corWpt = (z, k) => (z.wpt && z.wpt[k]) || `${z.name.replace(/^OAT corridor /, '').replace(/ \(.*\)$/, '')} ${k + 1}`;
 const corLevels = z => z.lower === 'TBC' ? (z.pref && z.pref.length ? `coordinated (preferential ${z.pref.join(' or ')})` : 'coordinated with the ATC units') : `${z.lower}-${z.upper}`;
@@ -1185,7 +1188,7 @@ function generateGeneric() {
   if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length && S.resMode !== 'manual') S.reserved = autoReserve();
   if (S.resMode === 'manual' && !(S.reserved || []).length && !cusLocked()) toast('Nessuna area riservata selezionata: selezionale nella lista e usa "Riporta tutto dentro le zone"');
   if (cusLocked()) S.reserved = cusLocked().map(c => c.id);
-  S.cor = autoCor();
+  S.cor = corPick();
   S.meta.bullseye = nearestBull().name;
   if (!S.c2sel) S.c2sel = proposeC2();
   S.gen = true; S.zones = genZones(); S.background = genBackground(); S.t = null;
@@ -2584,7 +2587,7 @@ function aspCard() {
   ${RES().filter(z => !z.custom).length >= 2 ? `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:6px"><span class="muted" style="font-size:12px;flex:1 1 220px">Unisci le aree selezionate in un'unica area custom con limiti verticali tuoi:</span>
     <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Unisci</button></div>` : ''}
   ${cusHtml()}
-  ${CORS().length ? `<div style="margin-top:8px"><b style="font-size:13px">Corridoi OAT (AIP ENR 5.2.2.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Per il trasferimento fra base e aree o come "aerovia" lungo una rotta. Proposti in automatico; clic per aggiungerli o toglierli (anche sulla mappa).</p>${CORS().map(z => `<button class="b sm shrink ${(S.cor || []).includes(z.id) ? 'primary' : ''}" data-cor="${esc(z.id)}" title="${esc(corLevels(z))}">${esc(z.name.replace(/^OAT corridor /, ''))}</button>`).join(' ')}</div>` : ''}
+  ${CORS().length ? `<div style="margin-top:8px"><b style="font-size:13px">Corridoi OAT (AIP ENR 5.2.2.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Per il trasferimento fra base e aree o come "aerovia" lungo una rotta. ${S.resMode === 'manual' && !cusLocked() ? 'Con "Le scelgo io" sono spenti: accendi solo quelli che ti servono' : 'Proposti in automatico'}; clic per aggiungerli o toglierli (anche sulla mappa).</p>${CORS().map(z => `<button class="b sm shrink ${(S.cor || []).includes(z.id) ? 'primary' : ''}" data-cor="${esc(z.id)}" title="${esc(corLevels(z))}">${esc(z.name.replace(/^OAT corridor /, ''))}</button>`).join(' ')}</div>` : ''}
   ${CFG().length ? `<div style="margin-top:8px"><b style="font-size:13px">Configurazioni di attivazione simultanea (AIP ENR 5.1.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Le zone di questi gruppi si attivano da sole o solo nelle combinazioni elencate. Una combinazione non prevista viene corretta in automatico alla generazione.</p>
     ${cfgGroups().map(g => `<div style="margin:4px 0"><span class="muted" style="font-size:12px">${esc(g)}:</span> ${CFG().filter(c => c.group === g).map(c => `<button class="b sm shrink ${activeConfigs().includes(c) ? 'primary' : ''}" data-cfg="${esc(c.id)}" title="${esc(c.zones.map(z => z.replace('LI-', '')).join(' + '))}${c.sup ? ' – richiede un Supplemento AIP' : ''}">${esc(c.id)}${c.sup ? ' *' : ''}</button>`).join(' ')}</div>`).join('')}
     ${cfgIssues().length ? `<div class="warn" style="margin-top:6px">${cfgIssues().map(esc).join('<br>')}</div>` : ''}</div>` : ''}
@@ -2984,13 +2987,13 @@ document.addEventListener('click', e => {
     case 'aspaip': defaultAirspace(); renderAll(); toast('Zone AIP caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'resauto': S.resMode = 'auto'; S.reserved = autoReserve(); S.cor = autoCor(); save(); renderAll(); toast('Aree proposte dal generatore'); return;
-    case 'resman': S.resMode = 'manual'; save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
+    case 'resman': toManual(); save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
     case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
-      S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); S.resMode = 'manual'; save(); renderAll(); return; }
+      S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); toManual(); save(); renderAll(); return; }
     case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); drawMap(); return;
-    case 'resnone': S.resMode = 'manual'; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
+    case 'resnone': S.resMode = 'manual'; S.cor = []; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
     case 'genauto': S.resMode = 'auto'; generateGeneric(); return;
-    case 'genman': S.resMode = 'manual'; generateGeneric(); return;
+    case 'genman': toManual(); generateGeneric(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
     case 'aibregen': genAIB(); if (S.t) { applyAIB(S.t); } save(); renderAll(true); toast('Scenari AIB generati'); return;
     case 'sarregen': genSAR(); if (S.t) applySAR(S.t); save(); renderAll(true); toast('Scenari SAR generati'); return;
