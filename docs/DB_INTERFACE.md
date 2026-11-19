@@ -151,3 +151,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## BLUE / RED boundary (v1.13)
 
 * `S.border`: null (automatic straight line across the front) or an array of `[lat, lon]` points edited by the staff; it is carried in the saved event and the public payload. Beyond its ends the line continues straight. The FLOT control measure follows it.
+
+## How areas are proposed (v1.14.1)
+
+* Each task has a level band (`TASK_FL`): AAR/receiver FL150-FL280, DCA/OCA/escort/QRA FL100-FL350, SEAD FL100-FL300, strike FL50-FL300, CAS FL50-FL200, maritime/recce FL50-FL250. An area fits a band if it overlaps it by at least 5000 ft; an unknown (TBC) upper limit never fits.
+* Areas published for an activity of the event (`use`: FIRING/A2G, PARA, HELO, LOWLEVEL) are proposed whatever their levels.
+* Training events: nearest fitting areas around the theatre (AAR corridors first for refuelling, max 2 + 2-4 areas, 1 INDIA area if AEW). Combat events: areas around the front as before, plus the nearest areas for any band not yet covered.

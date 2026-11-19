@@ -680,11 +680,27 @@ function autoCor() { const res = RES(), bases = (S.blueBases || []).map(ap).filt
 const nearZones = (km = 320) => { const c = theatre().red.center; return LIB().filter(z => z.type !== 'COR' && dist(c, centroid(z.poly)) < km).sort((a, b) => dist(c, centroid(a.poly)) - dist(c, centroid(b.poly))); };
 const zArea = poly => { const c = centroid(poly), k = Math.cos(c[0] * Math.PI / 180) * 111.32; let a = 0; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) a += (poly[j][1] * k) * (poly[i][0] * 110.57) - (poly[i][1] * k) * (poly[j][0] * 110.57); return Math.abs(a / 2); };
 function autoReserve() { if (cusLocked()) return cusLocked().map(c => c.id); return fixConfigs([...new Set(autoReserve0().concat((S.custom || []).map(c => c.id)))]); }
-function autoReserve0() { const g = geom(), real = S.asp && S.asp.source !== 'demo', LIB = () => LIBF().filter(z => z.type !== 'COR');
-  if (real && S.asp.source === 'aip' && PROF().civil) return []; // AIP layer = military areas only: civil events do not use them
-  const T = new Set(reqTasks()), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : []), ...(T.has('LOWNAV') ? ['LOWLEVEL'] : [])]);
-  return LIB().filter(z => z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || zArea(z.poly) >= 40 || (z.use || []).some(u => want.has(u)))
-    && (pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < (real ? 60 : 140) || (real && (z.use || []).some(u => want.has(u)) && dist(g.front, centroid(z.poly)) < ((z.use || []).includes('LOWLEVEL') ? 220 : 150)))).map(z => z.id); }
+// level bands (FL) each task needs from a reserved area; an area qualifies if it overlaps one band by ≥ 5000 ft
+const TASK_FL = { AAR: [150, 280], RECEIVER: [150, 280], DCA: [100, 350], OCA: [100, 350], ESCORT: [100, 350], QRA: [100, 350], SEAD: [100, 300], STRIKE: [50, 300], CAS: [50, 200], ANTISHIP: [50, 250], MPA: [50, 250], RECCE: [50, 250] };
+const zBandOk = (z, b) => !/TBC|TBD/i.test(String(z.upper)) && zLo(z.lower) <= b[1] - 50 && zLimit(z.upper) >= b[0] + 50; // unknown upper limit: not proposed for a level band
+function autoReserve0() { const g = geom(), real = S.asp && S.asp.source !== 'demo', P = PROF(), LIB = () => LIBF().filter(z => z.type !== 'COR');
+  if (real && S.asp.source === 'aip' && P.civil) return []; // AIP layer = military areas only: civil events do not use them
+  const T = new Set(reqTasks().filter(t => !offT(t))), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : []), ...(T.has('LOWNAV') ? ['LOWLEVEL'] : [])]);
+  const bands = [...T].map(t => TASK_FL[t]).filter(Boolean), tagged = z => (z.use || []).some(u => want.has(u));
+  // an area is useful when its vertical limits fit what the event flies (e.g. AAR FL150-FL280), or it is published for an activity of the event (firing, para, helicopters, low level)
+  const useful = z => tagged(z) || bands.some(b => zBandOk(z, b));
+  const cand = LIB().filter(z => z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || ((zArea(z.poly) >= 40 || tagged(z)) && (!P.sober || useful(z))))); // combat: ground elements need the areas near the front at any level
+  if (P.sober && real) { // training: no front line; the nearest useful areas around the theatre, AAR corridors first for refuelling
+    const d = z => dist(g.front, centroid(z.poly)), out = [];
+    if (T.has('AAR') || T.has('RECEIVER')) out.push(...cand.filter(z => z.type === 'AAR' && d(z) < 250).sort((a, b) => d(a) - d(b)).slice(0, 2));
+    const rest = cand.filter(z => z.type !== 'AAR' && z.type !== 'IND' && d(z) < (tagged(z) && (z.use || []).includes('LOWLEVEL') ? 220 : 160)).sort((a, b) => (tagged(b) - tagged(a)) || d(a) - d(b));
+    out.push(...rest.slice(0, out.length ? 2 : 4)); out.push(...cand.filter(z => z.type === 'IND' && d(z) < 250).sort((a, b) => d(a) - d(b)).slice(0, 1));
+    return [...new Set(out.map(z => z.id))]; }
+  const sel = cand.filter(z => pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < (real ? 60 : 140) || (real && tagged(z) && dist(g.front, centroid(z.poly)) < ((z.use || []).includes('LOWLEVEL') ? 220 : 150)));
+  // every level band the event flies must be covered by at least one area: otherwise add the nearest areas that fit it
+  if (real) bands.forEach(b => { if (sel.some(z => z.type !== 'IND' && zBandOk(z, b))) return; const d = z => dist(g.front, centroid(z.poly));
+    sel.push(...cand.filter(z => z.type !== 'IND' && z.type !== 'AAR' && zBandOk(z, b) && !sel.includes(z) && d(z) < 180).sort((a, c) => d(a) - d(c)).slice(0, 2)); });
+  return [...new Set(sel.map(z => z.id))]; }
 const inRes = p => { const r = RES(); return !r.length || r.some(z => pip(p, z.poly)); };
 const zoneAt = p => RES().find(z => pip(p, z.poly));
 function sampleRes(center, rKm) {

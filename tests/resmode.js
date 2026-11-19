@@ -68,4 +68,11 @@ r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.S.meta.theatre='SA'
   document.querySelector('#resman').click(); o.afterSwitch=(APP.S.cor||[]).length;
   APP.generateGeneric(); APP.parseLines('4x F-35A\n1x KC-767'); APP.tailor(); o.manual=(APP.S.cor||[]).length; return o; });
 if(!r.auto) fail.push('auto mode: no corridors proposed (SA)'); if(r.afterSwitch||r.manual) fail.push('manual mode corridors on: '+JSON.stringify(r));
+
+// proposals follow the levels the event flies: AAR / intercept training never get low-level areas, and always get one fitting area
+r=await page.evaluate(()=>{ const o=[], lim=s=>{const m=String(s).match(/FL\s?(\d+)/); return m?+m[1]:(/(\d+)\s?FT/.exec(s)||[0,0])[1]/100;};
+  for (const [ev,b] of [['AAR',[150,280]],['ID',[100,350]]]) for (const th of ['NE','NO','CT','SA','SI','PU']) { APP.S.custom=[]; APP.S.resMode='auto'; APP.S.meta.theatre=th; APP.setEvents([ev]); APP.generateGeneric();
+    const res=APP.RES(); const low=res.filter(z=>z.type!=='IND'&&!/TBC/.test(z.upper)&&lim(z.upper)<b[0]); if(low.length) o.push(`${ev} ${th}: low ${low.map(z=>z.id)}`);
+    if(!res.some(z=>z.type!=='IND'&&lim(z.upper)>=b[0]+50)) o.push(`${ev} ${th}: no area for FL${b[0]}-${b[1]}`); } return o; });
+fail.push(...r);
 console.log(fail.length?'"err": '+fail.join('; '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
