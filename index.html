@@ -1109,9 +1109,22 @@ function genZones() {
   }
   return z;
 }
+// default bases: one BLUE and one RED; for military / training events civil airports are excluded (the staff can add more by hand)
+function defaultBases(th = theatre()) {
+  const milEv = !PROF().civil, isMil = k => AIRPORTS[k] && AIRPORTS[k][3] !== 'CIV', pos = k => [AIRPORTS[k][1], AIRPORTS[k][2]], rc = th.red.center;
+  let bp = milEv ? th.blue.filter(isMil) : th.blue.filter(k => AIRPORTS[k]);
+  if (!bp.length) bp = th.blue.filter(k => AIRPORTS[k]);
+  const blue = bp.sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b))).slice(0, 1);
+  S.blueBases = blue;
+  let red = th.red.bases.filter(k => AIRPORTS[k] && !blue.includes(k));
+  if (milEv) { const g = geom(), toB = dest(g.front, g.dir, 50), toR = dest(g.front, g.dir + 180, 50);
+    const m = Object.keys(AIRPORTS).filter(k => isMil(k) && !blue.includes(k) && dist(pos(k), rc) < th.red.r * 1.5 && dist(pos(k), toR) < dist(pos(k), toB)).sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b)));
+    if (m.length) red = m; }
+  S.redBases = red.slice(0, 1);
+}
 function generateGeneric() {
   const th = theatre();
-  S.blueBases = [...th.blue]; S.redBases = [...th.red.bases];
+  defaultBases(th);
   if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else if (!(S.reserved || []).length) S.reserved = autoReserve();
   S.meta.bullseye = nearestBull().name;
   if (!S.c2sel) S.c2sel = proposeC2();
@@ -2660,7 +2673,7 @@ document.addEventListener('change', e => {
   if (t.dataset.map !== undefined && CSV_PENDING) { CSV_PENDING.map[+t.dataset.map] = t.value; return; }
   const id = t.id;
   if (id === 'op') S.meta.op = t.value;
-  if (id === 'theatre') { S.meta.theatre = t.value; const th = theatre(); S.blueBases = [...th.blue]; S.redBases = [...th.red.bases]; S.c2sel = null; if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name; if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (id === 'theatre') { S.meta.theatre = t.value; defaultBases(); S.c2sel = null; if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name; if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (id === 'bull') { S.meta.bullseye = t.value.toUpperCase();
     if (S.t) { const el = S.t.airspace.find(a => a.type === 'BULLSEYE'); if (el) { el.name = `BULLSEYE ${S.meta.bullseye}`; el.pts = [bullPos()]; }
       if (S.t.spins && S.t.spins[0]) S.t.spins[0] = `Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}${(bullOf(S.meta.bullseye) || {}).ref ? ' (' + bullOf(S.meta.bullseye).ref + ')' : ''}. Threat calls in BULLSEYE format.`; } }
@@ -2698,7 +2711,7 @@ document.addEventListener('click', e => {
   const v = id => ($('#' + id) || {}).value || '';
   switch (t.id) {
     case 'rop': S.meta.op = 'OPERATION ' + pick(OP_A) + ' ' + pick(OP_B); break;
-    case 'rth': { S.meta.theatre = pick(THEATRES).id; const th = theatre(); S.blueBases = [...th.blue]; S.redBases = [...th.red.bases]; S.c2sel = null; if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+    case 'rth': { S.meta.theatre = pick(THEATRES).id; defaultBases(); S.c2sel = null; if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
     case 'rfac': { const o = { ...S.factions }; S.factions = { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) }; FAC_ED = null; if (S.background) S.background = S.background.split(o.blue).join(S.factions.blue).split(o.red).join(S.factions.red); break; }
     case 'gen': generateGeneric(); return;
     case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
@@ -3956,7 +3969,7 @@ initMap();
 route();
 loadLand();
 if (MODE === 'staff') evInit();
-window.APP = { setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

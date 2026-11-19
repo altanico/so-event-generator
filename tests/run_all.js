@@ -2,7 +2,7 @@
 // Needs the app served at BASE_URL (default http://localhost:8765, e.g. `npm run serve`).
 const { execFileSync } = require('child_process'); const fs = require('fs'); const path = require('path');
 const out = path.join(__dirname, 'out'); fs.mkdirSync(out, { recursive: true });
-const tests = ['aib.js', 'sar.js', 'pr.js', 'cas.js', 'evt.js', 'evt2.js', 'evt3.js', 'ita.js', 'save.js', 'fac.js', 'btn.js', 'nm.js', 'lib.js'];
+const tests = ['bases.js', 'aib.js', 'sar.js', 'pr.js', 'cas.js', 'evt.js', 'evt2.js', 'evt3.js', 'ita.js', 'save.js', 'fac.js', 'btn.js', 'nm.js', 'lib.js'];
 let bad = 0;
 for (const t of tests) {
   let log = '';
