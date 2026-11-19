@@ -29,6 +29,7 @@ Events are saved in the artifact's shared store (staff only) or in the browser, 
 | Outputs | `renderMap` (canvas), masterplan PDF (`MPSEC`, `mpOn`, `sec()`), decks, `renderPublic`, `buildPayload` |
 | CAS / JTAC | `S.cas` prepared before sign-ups (tab "CAS / JTAC"), `genCAS`, `assignCAS`, `applyCAS`, `casNine`, `casGamePlan`, `casCheckIn`, `casSitUpdate`, `casPublic`, `exportJtacPack` (from the IVAO *Manuale Close Air Support v2.0*) |
 | CSAR / MEDEVAC | `S.pr` prepared before sign-ups (tab "CSAR / MEDEVAC"), `genPR`, `assignPR`, `applyPR`, `prElevenLine`, `prBrief`, `prOscBrief`, `med9`, `sarneg`, `prPublic`, `exportPrPack` (from the IVAO *Manuale Personnel Recovery e Mil MEDEVAC v2.0*) |
+| SAR civile | `S.sar` prepared before sign-ups (tab "SAR civile"), `genSAR`, `sarAreas`, `sarPattern` (SS/VS/TS/PS/OS), `assignSAR` (callsigns RESCUE INDIA LIMA/MIKE + letter), `applySAR`, `sarPlan` (search action plan), `sarTexts`, `sarPublic`, `exportSarPack` (from the IVAO *Manuale SAR, MED, HEMS, HOSP, HUM v2*) |
 | Persistence | `save()` (current work), saved-events archive (`evSave`, `evLoad`, db or localStorage) |
 
 Data contracts for the division database (zones, frequencies, ATC positions, bullseyes, tracks, navigation points): [`docs/DB_INTERFACE.md`](docs/DB_INTERFACE.md).
@@ -39,6 +40,7 @@ Data contracts for the division database (zones, frequencies, ATC positions, bul
 - **No participant names or VIDs in public outputs** (public page, decks, masterplan). Names appear in the staff briefing deck only when "with names" is ticked.
 - **CAS 9-lines, targets and situation updates stay with staff and JTACs** (JTAC pack). Pilots get only JTAC frequencies, CP/IP, mission numbers, laser codes and blocks; `casPublic()` strips the rest from the public payload.
 - **CSAR authentication (word/letter/number/color, challenge/password, duress, SARNEG), survivor positions and 9-line MEDEVAC stay in the PR pack**; pilots get only CSAR RV and SARDOT (`prPublic()`).
+- **Civil SAR: real position of the persons in distress, their condition and the distress card stay in the SAR pack** (staff/RCC); pilots get only the general SAR procedure (`sarPublic()`), the search action plan is passed on frequency.
 - **No invented ATC positions or frequencies.** Real APP/TWR/CTR come from the database or an imported file; otherwise they show TBC/TBD. Event roles (GCI, RCC, DOS, dispatch…) are exercise callsigns.
 - **Everything stays inside the selected reserved areas** (R/D/TSA/TRA) unless it is published data (tracks, bullseyes).
 - **Only what is pertinent to the event type is shown**; the rest is hidden or deselectable. Non-combat events use a sober briefing: no factions, threats or weapons.

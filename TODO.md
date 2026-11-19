@@ -26,6 +26,7 @@
 - 9-line MEDEVAC: line 8 always "A – military"; line 9 = terrain description (as in the manual example).
 
 ## Assumptions to verify
+- Civil SAR (v1.0): track spacing from the manual table at 1000 ft (helicopter / fixed wing); search radius from the area that the units can cover in ~90 min, at least 2 legs per unit; MRCC ROMA for sea, generic "RCC" over land; on-scene frequency from the RCCS position in the database, otherwise TBD; callsign letters assigned in order of tasking across all scenarios.
 - CAS: magnetic variation fixed per event (default 3.5° E); target elevation left to the JTAC (no terrain model).
 - Sectorfile format (SCT sections VOR/NDB/FIXES/VFR, coordinates `N043.20.10.000`) – tested only on a synthetic file.
 - India (AEW) area floors interpreted as lower limits.

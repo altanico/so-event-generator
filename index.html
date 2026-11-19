@@ -171,6 +171,7 @@ details summary{cursor:pointer;margin:6px 0}
     <button data-tab="scenario" class="on">1 · Scenario generico</button>
     <button data-tab="cas" id="tabcas" hidden>CAS / JTAC</button>
     <button data-tab="pr" id="tabpr" hidden>CSAR / MEDEVAC</button>
+    <button data-tab="sar" id="tabsar" hidden>SAR civile</button>
     <button data-tab="roster">2 · Partecipanti</button>
     <button data-tab="tailor">3 · Adattamento</button>
     <button data-tab="export">4 · Export</button>
@@ -1016,7 +1017,7 @@ function REL() { // what is pertinent to this event
   return {
     threats: combat, factions: combat, bull: combat || ids.includes('ID'),
     aar: t ? (has('AAR') || has('RECEIVER')) : want('AAR'), aew: t ? has('AEW') : want('AEW'),
-    cas: casWanted() && !!S.cas, pr: prWanted() && !!S.pr, routes: t ? routesOf(t).length > 0 : (ids.includes('NAVI') || ids.includes('NAVL')), points: ids.includes('NAVI') || ids.includes('NAVL'),
+    cas: casWanted() && !!S.cas, pr: prWanted() && !!S.pr, sar: sarWanted() && !!S.sar, routes: t ? routesOf(t).length > 0 : (ids.includes('NAVI') || ids.includes('NAVL')), points: ids.includes('NAVI') || ids.includes('NAVL'),
   };
 }
 const MPSEC = [ // fixed template structure; each item can be switched off (empty section -> NIL)
@@ -1027,7 +1028,7 @@ const MPSEC = [ // fixed template structure; each item can be switched off (empt
     ['map', 'Mappa', () => true], ['acm', 'Misure di controllo dello spazio aereo', () => true], ['routes', 'Rotte di navigazione', () => REL().routes], ['threats', 'Aree di minaccia', () => REL().threats]]],
   ['Timeline', [['tl', 'Timeline', () => true]]],
   ['Roles', [['flights', 'Flight e task', () => true], ['airframes', 'Ruoli e velivoli ammessi', () => true], ['c2', 'Postazioni ATC / C2', () => true]]],
-  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Serial', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
+  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Serial', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['sar', 'SAR civile – procedura, nominativi e piano di volo', () => REL().sar], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
   ['Resources', [['resources', 'Risorse e link', () => true]]],
   ['Contact', [['contact', 'Contatti', () => true]]],
 ];
@@ -1116,6 +1117,7 @@ function generateGeneric() {
   S.gen = true; S.zones = genZones(); S.background = genBackground(); S.t = null;
   if (casWanted()) genCAS(); else S.cas = null;
   if (prWanted()) genPR(); else S.pr = null;
+  if (sarWanted()) genSAR(); else S.sar = null;
   save(); renderAll(true); toast('Scenario generico creato');
 }
 
@@ -1611,7 +1613,9 @@ function sarneg(word, p) { // degrees-minutes-seconds digits encoded with the 10
 }
 function genPR() {
   const g = geom(), cfg = prCfg(), used = new Set(), sp = shuffle(PR_SURV), csar = [], med = [];
-  const word = () => { const w = pick(WORDS.filter(x => !used.has(x))) || pick(WORDS); used.add(w); return w; };
+  // authentication words come from their own list, never shared with area / objective names (WORDS), so they cannot appear in public outputs by chance
+  const AW = ['AMBERJACK', 'BRAMBLE', 'CORMORANT', 'DRIFTWOOD', 'ELDERBERRY', 'FLINTLOCK', 'GOSSAMER', 'HAZELNUT', 'INKWELL', 'JACKDAW', 'KINGFISHER', 'LAMPLIGHT', 'MARIGOLD', 'NUTMEG', 'OSPREY', 'PEPPERCORN', 'QUARTZITE', 'ROSEWOOD', 'SANDPIPER', 'THISTLE', 'UPLAND', 'VERBENA', 'WILLOWBARK', 'YARROW'].filter(x => !WORDS.includes(x));
+  const word = () => { const w = pick(AW.filter(x => !used.has(x))) || pick(AW); used.add(w); return w; };
   for (let i = 0; i < cfg.nCsar; i++) {
     const surv = snapRes(dest(dest(g.front, g.dir + 90, (i - (cfg.nCsar - 1) / 2) * 30 + (Math.random() * 10 - 5)), g.dir + 180, 8 + Math.random() * 10));
     const lz = snapRes(dest(surv, Math.random() * 360, 0.25 + Math.random() * 0.35));
@@ -1738,6 +1742,140 @@ function renderPR() {
     ${prPre(`9-line MEDEVAC – ${m.unit}`, [...med9(m).map(([n, k, v]) => `LINE ${n}: ${v}`), '', `Lines 1-5 first; lines 6-9 when the aircraft is airborne. Destination MTF: ${m.mtf.name}.`])}</div>`).join('')}`;
 }
 
+/* =====================================================================
+   5e. CIVIL SAR scenarios (IVAO Manuale SAR-HEMS-MEDEVAC-HOSP-HUM v2.0)
+   Prepared before sign-ups in S.sar: distress, datum, search area split
+   into sub-areas, pattern (SS/VS/TS/PS/OS), spacing, CSP, search action plan,
+   SAR briefing, SITREP and debriefing forms. The real position of the
+   survivors is for staff only; pilots get the general SAR procedure.
+   ===================================================================== */
+const SAR_OBJ = { // [label, helo spacing NM, fixed-wing spacing NM at 1000 ft (manual tables), environment]
+  PIW: ['Person in water', 0.1, 0.1, 'SEA'], RAFT4: ['Life raft, 4 persons', 2.9, 2.3, 'SEA'], RAFT6: ['Life raft, 6 persons', 3.5, 2.8, 'SEA'],
+  BOAT5: ['Boat under 5 m (17 ft)', 2.5, 2.0, 'SEA'], BOAT7: ['Boat 7 m (23 ft)', 5.9, 5.0, 'SEA'], BOAT12: ['Boat 12 m (40 ft)', 11.9, 10.4, 'SEA'],
+  ACFT: ['Light aircraft wreck', 1.0, 1.5, 'LAND'], HIKER: ['Persons on foot', 0.5, 0.8, 'MOUNTAIN'], CAR: ['Car off the road', 0.8, 1.2, 'LAND'],
+};
+const SAR_PAT = { SS: 'Expanding square (SS)', VS: 'Sector search (VS)', TS: 'Track line search (TSR)', PS: 'Parallel sweep (PS)', OS: 'Contour search (OS)' };
+const SAR_BOATS = ['SAILING YACHT AURORA', 'FISHING VESSEL SAN MARCO', 'MOTOR BOAT LIBECCIO', 'SAILING YACHT MAESTRALE', 'RIB DELFINO', 'FISHING VESSEL STELLA MARIS'];
+const SAR_SHIPS = ['MV ADRIATIC STAR', 'MV LEVANTE', 'MV TIRRENO TRADER', 'MV CORSICA CARRIER'];
+const sarCfg = () => { S.sarCfg = Object.assign({ n: 2, units: 2, env: 'AUTO', fmt: 'DMM' }, S.sarCfg || {}); return S.sarCfg; };
+const sarWanted = () => evIds().includes('SAR');
+const sarLoc = p => casLoc(p, sarCfg().fmt);
+const landRings = () => { try { return LAND; } catch (e) { return null; } };
+const onLand = p => { const L0 = landRings(); return !!(L0 && L0.some(r => pip(p, r))); };
+const lxy = (c, x, y) => dest(dest(c, 90, x), 0, y); // local km east / north
+const sarFlight = id => (S.t && id && S.t.flights.find(f => f.id === id)) || null;
+const sarLetter = i => NATO[i % 26];
+function sarAreas(sc) { // square tangent to the circle of radius R around the datum, split in vertical strips, one per unit
+  const R = sc.R * NMK, n = Math.max(1, sc.units), w = 2 * R / n, out = [];
+  for (let i = 0; i < n; i++) { const x0 = -R + i * w, x1 = x0 + w;
+    out.push({ id: `${sc.id}-${i + 1}`, poly: [lxy(sc.datum, x0, -R), lxy(sc.datum, x1, -R), lxy(sc.datum, x1, R), lxy(sc.datum, x0, R)], x0, x1 }); }
+  return out;
+}
+function sarPattern(sc, a, k) { // track of unit k in sub-area a (km local coords converted to lat/lon); drawn legs are capped
+  const S0 = sc.S * NMK, R = sc.R * NMK, pts = [];
+  if (sc.pattern === 'SS') { let x = 0, y = 0, len = S0, dir = 0; pts.push(sc.datum); const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]], rt = (k || 0) * Math.PI / 4, c = Math.cos(rt), s2 = Math.sin(rt); // second unit: square turned 45 degrees (IAMSAR)
+    for (let i = 0; i < 40 && Math.max(Math.abs(x), Math.abs(y)) < R; i++) { x += dirs[dir][0] * len; y += dirs[dir][1] * len; pts.push(lxy(sc.datum, x * c + y * s2, -x * s2 + y * c)); dir = (dir + 1) % 4; if (i % 2 === 1) len += S0; } return { pts, csp: sc.datum }; }
+  if (sc.pattern === 'VS') { const r = Math.min(R, 5 * NMK), h = sc.hdg || 0; pts.push(sc.datum);
+    for (let j = 0; j < 3; j++) { pts.push(dest(sc.datum, h + j * 120, r), dest(sc.datum, h + j * 120 + 60, r), sc.datum); } return { pts, csp: sc.datum }; }
+  if (sc.pattern === 'OS') { const rings = [1, 2, 3].map(r => { const ring = []; for (let b = 0; b <= 360; b += 15) ring.push(dest(sc.datum, b, r)); return ring; }); return { rings, pts: rings[0], csp: rings[0][0] }; }
+  if (sc.pattern === 'TS') { const A = sc.route[0], B = sc.route[1], br = bearing(A, B), off = S0 / 2;
+    pts.push(dest(A, br - 90, off), dest(B, br - 90, off), dest(B, br + 90, off), dest(A, br + 90, off)); return { pts, csp: pts[0] }; }
+  // PS: legs north-south along the long side of the strip, creeping east
+  const legs = Math.max(1, Math.round((a.x1 - a.x0) / Math.max(S0, 0.2))), step = (a.x1 - a.x0) / legs, draw = Math.min(legs, 30), every = legs / draw;
+  for (let i = 0; i < draw; i++) { const x = a.x0 + step / 2 + Math.floor(i * every) * step, up = i % 2 === 0; pts.push(lxy(sc.datum, x, up ? -R + step / 2 : R - step / 2), lxy(sc.datum, x, up ? R - step / 2 : -R + step / 2)); }
+  return { pts, csp: pts[0], legs };
+}
+function genSAR() {
+  const g = geom(), th = theatre(), cfg = sarCfg(), out = [];
+  const nearAp = (p, n) => Object.entries(AIRPORTS).map(([k, v]) => [k, v[0], [v[1], v[2]]]).sort((a, b) => dist(a[2], p) - dist(b[2], p)).slice(0, n);
+  for (let i = 0; i < cfg.n; i++) {
+    let env = cfg.env === 'AUTO' ? ['SEA', 'MOUNTAIN', 'LAND'][i % 3] : cfg.env, datum = null;
+    if (env === 'SEA') { for (let k = 0; k < 30 && !datum; k++) { const p = dest(th.sea || g.outside, Math.random() * 360, 5 + Math.random() * 30); if (!landRings() || !onLand(p)) datum = p; } if (!datum) datum = th.sea || g.outside; }
+    else { for (let k = 0; k < 30 && !datum; k++) { const p = dest(g.front, Math.random() * 360, 10 + Math.random() * 50); if (!landRings() || onLand(p)) datum = p; } if (!datum) datum = g.front; }
+    const keys = Object.entries(SAR_OBJ).filter(([k, v]) => v[3] === env || (env === 'LAND' && v[3] === 'MOUNTAIN')).map(x => x[0]), obj = pick(keys);
+    const ap = nearAp(datum, 6), hosp = ap[0];
+    let pattern, kind, R = 10, route = null, desc, pob, lkp = 'last known position';
+    if (env === 'SEA') { kind = obj === 'PIW' ? 'man overboard' : pick(['taking water', 'engine failure and drifting', 'capsized', 'fire on board']); pob = obj === 'PIW' ? 1 : obj.startsWith('RAFT') ? +obj.slice(4) : 2 + Math.floor(Math.random() * 4);
+      pattern = obj === 'PIW' ? 'VS' : pick(['SS', 'PS']); desc = obj === 'PIW' ? 'Person fallen overboard from a ferry' : `${pick(SAR_BOATS)}, ${kind}`; }
+    else if (obj === 'ACFT') { const a = ap[1], b = ap[ap.length - 1]; route = [a[2], b[2]]; datum = dest(a[2], bearing(a[2], b[2]), dist(a[2], b[2]) / 2); pattern = 'TS'; pob = 2; kind = 'overdue, ELT not heard';
+      desc = `Light aircraft I-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${pick(['BCD', 'XYZ', 'MKT', 'RLA'])} (PA-28) ${a[0]} → ${b[0]}, overdue`; lkp = `planned route ${a[0]} – ${b[0]}`; }
+    else if (obj === 'HIKER') { pattern = 'OS'; pob = 2; kind = 'missing, overdue since sunset'; desc = '2 hikers missing on the mountain'; R = 3; }
+    else { pattern = 'SS'; pob = 1 + Math.floor(Math.random() * 3); kind = 'left the road at night'; desc = 'Car missing on a mountain road'; R = 5; }
+    const S0 = SAR_OBJ[obj][1];
+    const units = cfg.units, A = units * S0 * 90 * 1.5; if (pattern !== 'TS' && R === 10) R = Math.min(30, Math.max(2, Math.round(Math.sqrt(A) / 2), Math.ceil(units * S0), Math.ceil(2 * S0)));
+    const wind = pick([270, 300, 330, 200, 160]), drift = env === 'SEA' ? 0.3 + Math.random() * 0.4 : 0.2 + Math.random() * 0.5;
+    const truth = route ? dest(dest(route[0], bearing(route[0], route[1]), dist(route[0], route[1]) * (0.3 + Math.random() * 0.5)), bearing(route[0], route[1]) + 90, (Math.random() - 0.5) * 3)
+      : dest(datum, env === 'SEA' ? (wind + 180) % 360 + (Math.random() * 40 - 20) : Math.random() * 360, R * NMK * drift);
+    const maritime = env === 'SEA';
+    out.push({ id: 'S' + (i + 1), env, obj, desc, kind, pob, datum, lkp, R, S: S0, pattern, route, hdg: wind, units, time: 5 + i * 20,
+      wx: `${pick(['CAVOK', 'SCT 2500 ft, visibility 8 km', 'BKN 1500 ft, visibility 5 km'])}, wind ${String(wind).padStart(3, '0')}/${pick([8, 12, 15, 20])} kt${maritime ? ', sea state ' + pick([2, 3, 4]) : ''}, valid until H+180`,
+      survival: maritime ? pick(['life jackets, flares, EPIRB not activated', 'life raft with flares and a mirror', 'life jackets only']) : obj === 'ACFT' ? 'ELT fitted, not heard; first-aid kit' : 'mobile phone with low battery, torch',
+      rcc: maritime ? 'MRCC ROMA' : 'RCC', truth, found: maritime ? pick(['orange life raft, survivors waving', 'person in the water with a life jacket and a light', 'boat half submerged, crew on the hull']) : obj === 'ACFT' ? 'wreck in a wood clearing, 2 survivors, one injured' : obj === 'HIKER' ? 'hikers on a ledge, one with a leg injury' : 'car in a ravine below the road, driver conscious',
+      recovery: maritime ? pick(['hoist with rescue basket', 'double lift (rescue swimmer)', 'hoist with stretcher']) : obj === 'HIKER' ? 'hoist with stretcher' : 'landing nearby, stretcher transfer',
+      hosp: { name: `Hospital ${hosp[1].replace(/ AB$/, '')}`, pos: hosp[2] }, ship: maritime && Math.random() < 0.6 ? { name: pick(SAR_SHIPS), pos: dest(datum, Math.random() * 360, 8 + Math.random() * 6), course: Math.floor(Math.random() * 36) * 10, speed: 12 } : null,
+      flights: [], osc: '', freq: '', elev: '' });
+  }
+  S.sar = { list: out, made: Date.now() };
+  return S.sar;
+}
+function assignSAR(t) {
+  if (!S.sar) genSAR();
+  const ids = new Set(t.flights.map(f => f.id)); S.sar.list.forEach(sc => sc.flights = sc.flights.filter(id => ids.has(id)));
+  const taken = new Set(S.sar.list.flatMap(sc => sc.flights));
+  t.flights.filter(f => f.task === 'SAR' && !taken.has(f.id)).forEach((f, i) => { const sc = S.sar.list.slice().sort((a, b) => a.flights.length - b.flights.length)[0]; sc.flights.push(f.id); });
+  let letter = 0; S.sar.list.forEach(sc => { sc.units = Math.max(sarCfg().units, sc.flights.length); sc.letters = sc.flights.map(() => sarLetter(letter++)); sc.osc = sc.flights.length ? sarCs(sc, 0) : ''; });
+}
+function sarCs(sc, k) { const L = (sc.letters || [])[k] || sarLetter(k), m = sc.env === 'SEA' ? 'MIKE' : 'LIMA'; return `RESCUE INDIA ${m} ${L} (RI${m[0]}${L[0]})`; }
+function applySAR(t) {
+  if (!sarWanted() || !t.flights.some(f => f.task === 'SAR')) return;
+  assignSAR(t);
+  const sf = new Set(t.flights.filter(f => f.task === 'SAR').map(f => f.id));
+  t.objectives = t.objectives.filter(o => !(o.type === 'SEARCH' && sf.has(o.flight)));
+  (t.serials || []).filter(r => r.kind === 'SAR').forEach(r => { const sc = S.sar.list.find(x => x.flights.includes(r.flights[0])); if (!sc) return; const k = sc.flights.indexOf(r.flights[0]);
+    r.text = `SAR ${sc.id}: fly as ${sarCs(sc, k)} (flight plan STS/SAR). The ${sc.rcc} passes the search action plan on frequency: sub-area ${sc.id}-${k + 1}, ${SAR_PAT[sc.pattern]}, track spacing ${sc.S} NM. Report to the OSC, send SITREPs, recover the survivors (${sc.recovery}) and take them to ${sc.hosp.name}.`;
+    r.success = 'Search flown as planned; object located and reported; recovery completed; SITREPs and debriefing passed.'; });
+}
+// --- texts (English) ---
+function sarUnit(sc, k) { const f = sarFlight(sc.flights[k]); return f ? `${sarCs(sc, k)} – ${f.cs}, ${f.type}` : `${sarCs(sc, k)} – [UNIT]`; }
+function sarDistress(sc) {
+  if (sc.env === 'SEA') return `MAYDAY MAYDAY MAYDAY, THIS IS ${sc.desc.split(',')[0]}, POSITION ${sarLoc(sc.datum)}, ${sc.kind.toUpperCase()}, ${sc.pob} PERSONS ON BOARD, ${sc.survival.toUpperCase()}, REQUEST IMMEDIATE ASSISTANCE`;
+  if (sc.obj === 'ACFT') return `ATC REPORT: ${sc.desc.toUpperCase()}, ${sc.pob} POB, LAST RADAR CONTACT ${sarLoc(sc.datum)} AT ${totClock(sc.time)}, NO REPLY ON 121.500`;
+  return `112 / 118 REPORT: ${sc.desc.toUpperCase()}, ${sc.pob} PERSONS, LAST CONTACT BY PHONE FROM ${sarLoc(sc.datum)} AT ${totClock(sc.time)}; ${sc.survival.toUpperCase()}`;
+}
+function sarPlan(sc) {
+  const ar = sarAreas(sc), n = sc.units;
+  return { from: sc.rcc, to: Array.from({ length: n }, (_, k) => sarCs(sc, k).split(' (')[0]).join(', '), distress: sc.desc,
+    situation: [`${sc.desc.toLowerCase().includes(sc.kind.toLowerCase()) ? sc.desc : sc.desc + '; ' + sc.kind}. ${sc.lkp.charAt(0).toUpperCase() + sc.lkp.slice(1)} ${sarLoc(sc.datum)} at ${totClock(sc.time)}.`, `${sc.pob} persons on board. Survival equipment: ${sc.survival}.`, `Primary search object: ${SAR_OBJ[sc.obj][0].toLowerCase()}.`, `Weather: ${sc.wx}.`, sc.ship ? `On scene: ${sc.ship.name}, ${sarLoc(sc.ship.pos)}, course ${String(sc.ship.course).padStart(3, '0')}, ${sc.ship.speed} kt.` : 'No other SAR resources on scene.'],
+    areas: `Datum ${sarLoc(sc.datum)}; radius ${sc.R} NM; square of ${2 * sc.R} NM split into ${n} sub-area${n > 1 ? 's' : ''} (${ar.map(a => a.id).join(', ')}).`,
+    exec: ar.map((a, k) => { const p = sarPattern(sc, a, k); return [a.id, sarUnit(sc, k), SAR_PAT[sc.pattern], sc.pattern === 'PS' ? 'EAST' : sc.pattern === 'SS' ? `first leg ${String(k * 45).padStart(3, '0')}°` : '—', sarLoc(p.csp)]; }),
+    coord: [`RCC: ${sc.rcc}`, `OSC: ${sc.osc || sarCs(sc, 0)}`, `Track spacing: ${sc.S} NM (${SAR_OBJ[sc.obj][0].toLowerCase()}, 1000 ft)`, `Search altitude: ${sc.env === 'SEA' ? '500-1000 ft' : '1000 ft AGL'}, common speed: max speed of the slowest unit`, 'Non-SAR aircraft to remain clear of the search area', ...(sc.pattern === 'SS' && n > 1 ? ['Expanding square with more than one unit: each square starts at the datum, turned 45 degrees from the previous one; units separated by at least 500 ft'] : [])],
+    comms: [(() => { let r = null; try { r = c2Sel().find(x => x.on && x.key === 'RCCS'); } catch (e) { } return `${sc.rcc} / on-scene: ${r && r.cs ? r.cs : 'TBC'} ${r && r.freq ? r.freq : 'TBD'} (OSC may assign a separate on-scene frequency)`; })(), 'Monitoring: 121.500', 'Coordination with ATS on the sector frequency'],
+    reports: ['OSC: SITREP to the RCC on arrival, every 30 minutes and on locating the object', 'Units: report on-task, completion of the sub-area and coverage obtained'] };
+}
+function sarTexts(sc) { const P = sarPlan(sc);
+  return { distress: [sarDistress(sc)],
+    plan: [`FROM: ${P.from}`, `TO: ${P.to}`, `DISTRESS: ${P.distress}`, 'SEARCH ACTION PLAN', 'SITUATION', ...P.situation.map(x => '- ' + x), 'SAR AREAS', '- ' + P.areas, 'EXECUTION (area / facility / pattern / creep / CSP)', ...P.exec.map(r => '- ' + r.join(' / ')), 'CO-ORDINATION', ...P.coord.map(x => '- ' + x), 'COMMUNICATIONS', ...P.comms.map(x => '- ' + x), 'REPORTS', ...P.reports.map(x => '- ' + x)],
+    truth: [`Real position: ${sarLoc(sc.truth)} (${(dist(sc.datum, sc.truth) / NMK).toFixed(1)} NM ${card8(bearing(sc.datum, sc.truth)).toLowerCase()} of the datum)`, `What the crews will find: ${sc.found}`, `Recovery: ${sc.recovery}`, `Destination: ${sc.hosp.name} ${sarLoc(sc.hosp.pos)}`] };
+}
+function sarPublic(sar) { return sar ? { list: sar.list.map(sc => ({ id: sc.id, env: sc.env, flights: sc.flights, letters: sc.letters })) } : null; }
+function renderSAR() {
+  if (!GEN()) return `<h2>SAR civile</h2><div class="warn">Prima genera lo scenario.</div>`;
+  if (!S.sar) return `<h2>SAR civile</h2><p class="muted">Prepara gli scenari SAR prima degli iscritti.</p><button class="b primary" id="sarregen">Genera scenari SAR</button>`;
+  const cfg = sarCfg(), o = (v, list) => list.map(([k, l]) => `<option value="${k}" ${String(v) === String(k) ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  return `<h2>SAR civile</h2>
+  <div class="intro">Scenari di ricerca e soccorso civile secondo il manuale IVAO SAR-HEMS-MEDEVAC-HOSP-HUM: chiamata di soccorso, datum, area di ricerca divisa in sotto-aree, schema di ricerca (SS, VS, TS, PS, OS), spaziatura dalle tabelle del manuale, CSP, messaggio "search action plan", briefing, SITREP e debriefing. La <b>posizione reale</b> dei superstiti è solo per lo staff (SAR pack). Puoi trascinare il datum sulla mappa.</div>
+  <div class="row"><div><label>Scenari</label><input data-sarg="n" type="number" min="1" max="6" value="${cfg.n}"></div><div><label>Unità previste per scenario</label><input data-sarg="units" type="number" min="1" max="6" value="${cfg.units}"></div>
+  <div><label>Ambiente</label><select data-sarg="env">${o(cfg.env, [['AUTO', 'misto (mare, montagna, terra)'], ['SEA', 'mare'], ['MOUNTAIN', 'montagna'], ['LAND', 'terra']])}</select></div><div><label>Coordinate</label><select data-sarg="fmt">${o(cfg.fmt, Object.entries(CAS_FMT_LBL))}</select></div></div>
+  <div class="row" style="margin:6px 0 10px;flex-wrap:wrap"><button class="b sm shrink" id="sarregen">↻ Rigenera scenari SAR</button><button class="b sm shrink primary" data-sarpack="ALL">Scarica SAR pack (tutti)</button></div>
+  ${S.sar.list.map(sc => { const T = sarTexts(sc); return `<div class="card" style="margin-bottom:10px"><div class="row" style="align-items:flex-end;flex-wrap:wrap">
+    <div><label>SAR ${sc.id} – ${sc.env === 'SEA' ? 'mare' : sc.env === 'MOUNTAIN' ? 'montagna' : 'terra'}</label><input data-sar="${sc.id}" data-cf="desc" value="${esc(sc.desc)}"></div>
+    <div style="max-width:120px"><label>Schema</label><select data-sar="${sc.id}" data-cf="pattern">${o(sc.pattern, Object.entries(SAR_PAT).map(([k, v]) => [k, k]))}</select></div>
+    <div style="max-width:90px"><label>R (NM)</label><input data-sar="${sc.id}" data-cf="R" type="number" min="1" max="20" value="${sc.R}"></div><div style="max-width:90px"><label>S (NM)</label><input data-sar="${sc.id}" data-cf="S" type="number" step="0.1" min="0.1" value="${sc.S}"></div>
+    <button class="b sm shrink" data-sarpack="${sc.id}">SAR pack</button></div>
+    <div class="muted" style="font-size:12px;margin:4px 0">${esc(SAR_OBJ[sc.obj][0])} · ${sc.pob} POB · ${esc(sc.rcc)} · unità: ${sc.flights.map((id, k) => esc(sarUnit(sc, k))).join('; ') || 'nessun flight'} · ospedale: ${esc(sc.hosp.name)}</div>
+    ${prPre('Chiamata di soccorso', T.distress)}${prPre('Search action plan', T.plan)}${prPre('Solo staff – soluzione', T.truth)}</div>`; }).join('')}`;
+}
+
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
@@ -1750,7 +1888,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t);
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -1759,7 +1897,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t);
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -1876,6 +2014,17 @@ function drawMap(fit) {
   const add = l => l.addTo(LAYERS);
   const drag = (m, setter) => { m.on('dragend', e => { const ll = e.target.getLatLng(); setter([+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); save(); renderPanel(); drawMap(); }); return m; };
   const showZones = TAB === 'scenario' || !S.t;
+  if (S.sar && REL().sar && TAB === 'sar') for (const sc of S.sar.list) {
+    add(L.circle(sc.datum, { radius: sc.R * NMK * 1000, color: '#0369a1', weight: 1, dashArray: '4 6', fill: false }));
+    sarAreas(sc).forEach((a, k) => { add(L.polygon(a.poly, { color: '#0369a1', weight: 1.5, fillColor: '#38bdf8', fillOpacity: .06 })).bindTooltip(`Sub-area ${a.id} – ${sarCs(sc, k).split(' (')[0]}`);
+      const pt = sarPattern(sc, a, k); (pt.rings || [pt.pts]).forEach(l => add(L.polyline(l, { color: '#0284c7', weight: 1.5 }))); add(L.circleMarker(pt.csp, { radius: 5, color: '#0f172a', weight: 1, fillColor: '#facc15', fillOpacity: 1 })).bindTooltip(`CSP ${a.id}`);
+      if (['SS', 'VS', 'OS', 'TS'].includes(sc.pattern)) return; });
+    if (sc.route) add(L.polyline(sc.route, { color: '#7c3aed', weight: 2, dashArray: '6 4' })).bindTooltip('Planned route');
+    drag(add(L.marker(sc.datum, { draggable: true, icon: icon('#0369a1', '+', `DATUM ${sc.id}`, 'circle', 14) })), p => { sc.datum = p; }).bindTooltip(`Datum ${sc.id} – trascina per spostarlo`);
+    add(L.marker(sc.truth, { icon: icon('#b91c1c', '✕', `${sc.id} reale (staff)`, 'circle', 12) })).bindTooltip('Posizione reale – solo staff');
+    add(L.marker(sc.hosp.pos, { icon: icon('#dc2626', 'H', sc.hosp.name, 'circle', 14) }));
+    if (sc.ship) add(L.marker(sc.ship.pos, { icon: icon('#334155', '⛴', sc.ship.name, 'circle', 14) }));
+  }
   if (S.pr && REL().pr && TAB === 'pr') { for (const c of S.pr.csar) {
       if (!c.located) { add(L.circle(c.surv, { radius: 3704, color: '#ea580c', weight: 1.5, dashArray: '6 6', fillOpacity: .06 })).bindTooltip(`${c.id} search area (2 NM)`); const sq = [c.surv]; let p = c.surv, k = 1; for (let i = 0; i < 8; i++) { p = dest(p, (i * 90) % 360, 0.9 * Math.ceil(k / 2)); k++; sq.push(p); } add(L.polyline(sq, { color: '#ea580c', weight: 1.5 })).bindTooltip('Expanding square'); }
       add(L.polyline([c.rv, c.wpIn, c.lz], { color: '#d97706', weight: 3 })).bindTooltip(`${c.id} ingress`); add(L.polyline([c.lz, c.wpOut, c.rv], { color: '#16a34a', weight: 2.5, dashArray: '8 6' })).bindTooltip(`${c.id} egress`);
@@ -2230,6 +2379,8 @@ function renderExport() {
   <div class="row" style="margin-top:8px"><button class="b" id="pubpreview">👁 Anteprima</button><button class="b primary" id="pubpublish">Pubblica sulla pagina pubblica</button></div>
   <div class="row" style="margin-top:6px"><button class="b" id="pubhtml">Scarica pagina pubblica (.html)</button></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>
+  ${REL().sar ? `<div class="card"><b>SAR pack (SAR civile) – solo staff e RCC</b><p class="muted" style="margin:4px 0">Per ogni scenario: mappa delle aree e degli schemi, chiamata di soccorso, search action plan, briefing SAR, SITREP, debriefing, scheda per chi interpreta i dispersi e, in fondo, le soluzioni.</p>
+    <div class="row" style="flex-wrap:wrap">${S.sar.list.map(sc => `<button class="b shrink" data-sarpack="${sc.id}">${sc.id}</button>`).join('')}<button class="b primary shrink" data-sarpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().pr ? `<div class="card"><b>PR pack (CSAR / MEDEVAC) – solo staff, AMC e OSC</b><p class="muted" style="margin:4px 0">Per ogni scenario: mappa, MAYDAY, PR 11-line, briefing CSARTF e OSC, SPINS, code words, scheda per il personale isolato e 9-line MEDEVAC.</p>
     <div class="row" style="flex-wrap:wrap">${[...S.pr.csar.map(c => c.id), ...S.pr.med.map(m => m.id)].map(id => `<button class="b shrink" data-prpack="${id}">${id}</button>`).join('')}<button class="b primary shrink" data-prpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().cas ? `<div class="card"><b>JTAC pack (CAS) – solo staff e JTAC</b><p class="muted" style="margin:4px 0">PDF con mappa del settore, situation update, check-in atteso, game plan e 9-line di ogni flight. Le 9-line si vedono anche nella linguetta CAS / JTAC.</p>
@@ -2238,13 +2389,13 @@ function renderExport() {
 }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop;
-  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
+  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
     `<datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist>`;
   p.scrollTop = top;
 }
 function renderAll(fit) {
   if (typeof renderEvBadge === 'function') renderEvBadge();
-  { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; const tp = document.getElementById('tabpr'); if (tp) tp.hidden = !(GEN() && prWanted()); if (TAB === 'pr' && !(GEN() && prWanted())) TAB = 'scenario'; }
+  { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; const tp = document.getElementById('tabpr'); if (tp) tp.hidden = !(GEN() && prWanted()); if (TAB === 'pr' && !(GEN() && prWanted())) TAB = 'scenario'; const ts = document.getElementById('tabsar'); if (ts) ts.hidden = !(GEN() && sarWanted()); if (TAB === 'sar' && !(GEN() && sarWanted())) TAB = 'scenario'; }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
   renderPanel(); renderMapTools(); drawMap(fit);
 }
@@ -2295,6 +2446,8 @@ document.addEventListener('change', e => {
   if (t.id === 'aspfile' && t.files[0]) { t.files[0].text().then(txt => { try { const d = parseAirspace(JSON.parse(txt)); if (!d.zones.length && !d.freqs.length) throw 0; setAirspace(d, 'file', { file: t.files[0].name }); renderAll(); toast(`Importate ${d.zones.length} zone e ${d.freqs.length} frequenze`); } catch (err) { toast('File non riconosciuto (vedi formato in DB_INTERFACE.md)'); } }); return; }
   if (t.dataset.mp) { mpGet()[t.dataset.mp] = t.value; save(); return; }
   if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (t.dataset.sarg) { const c = sarCfg(); c[t.dataset.sarg] = ['env', 'fmt'].includes(t.dataset.sarg) ? t.value : Math.max(1, +t.value || 1); save(); renderPanel(); return; }
+  if (t.dataset.sar && S.sar) { const sc = S.sar.list.find(x => x.id === t.dataset.sar); if (!sc) return; const f = t.dataset.cf; sc[f] = ['R', 'S'].includes(f) ? Math.max(0.1, +t.value || 0.1) : t.value; save(); if (f !== 'desc') renderPanel(); drawMap(); return; }
   if (t.dataset.prg) { const c = prCfg(); c[t.dataset.prg] = t.dataset.prg === 'fmt' ? t.value : Math.max(0, +t.value || 0); save(); renderPanel(); return; }
   if (t.dataset.prc && S.pr) { const c = S.pr.csar.find(x => x.id === t.dataset.prc); if (!c) return; const f = t.dataset.cf; c[f] = f === 'located' ? t.checked : t.value; if (f === 'pob') c.pob = +t.value; if (f === 'type') { c.pob = t.value === 'Tornado IDS' ? 2 : 1; c.chutes = c.pob; } save(); if (f !== 'cs') renderPanel(); drawMap(); return; }
   if (t.dataset.prm && S.pr) { const m = S.pr.med.find(x => x.id === t.dataset.prm); if (!m) return; m[t.dataset.cf] = t.value; save(); if (!['unit', 'freq'].includes(t.dataset.cf)) renderPanel(); return; }
@@ -2339,6 +2492,7 @@ document.addEventListener('click', e => {
   if (t.dataset.copy !== undefined) { try { navigator.clipboard.writeText(t.dataset.copy).then(() => toast('Copiato')); } catch (err) { toast('Copia non disponibile'); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
+  if (t.dataset.sarpack) { exportSarPack(t.dataset.sarpack, t); return; }
   if (t.dataset.c2del) { S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
   if (t.dataset.del) {
     const k = t.dataset.del, id = t.dataset.id;
@@ -2360,6 +2514,7 @@ document.addEventListener('click', e => {
     case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
+    case 'sarregen': genSAR(); if (S.t) applySAR(S.t); save(); renderAll(true); toast('Scenari SAR generati'); return;
     case 'prregen': genPR(); if (S.t) applyPR(S.t); save(); renderAll(); toast('Scenari CSAR / MEDEVAC generati'); return;
     case 'casregen': genCAS(); if (S.t) applyCAS(S.t); save(); renderAll(); toast('Scenari CAS generati'); return;
     case 'c2add': c2Sel().push({ id: uid(), key: 'X', real: false, on: true, role: 'Nuova postazione', cs: '', freq: '' }); save(); renderPanel(); return;
@@ -2481,6 +2636,14 @@ async function renderMap(mode, opt = {}) {
     for (const o of S.t.objectives) { if (o.r) circle(o.pos, o.r, K2('#60a5fa'), 'rgba(59,130,246,.12)', [8, 6]); }
     for (const o of S.t.objectives) { dot(o.pos, '#2563eb', 8); const [x, y] = P(o.pos); label(`${o.id} ${o.name}`, x + 11, y + 4, K2('#bfdbfe'), 17); }
   }
+  if (opt.sar) { const sc = opt.sar;
+    circle(sc.datum, sc.R * NMK, '#0369a1', 'rgba(56,189,248,.04)', [6, 6]);
+    sarAreas(sc).forEach((a, k) => { line(a.poly.concat([a.poly[0]]), '#0369a1', 2); const pt = sarPattern(sc, a, k); (pt.rings || [pt.pts]).forEach(l => line(l, '#0284c7', 1.8)); dot(pt.csp, '#facc15', 6); const [x, y] = P(a.poly[3]); label(a.id, x + 6, y + 16, '#0369a1', 15); });
+    if (sc.route) line(sc.route, '#7c3aed', 2.5, [10, 6]);
+    dot(sc.datum, '#0369a1', 7); { const [x, y] = P(sc.datum); label('DATUM', x + 9, y + 4, '#0369a1', 15); }
+    if (opt.sarTruth) { dot(sc.truth, '#b91c1c', 7); const [x, y] = P(sc.truth); label('REAL POSITION (staff)', x + 9, y + 4, '#b91c1c', 14); }
+    dot(sc.hosp.pos, '#dc2626', 7); { const [x, y] = P(sc.hosp.pos); label(sc.hosp.name, x + 9, y + 4, '#dc2626', 14); }
+    if (sc.ship) { dot(sc.ship.pos, '#334155', 6); const [x, y] = P(sc.ship.pos); label(sc.ship.name, x + 9, y + 4, '#334155', 14); } }
   if (opt.pr) { const c = opt.pr.c, m = opt.pr.m;
     if (c) { if (!c.located) circle(c.surv, 3.7, '#ea580c', 'rgba(234,88,12,.08)', [8, 6]); line([c.rv, c.wpIn, c.lz], '#d97706', 4); line([c.lz, c.wpOut, c.rv], '#16a34a', 3.5, [12, 8]);
       [[c.surv, '#ea580c', c.cs], [c.lz, '#16a34a', 'LZ'], [c.rv, '#0891b2', 'RV ' + c.id], [c.wpIn, '#d97706', 'WP IN'], [c.wpOut, '#16a34a', 'WP OUT'], [c.sardot.pos, '#7c3aed', c.sardot.name]].forEach(([q, col, l]) => { dot(q, col, 7); const [a, b] = P(q); label(l, a + 9, b + 4, col, 15); }); }
@@ -2670,6 +2833,9 @@ async function deckBrief() {
       lines.push({ text: ' ', options: { fontSize: 6, breakLine: true } }); });
     s.addText(lines, { x: 0.5, y: 1.2, w: 4.9, h: 3.9, color: K.TEXT, fontFace: FONT, valign: 'top', margin: 0, isTextBox: true, fit: 'shrink' });
   }
+  // civil SAR (pilot side)
+  if (REL().sar && S.sar && mpOn('sar')) { s = slideT(p, 'Search and rescue – procedure', 'The search action plan is passed by the RCC on frequency');
+    bullets(s, ['Callsign RESCUE INDIA LIMA / MIKE + letter (e.g. RILA), flight plan item 18 STS/SAR', 'RCC passes datum, sub-area, pattern (SS, VS, TS, PS, OS), track spacing and CSP', 'First unit on scene acts as OSC; report to the OSC, SITREP on request', 'Search altitude 500-1000 ft over the sea, ~1000 ft AGL over land; common speed = slowest unit', 'Monitor 121.500; survivors to the designated hospital'], { x: 0.6, y: 1.3, w: 8.8, h: 3.8 }); }
   // CSAR (pilot side)
   if (REL().pr && S.pr && S.pr.csar.length && mpOn('pr')) { s = slideT(p, 'Personnel recovery – CSAR RV & SARDOT', 'MAYDAY on GUARD, then CSAR A; positions from the SARDOT only');
     table(s, ['Scenario', 'CSAR RV', 'SARDOT', 'Assets'], S.pr.csar.map(c => [{ text: c.id, options: { bold: true, color: K.AMBER } }, prLoc(c.rv), `${c.sardot.name}\n${prLoc(c.sardot.pos)}`, [...c.rescort, ...c.rescue].map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join('\n') || '—']), { colW: [1.1, 2.6, 3.0, 2.3], fontSize: 9 }); }
@@ -2763,7 +2929,7 @@ const GLOSSARY = {
   AAR: 'Air-to-Air Refuelling', AEW: 'Airborne Early Warning', GCI: 'Ground-Controlled Interception', 'DZ / LZ': 'Drop zone / Landing zone',
   'LOW & SLOW': 'Interception of slow, low-flying targets such as helicopters', ASuW: 'Anti-Surface Warfare', MPA: 'Maritime Patrol Aircraft'
 };
-Object.assign(GLOSSARY, { AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
+Object.assign(GLOSSARY, { DATUM: 'Reference point, line or area used to plan a search', CSP: 'Commence search point', SITREP: 'Situation report from the on-scene coordinator to the RCC', AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
 const ROLE_DESC = {
   SEAD: 'Locate and neutralise SAM sites and radars to open the corridor for the strike package.',
   STRIKE: 'Destroy the assigned high-value targets at the briefed TOT.',
@@ -2805,7 +2971,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const { PDFDocument, rgb, StandardFonts, PDFName, PDFString } = PDFLib;
   const mp = mpGet(), t = S.t, th = theatre(), g = geom();
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
+  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
   let F = {};
   if (assets.fonts && window.fontkit) { pdf.registerFontkit(window.fontkit); for (const k of Object.keys(assets.fonts)) F[k] = await pdf.embedFont(assets.fonts[k], { subset: false }); }
   else { F.reg = await pdf.embedFont(StandardFonts.Helvetica); F.bold = await pdf.embedFont(StandardFonts.HelveticaBold); F.ital = await pdf.embedFont(StandardFonts.HelveticaOblique); F.head = F.bold; F.xb = F.bold; }
@@ -2834,7 +3000,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   draw(cover, event, 76, 530, F.head, 15, WHITE);
   draw(cover, division, 76, 553, F.reg, 11, WHITE);
   draw(cover, date + (S.meta.hHour ? ` · H-hour ${S.meta.hHour}` : '') + ` · ${revLabel()}${curRev() ? ' (' + curRev().date + ')' : ''}`, 76, 572, F.reg, 9, WHITE);
-  draw(cover, jsel ? (jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
+  draw(cover, jsel ? (jsel.kind === 'sar' ? 'SAR PACK – staff and RCC only, contains the solutions' : jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
   const cx = (txt, f, s, y) => draw(cover, txt, (PW - W(txt, f, s)) / 2, y, f, s, WHITE);
   cx('Special Operations Department', F.ital, 12, 765); cx('International Virtual Aviation Organisation', F.reg, 12, 783);
   // ---------- inner page machinery ----------
@@ -2903,6 +3069,29 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     }
     y += o.after ?? 10;
   };
+  if (jsel && jsel.kind === 'sar') { // ---------- SAR pack ----------
+    for (const sc of jsel.list) { const P = sarPlan(sc), T = sarTexts(sc);
+      newPage(); h1(`SAR ${sc.id} – ${sc.desc}`);
+      para(`${SAR_OBJ[sc.obj][0]}, ${sc.pob} persons. Coordination ${sc.rcc}. Units: ${Array.from({ length: sc.units }, (_, k) => sarUnit(sc, k)).join('; ')}. Distress at ${totClock(sc.time)}.`);
+      const png = jsel.maps[sc.id]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4;
+        para('Blue: search area (circle of radius R around the datum and tangent square) split into sub-areas, search tracks and commence search points (yellow).', { size: 7.5 }); } catch (e) { } }
+      h6('Distress'); para(T.distress[0]);
+      h1(`Search action plan – SAR ${sc.id}`);
+      table([{ h: 'Item', w: .22 }, { h: 'Content', w: .78 }], [['From', P.from], ['To', P.to], ['Distress', P.distress]].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      h6('Situation'); bullets(P.situation); h6('SAR areas'); para(P.areas);
+      h6('Execution'); table([{ h: 'Area', w: .1 }, { h: 'Facility', w: .34 }, { h: 'Pattern', w: .2 }, { h: 'Creep', w: .09 }, { h: 'CSP', w: .27 }], P.exec.map(r => [{ t: r[0], bold: true }, r[1], r[2], r[3], r[4]]), { size: 7.5 });
+      h6('Co-ordination'); bullets(P.coord); h6('Communications'); bullets(P.comms); h6('Reports'); bullets(P.reports);
+      h1(`SAR briefing – SAR ${sc.id}`);
+      table([{ h: 'Item', w: .3 }, { h: 'Content', w: .7 }], [['Nature of the distress', sc.desc.toLowerCase().includes(sc.kind.toLowerCase()) ? sc.desc : `${sc.desc}; ${sc.kind}`], ['Search object', `${SAR_OBJ[sc.obj][0]}; ${sc.pob} POB`], ['Assigned area', `${P.areas}`], ['Type of search', `${SAR_PAT[sc.pattern]}, track spacing ${sc.S} NM`], ['Commence search at', P.exec.map(r => `${r[0]}: ${r[4]}`).join('; ')], ['Frequencies', P.comms.join('; ')], ['Coordinating unit', sc.rcc], ['Ships', sc.ship ? `${sc.ship.name}, ${sarLoc(sc.ship.pos)}, course ${String(sc.ship.course).padStart(3, '0')}, ${sc.ship.speed} kt` : 'none'], ['Flight plan', `Callsigns as above, item 18 STS/SAR`], ['Recovery and destination', `${sc.recovery} – ${sc.hosp.name} ${sarLoc(sc.hosp.pos)}`]].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      ensure(150); h6('SITREP (to be completed by the OSC)'); table([{ h: 'Item', w: .3 }, { h: 'Content', w: .7 }], [['Priority', 'DISTRESS'], ['Date / time UTC', ''], ['From / to', `OSC ${sc.osc || sarCs(sc, 0)} / ${sc.rcc}`], ['SITREP no.', ''], ['Unit identification', ''], ['Position', ''], ['Situation', ''], ['Persons at risk', ''], ['Assistance required', ''], ['Other', '']].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      h6('SAR debriefing (each unit)'); table([{ h: 'Item', w: .3 }, { h: 'Content', w: .7 }], [['Search unit', ''], ['Departure / landing', ''], ['Departure time / on task / off task', ''], ['Area searched', ''], ['Type of search / altitude', ''], ['Sea state / observers / weather', ''], ['Object located (position)', ''], ['Survivors (number and condition)', ''], ['Notes', '']].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+      newPage(); h1(`Distress card – SAR ${sc.id}`); para('For the staff member or player who acts as the persons in distress. Read the call at the briefed time; answer the rescuers as the situation develops.', { font: F.ital });
+      para(T.distress[0], { font: F.bold }); table([{ h: 'Item', w: .3 }, { h: 'Value', w: .7 }], [['Real position', sarLoc(sc.truth)], ['Survival equipment', sc.survival], ['Signals', sc.env === 'SEA' ? 'Flares and mirror when you hear or see the aircraft' : 'Torch / phone light, wave clothing'], ['Condition', sc.found]].map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8.5 });
+    }
+    newPage(); h1('Staff only – solutions');
+    for (const sc of jsel.list) { h6(`SAR ${sc.id}`); bullets(sarTexts(sc).truth); const png = jsel.maps[sc.id + ':truth']; if (png) { try { const img = await pdf.embedPng(png); const w = CW * 0.7, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 8; } catch (e) { } } }
+    return { pdf, tocMap: {}, custom: !!assets.fonts };
+  }
   if (jsel && jsel.kind === 'pr') { // ---------- PR pack (CSAR / MEDEVAC) ----------
     const cs = id => (prFlight(id) || {}).cs;
     for (const c of jsel.csar) { const T = prTexts(c);
@@ -2983,7 +3172,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const used = new Set(['GAT', 'OAT', 'AO', 'H-hour', ...(PROF().sober ? [] : ['ROE']), 'SPINS']);
   const txtAll = JSON.stringify([S.cats, t && t.flights.map(f => f.task), t && t.threats.map(x => x.type), t && t.airspace.map(a => a.type)]);
   const has = re => re.test(txtAll);
-  if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k)); if (REL().pr) ['AMC', 'OSC', 'SARDOT', 'CSARTF', 'LZ'].forEach(k => used.add(k));
+  if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k)); if (REL().pr) ['AMC', 'OSC', 'SARDOT', 'CSARTF', 'LZ'].forEach(k => used.add(k)); if (REL().sar) ['RCC', 'OSC', 'DATUM', 'CSP', 'SITREP'].forEach(k => used.add(k));
   if (has(/SEAD|IADS/)) { used.add('SEAD'); used.add('DEAD'); used.add('SAM'); used.add('EWR'); } if (has(/MANPADS|SHORAD/)) { used.add('MANPADS'); used.add('AAA'); }
   if (has(/DCA|AIR/)) used.add('DCA'); if (has(/OCA|ESCORT/)) used.add('OCA'); if (has(/QRA|RENEGADE/)) { used.add('QRA'); used.add('RENEGADE'); }
   if (has(/CAS|GROUND/)) { used.add('CAS'); used.add('JTAC'); used.add('KILL BOX'); } if (has(/STRIKE|HVT/)) { used.add('HVT'); used.add('TOT'); }
@@ -3084,6 +3273,9 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     para('Contact the JTAC on its frequency at the control point. Check in with mission number, number and type of aircraft, position and block, ordnance and laser codes, playtime and abort code. The JTAC then passes situation update, game plan and the 9-line briefing; read back lines 4, 6, 8 and the restrictions.');
     table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], S.cas.jtacs.map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
     if (t && S.cas.jtacs.some(J => J.tasks.some(T => T.flight))) table([{ h: 'Flight', w: .2 }, { h: 'Mission no.', w: .14 }, { h: 'JTAC', w: .18 }, { h: 'Laser codes', w: .24 }, { h: 'Block', w: .24 }], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [{ t: (t.flights.find(f => f.id === T.flight) || {}).cs || '', bold: true }, T.missionNo, J.cs, T.codes.join(' / '), T.block ? T.block + ' (x1000 ft)' : 'low level'])), { size: 7.5 }); }
+  if (mpOn('sar') && REL().sar && S.sar) { h6('Search and rescue – procedure');
+    para('SAR units are tasked by the RCC (MRCC for maritime events), which passes the search action plan on frequency: datum, sub-area, search pattern, track spacing and commence search point. When two or more units operate together the first on scene acts as OSC: report to the OSC on the assigned frequency and send SITREPs as requested.');
+    bullets(['Callsign: RESCUE + INDIA + LIMA (RCC) or MIKE (MRCC) + a letter in order of tasking, e.g. RESCUE INDIA LIMA ALPHA (RILA in the flight plan).', 'Flight plan: normal GAT flight plan with item 18 STS/SAR; HEMS and hospital flights STS/HOSP; MEDEVAC STS/MEDEVAC.', 'Search altitude 500-1000 ft over the sea, about 1000 ft AGL over land; all units search at the speed of the slowest unit.', 'Monitor 121.500; never report the medical condition of survivors to ATS.']); }
   if (mpOn('pr') && REL().pr && S.pr && S.pr.csar.length) { h6('Personnel recovery (CSAR) and MEDEVAC');
     para('An isolated crew calls MAYDAY on GUARD and then listens on CSAR A; positions are passed from the SARDOT, never as coordinates in the clear. CSARTF assets join at the CSAR RV and contact the AMC and the OSC before entering the objective area. Authentication data are passed by the AMC.');
     table([{ h: 'Scenario', w: .14 }, { h: 'CSAR RV', w: .43 }, { h: 'SARDOT', w: .43 }], S.pr.csar.map(c => [{ t: c.id, bold: true }, prLoc(c.rv), `${c.sardot.name}  ${prLoc(c.sardot.pos)}`]), { size: 7.5 }); }
@@ -3108,6 +3300,22 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec(null);
   const tocMap = Object.fromEntries(toc.filter(([n]) => n !== 'Content'));
   return { pdf, tocMap, custom: !!assets.fonts };
+}
+async function exportSarPack(which, btn) {
+  if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
+  if (!S.sar) return toast('Nessuno scenario SAR');
+  const list = S.sar.list.filter(sc => which === 'ALL' || sc.id === which); if (!list.length) return;
+  if (btn) btn.disabled = true; toast('Generazione SAR pack…');
+  try {
+    const assets = await mpAssets(), maps = {};
+    for (const sc of list) { const focus = [...sarAreas(sc).flatMap(a => a.poly), sc.hosp.pos, ...(sc.route || []), ...(sc.ship ? [sc.ship.pos] : [])];
+      const m = await renderMap('brief', { light: true, w: 1300, h: 820, focus, sar: sc, minPad: 0.03 }); if (m) maps[sc.id] = dataUrlBytes(m);
+      const m2 = await renderMap('brief', { light: true, w: 1100, h: 700, focus: [...sarAreas(sc).flatMap(a => a.poly), sc.truth], sar: sc, sarTruth: true, minPad: 0.03 }); if (m2) maps[sc.id + ':truth'] = dataUrlBytes(m2); }
+    const r = await buildMasterplanPdf(null, assets, null, { kind: 'sar', list, maps });
+    await download(`${fileBase()}_SAR_${which}.pdf`, new Blob([await r.pdf.save()], { type: 'application/pdf' }));
+    toast('SAR pack generato');
+  } catch (err) { console.error(err); toast('Errore: ' + err.message); }
+  if (btn) btn.disabled = false;
 }
 async function exportPrPack(which, btn) {
   if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
@@ -3247,7 +3455,7 @@ function buildPayload(includeBrief) {
   const sc = JSON.parse(JSON.stringify(S));
   // public material never carries people's names or VIDs
   sc.roster = { pilots: (sc.roster.pilots || []).map(p => ({ id: p.id, typeRaw: p.typeRaw })), controllers: (sc.roster.controllers || []).map(c => ({ id: c.id, pref: c.pref })) };
-  sc.cas = casPublic(sc.cas); sc.pr = prPublic(sc.pr);
+  sc.cas = casPublic(sc.cas); sc.pr = prPublic(sc.pr); sc.sar = sarPublic(sc.sar);
   if (sc.t) { delete sc.t.cas; sc.t.warnings = []; sc.t.flights.forEach(f => f.pilots = []); sc.t.c2.forEach(c => { c.controller = /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) ? 'Open' : 'Assigned'; }); }
   if (sc.asp) sc.asp = { source: sc.asp.source, loaded: sc.asp.loaded, zones: RES(), freqs: [], bullseyes: bulSel(), tracks: TRK() }; // only the reserved areas and the event bullseye
   if (!includeBrief) sc.t = null;
@@ -3295,6 +3503,7 @@ function renderPublic() {
   const brief = t ? `
     <section class="pcard"><h2>Flights &amp; tasking</h2>
       ${tbl(['Callsign', 'Aircraft', 'Base', 'Task', 'Package', 'Freq'], t.flights.map(f => [`<b class="blue">${esc(f.cs)}</b>`, `${f.size} × ${esc(f.type)}`, esc(f.base || '-'), esc(ROLES[f.task] || f.task), esc(PKG[f.pkg] || f.pkg), esc(f.freq || 'TBD')]))}</section>
+    ${S.sar && REL().sar ? `<section class="pcard"><h2>Search and rescue</h2><p class="muted">The RCC passes the search action plan on frequency. Callsign RESCUE INDIA LIMA / MIKE + letter (e.g. RILA), flight plan item 18 STS/SAR. The first unit on scene acts as OSC; monitor 121.500.</p></section>` : ''}
     ${S.pr && REL().pr && S.pr.csar.length ? `<section class="pcard"><h2>Personnel recovery</h2><p class="muted">Isolated crews call MAYDAY on GUARD and then listen on CSAR A. Positions are passed from the SARDOT only.</p>${tbl(['Scenario', 'CSAR RV', 'SARDOT'], S.pr.csar.map(c => [`<b>${esc(c.id)}</b>`, esc(prLoc(c.rv)), esc(c.sardot.name + '  ' + prLoc(c.sardot.pos))]))}</section>` : ''}
     ${S.cas && REL().cas ? `<section class="pcard"><h2>Close air support</h2><p class="muted">Check in with the JTAC at the control point. Targets and the 9-line are passed on frequency.</p>${tbl(['JTAC', 'Frequency', 'Control points', 'IP / BP'], S.cas.jtacs.map(J => [`<b>${esc(J.cs)}</b>`, esc(J.freq || 'TBD'), J.cps.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>'), J.ips.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>')]))}
       ${tbl(['Flight', 'Mission no.', 'JTAC', 'Laser codes', 'Block'], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [`<b>${esc((t.flights.find(f => f.id === T.flight) || {}).cs || '')}</b>`, esc(T.missionNo), esc(J.cs), esc(T.codes.join(' / ')), esc(T.block || 'low level')])))}</section>` : ''}
