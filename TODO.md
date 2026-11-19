@@ -8,7 +8,11 @@
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
 - Separate the group from the opposition: a switch "Con forza avversaria (RED)" decides factions, threats, ROE, OPERATION/EXERCISE name, instead of the group (e.g. AEW / DCA with or without RED; air policing always cooperative).
-- Waiting for the staff's decisions before any change.
+- Staff decisions (19 Nov):
+  - CSAR in its own category: **Personnel Recovery** (not under air mobility).
+  - Category names always in English in the UI (Control of the Air, Attack, Air Mobility, ISR, Personnel Recovery, Basic Training, Civil / Civil Protection, Mixed); the rest of the staff UI stays Italian.
+  - Switch "With opposing force (RED)" approved, plus a second choice when it is on: **RED live** (flown by real participants) or **RED fictional** (narrative only: threats simulated / described in the scenario, as today).
+- Still to agree for RED live: how participants pick the side (roster column BLUE / RED, or the staff assigns), RED bases, separate RED briefing (not in the BLUE deck / public page?), block deconfliction / kill criteria / regeneration (already in the GCI card), RED callsigns.
 
 ## On hold (wait for the go-ahead)
 - [ ] **Inflight guide (A5 kneeboard)** – one guide for all participants: frequencies, ATC/C2 positions, airports, reserved areas, map, bullseye/tracks/routes only if pertinent, timeline, code words, emergency/lost comms. Role details stay in the mission briefing. Open questions: max number of A5 pages; source of the aerodrome charts (vSOP site not reachable from the build environment – files or a saved page are needed).
