@@ -675,6 +675,8 @@ const trkAlt = t => { if (t.kind !== 'AEW') return `FL${t.lo}-FL${t.hi}`; const 
 function orbitShapes(a) { const r = (a.rad || 15) * 1.852, out = a.pts.map(p => ring(p, r, 40).concat([dest(p, 0, r)]));
   if (a.pts.length > 1) { const b = bearing(a.pts[0], a.pts[1]); [90, -90].forEach(sg => out.push([dest(a.pts[0], b + sg, r), dest(a.pts[1], b + sg, r)])); }
   return out; }
+function bullSelHtml() { const f = geom().front, sel = String(S.meta.bullseye || '').toUpperCase(), list = BUL().slice().sort((a, b) => dist(f, a.pos) - dist(f, b.pos));
+  return `<select id="bull">${list.some(b => b.name === sel) ? '' : `<option value="${esc(sel)}" selected>${esc(sel || '—')}</option>`}${list.map(b => `<option value="${esc(b.name)}" ${b.name === sel ? 'selected' : ''}>${esc(b.name)} – ${Math.round(dist(f, b.pos) / 1.852)} NM${b.ref && b.ref !== '-' ? ' (' + esc(b.ref) + ')' : ''}</option>`).join('')}</select>`; }
 function bullSelectHtml() { return `<datalist id="bulllist">${BUL().map(b => `<option value="${esc(b.name)}">`).join('')}</datalist>`; }
 // --- AIP layer (removable): military restricted areas from AIP Italia ENR 5.1.2, in data/aip_zones.json (built by tools/aip_*.py).
 // Deleting that file (and data/aip_src/) removes the layer: the app then uses the database / imported file / demo data.
@@ -1570,7 +1572,7 @@ function buildTexts(flights, assigned, el) {
   const g = geom();
   const spins = [
     `Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}${(bullOf(S.meta.bullseye) || {}).ref ? ' (' + bullOf(S.meta.bullseye).ref + ')' : ''}. Threat calls in BULLSEYE format.`,
-    `Check-in with ${gciCs()}: callsign, mission, position, altitude, fuel / playtime; authentication and ALPHA CHECK on the bullseye.`,
+    `Check-in with ${gciCs()}: callsign, mission, position, altitude, fuel / playtime; ${authOn() ? 'authentication and ' : ''}ALPHA CHECK on the bullseye.`,
     'Squawk and IFF codes: assigned per package by ATC (TBD).',
     'Lost comms: return via the ingress route at the briefed altitude, squawk 7600.',
     'Joker / Bingo fuel: set by each flight lead.',
@@ -1678,7 +1680,7 @@ function casSlot(J, k, rw, g, used, uniq) {
   const boc = !rw && k % 2 === 1, n = J.tasks.length;
   J.tasks.push({ id: `${J.id}S${n + 1}`, flight: null, rw, target: tgt.id, ip: ip.name, control: boc ? 2 : 1, method: boc ? 'BOC' : 'BOT', wpn: rw ? 'AGM-114 Hellfire' : boc ? 'GBU-38' : 'GBU-12',
     fuze: 'INSTANTANEOUS', mark: J.night ? 'IR' : boc ? 'NONE' : 'LASER', seq: '', spacing: 30, tot: 18 + n * 8 + (+J.id.slice(1) - 1) * 2,
-    block: rw ? '' : `${10 + 3 * n}-${12 + 3 * n}`, missionNo: '', codes: [], playtime: 30, abort: 'ABORT IN THE CLEAR' });
+    block: rw ? '' : `${10 + 3 * n}-${12 + 3 * n}`, missionNo: '', codes: [], playtime: 30, abort: abortTxt() });
 }
 function genCAS() {
   const g = geom(), cfg = casCfg(), used = new Set();
@@ -2473,9 +2475,20 @@ function qraSetup(flights) {
     f.base = b.icao; f.cs = `${b.pfx[0]}${pad(lead)}`; f.csAll = f.size > 1 ? Array.from({ length: f.size }, (_, k) => `${b.pfx[0]}${pad(lead + k)}`).join(' / ') : f.cs; f.qra = b.icao;
     if (!S.blueBases.includes(b.icao)) S.blueBases.push(b.icao); });
 }
-// authentication tables (methods GCI1 and GCI2): generated per event
-function authTables() { const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), rows = Array.from({ length: 6 }, () => shuffle(L).slice(0, 13));
-  return { gci1: rows, gci2: Array.from({ length: 3 }, () => shuffle(L).join('')) }; }
+// authentication (staff 19 Nov): required by default (not for civil events), switchable off; only the letter-line table ("Authentication table");
+// RAMROD = 10-letter word without repeated letters, letter n = digit n (first letter = 0, as the SARNEG), new for every event
+const RAMRODS = ['NIGHTMARES', 'GREYHOUNDS', 'TRAMPOLINE', 'COMPLAINED', 'HYDROPLANE', 'BANKRUPTCY', 'DUPLICATES', 'MOTHERLAND', 'CLOTHESPIN', 'SPEARMINTY'].filter(w => w.length === 10 && new Set(w).size === 10 && !PR_SARNEG.includes(w));
+const authOn = () => S.meta && S.meta.auth != null ? !!S.meta.auth : !PROF().civil;
+function ramrod() { if (!authOn()) return ''; const sar = (S.pr && S.pr.csar || []).map(c => c.auth && c.auth.sarneg); if (!S.meta.ramrod || sar.includes(S.meta.ramrod)) S.meta.ramrod = pick(RAMRODS.filter(w => !sar.includes(w))); return S.meta.ramrod; }
+const ramEnc = n => { const w = ramrod(); return String(n).split('').map(d => w[+d]).join(''); };
+const abortTxt = () => { if (!authOn()) return 'ABORT IN THE CLEAR'; const n = String(10 + Math.floor(Math.random() * 90)); return `ABORT CODE ${ramEnc(n)} (${n})`; };
+function authTables() { const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''); return { lines: Array.from({ length: 4 }, () => shuffle(L).join('')) }; }
+function applyAuth(t) { if (!t) return; const on = authOn(); t.spins = (t.spins || []).filter(x => !/^Authentication: /.test(x)); const sp = t.spins;
+  if (S.cas) S.cas.jtacs.forEach(J => J.tasks.forEach(T => { if (on !== /^ABORT CODE/.test(T.abort || '')) T.abort = abortTxt(); }));
+  if (!on) { t.auth = { on: false }; sp.unshift('Authentication: NOT REQUIRED for this event.'); return; }
+  const w = ramrod(), ex = [String(10 + Math.floor(Math.random() * 90)), String(1000 + Math.floor(Math.random() * 9000))];
+  t.auth = { on: true, ramrod: w, table: (t.gci && t.gci.auth) || authTables(), examples: ex.map(n => [n, ramEnc(n)]) };
+  sp.unshift(`Authentication: REQUIRED. Authentication table given at the briefing (the station that authenticates gives the 1st and 3rd of three consecutive letters of a line, the other answers with the letter between). RAMROD ${w}: ${w.split('').map((c, k) => c + '=' + k).join(' ')} – numbers are passed with these letters (e.g. ${ex[0]} = ${ramEnc(ex[0])}).`); }
 const GCI_CHECK = {
   intercept: ['Check-in and radio check (training: the controller gives the clearance and the area limits)', 'Authentication', 'Radar contact and type of service (new squawk if needed)', 'Task (supersonic only for A-scramble or inside approved areas)', 'ALPHA CHECK on the active bullseye + WEAPONS SAFE', 'Playtime report', 'Start of the intercept (READY TO COMMIT?)', 'PICTURE if needed', 'Vectors to the target with intercept geometry', 'JUDY call', 'TALLY call', 'Identification data and further tasks, if any', 'End of the intercept and coordination for the return to base'],
   cap: ['Check-in and radio check (training: clearance and area limits)', 'Authentication', 'Radar contact and type of service (new squawk if needed)', 'Task: CAP info and clearance, if not briefed (deconfliction blocks, role to play, kill criteria, regeneration)', 'ALPHA CHECK on the active bullseye + WEAPONS SAFE', 'Playtime report', 'PICTURE / threat awareness and ROE in use', 'Further tasks', 'Execution of the activity', 'Termination and recap'],
@@ -2515,18 +2528,18 @@ function applyGCI(t) {
   const ph = []; // phraseology examples with the event's callsigns
   scr.forEach(q => { const c = q.cs, cs2 = (q.csAll.split(' / ')[1]) || c.replace(/\d+$/, x => String(+x + 1).padStart(2, '0'));
     if (!q.cap) ph.push(['Launch (ground alert)', [[`TWR`, q.msgGround], [`TWR, ${c}`, `TWO SHIPS TANGO SCRAMBLE`], [`${c}, TWR`, `TAXI ${blank}, RUNWAY ${blank}, REPORT READY FOR DEPARTURE`], [`${c}, TWR`, `RUNWAY ${blank} CLEARED FOR TAKE-OFF, WIND ${blank}`], [`TWR, ${c}`, `AIRBORNE ${blank}, CONTACT ${ctl} ON ${blank}`]]]);
-    ph.push(['Vectoring', [[`${ctl}, ${c}`, 'TWO SHIP CHECKING IN'], [`${c}, ${ctl}`, `RADAR CONTACT, CLOSE POSITIVE CONTROL, READ YOU FIVE BY FIVE, REPORT READY FOR AUTHENTICATION`], [`${c}, ${ctl}`, `AUTHENTICATE ${blank}`], [`${ctl}, ${c}`, `COME BACK ${blank}, AUTHENTICATE ${blank}`], [`${c}, ${ctl}`, `COME BACK ${blank}, GOOD AUTHENTICATION, REPORT WEAPONS SAFE AND READY FOR ALPHA CHECK`], [`${ctl}, ${c}`, `WEAPONS SAFE, ALPHA CHECK ${blank}`], [`${ctl}, ${cs2}`, 'TWO WEAPONS SAFE, SAME'], [`${c}, ${ctl}`, 'ROGER, REPORT YOUR PLAYTIME']]]);
+    ph.push(['Vectoring', [[`${ctl}, ${c}`, 'TWO SHIP CHECKING IN'], ...(authOn() ? [[`${c}, ${ctl}`, `RADAR CONTACT, CLOSE POSITIVE CONTROL, READ YOU FIVE BY FIVE, REPORT READY FOR AUTHENTICATION`], [`${c}, ${ctl}`, `AUTHENTICATE ${blank}`], [`${ctl}, ${c}`, `COME BACK ${blank}, AUTHENTICATE ${blank}`], [`${c}, ${ctl}`, `COME BACK ${blank}, GOOD AUTHENTICATION, REPORT WEAPONS SAFE AND READY FOR ALPHA CHECK`]] : [[`${c}, ${ctl}`, `RADAR CONTACT, CLOSE POSITIVE CONTROL, READ YOU FIVE BY FIVE, REPORT WEAPONS SAFE AND READY FOR ALPHA CHECK`]]), [`${ctl}, ${c}`, `WEAPONS SAFE, ALPHA CHECK ${blank}`], [`${ctl}, ${cs2}`, 'TWO WEAPONS SAFE, SAME'], [`${c}, ${ctl}`, 'ROGER, REPORT YOUR PLAYTIME']]]);
     ph.push(['Interception', [[`${c}, ${ctl}`, `THIS IS A TANGO SCRAMBLE ORDER FOR ${SCR_TASK[q.task]} AGAINST TRACK ${blank}, ${blank} NM, ${blank} FT, TRACKING ${blank}`], [`${ctl}, ${c}`, `ROGER TANGO SCRAMBLE FOR ${SCR_TASK[q.task]}, READY TO COMMIT`], [`${c}, ${ctl}`, `COMMIT ${blank}, THIS WILL BE BEAM TO STERN INTERCEPTION`], [`${ctl}, ${c}`, 'JUDY'], [`${c}, ${ctl}`, 'STRANGLE PARROT, WE WILL CONTINUE TO PROVIDE INFORMATION, REPORT TALLY'], [`${ctl}, ${c}`, 'TALLY ONE'], [`${c}, ${ctl}`, 'CLEARED VID RUN'], [`${ctl}, ${c}`, `READY TO COPY DATA? ${blank} (type, colours / markings, heading, level, speed, weapons / configuration, registration)`]]]);
     ph.push(['Resolution', q.task === 'LAND' ? [[`${c}, ${ctl}`, `YOUR TASK IS INTERVENTION TO LAND IN ${q.land || blank}`], [`${ctl}, ${c}`, `ROGER, TASK IS INTERVENTION TO LAND IN ${q.land || blank}`], [`${blank}, ${c}`, 'FOLLOW, FOLLOW … YOU LAND, YOU LAND'], [`${ctl}, ${c}`, `TARGET HAS LANDED, REQUEST RECOVERY TO ${q.base || blank}`]]
       : q.task === 'ESCORT' ? [[`${c}, ${ctl}`, 'YOUR TASK IS ESCORT UNTIL FIR LIMIT'], [`${ctl}, ${c}`, 'REACHING LIMIT'], [`${c}, ${ctl}`, `TANGO SCRAMBLE TERMINATED, RTB VIA ${q.base || blank} DIRECT`]]
       : [[`${c}, ${ctl}`, 'APPLY VIS 1 AND REPORT IF THE TARGET IS COMPLIANT'], [`121.500`, `AIRCRAFT WITH REGISTRATION ${blank} ${blank}, YOU HAVE BEEN INTERCEPTED BY ITALIAN AIR FORCE, IF YOU READ ME CONTACT ME ON GUARD FREQUENCY 121.500`], [`${ctl}, ${c}`, 'TARGET IS COMPLIANT'], [`${c}, ${ctl}`, `TANGO SCRAMBLE TERMINATED, RTB VIA ${q.base || blank} DIRECT`]]]); });
   t.caps = caps; caps.forEach(c => { if (!c.cs) return; ph.push([`CAP assignment – ${c.cs}`, [[`${c.cs}, ${ctl}`, `${c.type.toUpperCase()} OVER ${c.anchor}, LEFT TURN, INBOUND TRACK ${String(c.inbound).padStart(3, '0')}, LEG ${c.leg} MILES, ${c.alt}`], [`${ctl}, ${c.cs}`, 'REQUEST PICTURE'], [`${c.cs}, ${ctl}`, `PICTURE CLEAN`], [`${c.cs}, ${ctl}`, `NEW PICTURE SINGLE GROUP BULLSEYE ${blank}, ${blank}, ${blank}, TRACKING ${blank}, BOGEY, NEW TASK VID`], [`${c.cs}, ${ctl}`, 'RECAP AS FRAGGED']]]); });
   const need = scr.length || caps.length || aa.length;
-  t.gci = need ? { ctl, ctlFreq, scr, injects, auth: authTables(), control, blocks, kill, card, ph, checklists: GCI_CHECK } : null;
+  t.gci = need ? { ctl, ctlFreq, scr, injects, auth: authTables(), control, blocks, kill, card, ph, checklists: { ...GCI_CHECK, intercept: GCI_CHECK.intercept.filter(x => authOn() || x !== 'Authentication'), cap: GCI_CHECK.cap.filter(x => authOn() || x !== 'Authentication'), aar: GCI_CHECK.aar.filter(x => authOn() || x !== 'Authentication') } } : null;
   // SPINS / ROE lines (masterplan)
   if (need) { const sp = t.spins || (t.spins = []);
     sp.push(`Control: ${control.map(([r, c]) => `${r} – ${c}`).join('; ') || 'as briefed'}.`);
-    sp.push(`Authentication with ${ctl}: method GCI1 or GCI2, tables in the GCI pack (given at the briefing).`);
+    if (authOn()) sp.push(`Authentication with ${ctl}: authentication table (GCI pack, given at the briefing) and RAMROD.`);
     if (blocks) sp.push(`Block deconfliction: BLUE block ${blocks.blue}, RED / target block ${blocks.red}. ${blocks.note}`);
     kill.forEach(k => sp.push(k));
     if (scr.length) sp.push(`QRA: TANGO SCRAMBLE ORDER from TWR or the briefed channel (format in the GCI pack, dynamic items given live). Exit gates 15 NM from the base: NOVEMBER, ECHO, SIERRA, WHISKEY. Interceptors fly IOAT until the task is complete, then RTB IFR or VOAT.`);
@@ -2600,7 +2613,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); fitAirspace(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t);
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -2609,7 +2622,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); fitAirspace(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t);
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -2697,6 +2710,7 @@ function initMap() {
   const v = theatre().view;
   MAP = L.map('map', { zoomControl: true }).setView([v[0], v[1]], v[2]);
   MAP.createPane('land'); MAP.getPane('land').style.zIndex = 350;
+  MAP.createPane('bulls'); MAP.getPane('bulls').style.zIndex = 450; // bullseyes above the areas (overlay pane 400) so they can be clicked
   MAP.attributionControl.addAttribution('Map data: amCharts geodata / Natural Earth');
   if (LAND) drawLandLayer();
   LAYERS = L.layerGroup().addTo(MAP);
@@ -2782,7 +2796,7 @@ function drawMap(fit) {
     if (on) add(L.polyline(z.axis, { color: '#7e22ce', weight: 1.5 })); });
   if ((S.thDraft || []).length) { add(L.polyline(S.thDraft.concat(S.thDraft.length > 2 ? [S.thDraft[0]] : []), { color: '#0f172a', weight: 2, dashArray: '6 4' })); S.thDraft.forEach(p => add(L.circleMarker(p, { radius: 4, color: '#0f172a' }))); }
   if (bullShown()) { const sel = String(S.meta.bullseye || '').toUpperCase(); // all bullseyes of the list (to place areas and threats); the mission one highlighted, the others clickable
-    BUL().forEach(b => { if (b.name === sel) return; const m = add(L.circleMarker(b.pos, { radius: 4, color: '#64748b', weight: 1.5, fillColor: '#cbd5e1', fillOpacity: .9 })).bindTooltip(`◎ ${b.name}${b.ref && b.ref !== '-' ? ' (' + b.ref + ')' : ''} – clic per usarlo come bullseye della missione`, { sticky: true });
+    BUL().forEach(b => { if (b.name === sel) return; const m = add(L.circleMarker(b.pos, { pane: 'bulls', radius: 6, color: '#475569', weight: 2, fillColor: '#e2e8f0', fillOpacity: 1 })).bindTooltip(`◎ ${b.name}${b.ref && b.ref !== '-' ? ' (' + b.ref + ')' : ''} – clic per usarlo come bullseye della missione`, { sticky: true });
       m.on('click', () => { if (ADDMODE) return; setBull(b.name); save(); renderPanel(); drawMap(); toast(`Bullseye della missione: ${b.name}`); }); });
     const bp = bullPos(); add(L.circle(bp, { radius: 18520, color: '#D97706', weight: 1.5, fill: false, interactive: false })); add(L.circle(bp, { radius: 37040, color: '#D97706', weight: 1, dashArray: '4 6', fill: false, interactive: false }));
     add(L.marker(bp, { icon: icon('#f59e0b', '◎', sel, 'circle', 16) })).bindTooltip(`Bullseye della missione: ${sel} – ${fmtLL(bp)}`); }
@@ -2795,7 +2809,7 @@ function drawMap(fit) {
   mapZones().forEach(z => { const r = (S.reserved || []).includes(z.id), col = ZCOL[z.type] || '#475569';
     const pl = add(L.polygon(z.poly, { color: col, weight: r ? 2 : 1, dashArray: r ? null : '4 4', fillOpacity: r ? .10 : .02, opacity: r ? .9 : .5 }));
     pl.bindTooltip(`${z.name} · ${z.type} · ${z.lower}–${z.upper}${r ? ' · RISERVATA' : ' · clic per riservarla'}`, { sticky: true });
-    if (TAB === 'scenario') pl.on('click', e => { if (ADDMODE) return; const p = e && e.latlng ? [e.latlng.lat, e.latlng.lng] : centroid(z.poly), zs = zonesAt(p); if (zs.length > 1) return zonePick(p, zs); resToggle(z.id); }); });
+    if (TAB === 'scenario') pl.on('click', e => { if (ADDMODE) return; const p = e && e.latlng ? [e.latlng.lat, e.latlng.lng] : centroid(z.poly), zs = zonesAt(p), nb = bullNear(p); if (zs.length > 1 || nb) return zonePick(p, zs, nb); resToggle(z.id); }); });
   if (showZones) S.zones.forEach(z => {
     const col = z.side === 'BLUE' ? '#3b82f6' : '#ef4444';
     add(L.circle(z.center, { radius: z.r * 1000, color: col, weight: 1.5, dashArray: '6 6', fillOpacity: 0.07 }));
@@ -2933,9 +2947,14 @@ function aspIssuesHtml() {
 const polyArea = poly => Math.abs(poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[1] * q[0] - q[1] * p[0]; }, 0)) / 2;
 const zonesAt = p => mapZones().concat(CUS()).filter((z, i, a) => a.indexOf(z) === i && z.type !== 'COR' && pip(p, z.poly)).sort((a, b) => polyArea(a.poly) - polyArea(b.poly));
 function resToggle(id) { if (!S.resMode) S.resMode = 'manual'; const set = new Set(S.reserved || []); set.has(id) ? set.delete(id) : set.add(id); S.reserved = [...set]; save(); renderPanel(); drawMap(); }
-function zonePickHtml(zs) { const res = new Set(S.reserved || []);
-  return `<div style="min-width:220px"><b style="font-size:12px">${zs.length} aree sovrapposte qui</b><div class="muted" style="font-size:11px;margin-bottom:4px">Spunta quelle da riservare (dalla più piccola):</div>${zs.map(z => `<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0;cursor:pointer"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span><span>${esc(z.name)} <span class="muted">${esc(z.lower)}–${esc(z.upper)}</span></span></label>`).join('')}</div>`; }
-function zonePick(p, zs) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs)).openOn(MAP); }
+const bullNear = p => bullShown() ? BUL().filter(b => dist(b.pos, p) < 5 * 1.852).sort((a, b) => dist(a.pos, p) - dist(b.pos, p))[0] || null : null; // bullseye within 5 NM of a click
+function zonePickHtml(zs, nb) { const res = new Set(S.reserved || []), inUse = nb && nb.name === String(S.meta.bullseye || '').toUpperCase();
+  const bh = nb ? `<button class="b sm ${inUse ? 'primary' : ''}" data-bullpick="${esc(nb.name)}" style="width:100%;margin-bottom:6px">◎ ${esc(nb.name)}${inUse ? ' – bullseye della missione' : ' – usa come bullseye della missione'}</button>` : '';
+  if (!zs.length) return `<div style="min-width:220px">${bh}</div>`;
+  return bh + zonePickHtml0(zs); }
+function zonePickHtml0(zs) { const res = new Set(S.reserved || []);
+  return `<div style="min-width:220px"><b style="font-size:12px">${zs.length > 1 ? zs.length + ' aree sovrapposte qui' : 'Area qui'}</b><div class="muted" style="font-size:11px;margin-bottom:4px">Spunta quelle da riservare (dalla più piccola):</div>${zs.map(z => `<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0;cursor:pointer"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span><span>${esc(z.name)} <span class="muted">${esc(z.lower)}–${esc(z.upper)}</span></span></label>`).join('')}</div>`; }
+function zonePick(p, zs, nb) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs, nb)).openOn(MAP); }
 // zone list: filter by name/id, type, selection, range; sort by distance, name, type or lower limit
 const ZF = { q: '', type: '', sel: '', all: false, sort: 'dist' };
 // mission level band (S.meta.levels = [bottom, upper] in FL, 600 = UNL): areas that overlap it, even partly (touching only = hidden); unknown (TBC) upper limit = shown
@@ -3065,7 +3084,7 @@ function wBody(id) {
     case 'req': return `<p class="muted" style="margin-top:0">Ruoli richiesti ai partecipanti. Un ruolo tolto non viene assegnato e sparisce dai documenti.</p>${reqCard()}`;
     case 'th': return `<label>Nome evento</label><div class="row"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop" title="Nome casuale">🎲</button></div>
       <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', { ...(thChosen() || ADDMODE === 'th:draw' ? {} : { '': '— scegli il teatro —' }), ...thl, CUSTOM: S.thCustom ? `✏️ ${S.thCustom.name}${S.thCustom.name === 'Teatro disegnato' ? '' : ' (disegnato a mano)'}` : '✏️ Disegnalo tu sulla mappa…' }, ADDMODE === 'th:draw' ? 'CUSTOM' : S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth" title="Teatro casuale">🎲</button></div>
-      ${R.bull ? `<div><label>Bullseye (dalla lista)</label><input id="bull" list="bulllist" value="${esc(S.meta.bullseye)}">${bullSelectHtml()}</div>` : ''}</div>
+      ${R.bull ? `<div><label>Bullseye della missione</label>${bullSelHtml()}</div>` : ''}</div>
       ${ADDMODE === 'th:draw' ? `<div class="card" style="margin-top:8px"><b style="font-size:13px">Disegna il teatro</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Clic sulla mappa per ogni vertice (${(S.thDraft || []).length} finora), poi "Chiudi teatro". Basi, FIR e posizione delle forze vengono ricavate dal disegno; le aree riservate proposte sono quelle che toccano il teatro.</p>
         <div class="row"><button class="b sm primary shrink" id="thclose" ${(S.thDraft || []).length < 3 ? 'disabled' : ''}>Chiudi teatro</button><button class="b sm shrink" id="thcancel">Annulla</button></div></div>`
       : S.meta.theatre === 'CUSTOM' && S.thCustom ? `<div class="row" style="align-items:flex-end;margin-top:6px"><div><label>Nome del teatro disegnato</label><input id="thname" value="${esc(S.thCustom.name)}"></div><button class="b sm shrink" id="thdraw">Ridisegna</button></div>
@@ -3077,7 +3096,7 @@ function wBody(id) {
       <div><label><span class="dot" style="background:var(--red)"></span>Fazione RED</label><input id="fred" value="${esc(S.factions.red)}"></div><button class="b shrink" id="rfac">🎲</button></div>
       <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>
       ${borderHtml()}`;
-    case 'c2': return c2Card();
+    case 'c2': return `<label class="chip" style="margin-bottom:8px"><input type="checkbox" id="authon" ${authOn() ? 'checked' : ''}> Autenticazione richiesta (tabella di autenticazione + RAMROD nel briefing)</label>${authOn() && S.meta.ramrod ? `<span class="muted" style="font-size:12px"> RAMROD dell'evento: <b>${esc(S.meta.ramrod)}</b></span>` : ''}` + c2Card();
     case 'gen': return GEN() ? genDoneHtml() : genAskHtml();
   }
   return '';
@@ -3399,7 +3418,8 @@ document.addEventListener('change', e => {
   const id = t.id;
   if (id === 'op') S.meta.op = t.value;
   if (id === 'theatre') { if (!t.value) return; if (t.value === 'CUSTOM' && !S.thCustom) { thDrawStart(); return; } setTheatre(t.value); return; }
-  if (id === 'bull') { setBull(t.value); }
+  if (id === 'authon') { S.meta.auth = t.checked; if (S.t) applyAuth(S.t); save(); renderPanel(); return; }
+  if (id === 'bull') { setBull(t.value); save(); renderPanel(); drawMap(); return; }
   if (id === 'fblue' || id === 'fred') { facEdit(t, true); return; }
   if (id === 'bg') S.background = t.value;
   if (id === 'hh') S.meta.hHour = t.value;
@@ -3430,6 +3450,7 @@ document.addEventListener('click', e => {
   if (t.id === 'notamtxt') { download(`${fileBase()}_NOTAM.txt`, new Blob([notamList().map(n => n.text).join('\n\n') + '\n'], { type: 'text/plain' })); return; }
   if (t.dataset.trk) { trkToggle(t.dataset.trk); return; }
   if (t.dataset.var) { varToggle(t.dataset.var); return; }
+  if (t.dataset.bullpick) { setBull(t.dataset.bullpick); if (MAP) MAP.closePopup(); save(); renderPanel(); drawMap(); toast(`Bullseye della missione: ${t.dataset.bullpick}`); return; }
   if (t.dataset.cor) { const z = CORS().find(x => x.id === t.dataset.cor), st = new Set(S.cor || []); if (z) { st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
@@ -3909,7 +3930,7 @@ const GLOSSARY = {
   AAR: 'Air-to-Air Refuelling', AEW: 'Airborne Early Warning', GCI: 'Ground-Controlled Interception', 'DZ / LZ': 'Drop zone / Landing zone',
   'LOW & SLOW': 'Interception of slow, low-flying targets such as helicopters', ASuW: 'Anti-Surface Warfare', MPA: 'Maritime Patrol Aircraft'
 };
-Object.assign(GLOSSARY, { SMI: 'Slow mover interception: intercept of light aircraft, helicopters or ultralights flying low and slow (fighters + helicopter)', 'ALPHA CHECK': 'Check of the bearing and range of the bullseye from the aircraft', ANGELS: 'Altitude of friendly aircraft in thousands of feet (ANGELS 18 = 18000 ft)', PLAYTIME: 'Time the aircraft can stay in the area of operations (hours + minutes)', PICTURE: 'Tactical situation of the area, normally in BULLSEYE format', BRAA: 'Bearing, range, altitude and aspect of a contact from the fighter', BOGEY: 'Unidentified aircraft', BANDIT: 'Aircraft identified as enemy; does not imply clearance to engage', HOSTILE: 'Enemy aircraft; clearance to engage implied', JUDY: 'Radar contact on the target: the fighter (or receiver) completes the intercept on its own', TALLY: 'Visual contact on the target', COMMIT: 'Start an intercept against a target', 'BUSTER / GATE': 'BUSTER: military power; GATE: maximum power', STRANGLE: 'Switch off the equipment named (STRANGLE PARROT = transponder off)', PARROT: 'Military IFF transponder', 'KNOCK IT OFF': 'Stop all activity for safety reasons', TERMINATE: 'Stop the engagement when the training objective is achieved', 'T-SCRAMBLE': 'TANGO scramble: simulated QRA scramble ordered for training', VID: 'Visual identification of the intercepted aircraft', 'EXIT GATE': 'Departure gate 15 NM from the alert base (NOVEMBER, ECHO, SIERRA, WHISKEY) giving the first heading after take-off', 'IOAT / VOAT': 'Operational air traffic flying under instrument (IOAT) or visual (VOAT) rules', BarCAP: 'Barrier combat air patrol protecting an airspace for a set time', HAVCAP: 'High asset value CAP protecting AEW, tankers and ISR aircraft', ResCAP: 'Rescue CAP protecting the CSAR forces and the isolated personnel', TarCAP: 'Target CAP near a ground target, protecting the attack aircraft', ForCAP: 'Force CAP: escort of the strike forces', ARIP: 'Air refuelling initial point: where tanker and receivers start the rendezvous', ARCP: 'Air refuelling control point: where the receivers arrive astern / in observation of the tanker', ARCT: 'Air refuelling control time at the ARCP', 'ANCHOR POINT': 'Reference point on which the tanker pattern is built', 'BASE AAR ALTITUDE': 'Altitude of the (lowest) tanker during the refuelling', ASTERN: 'Stabilised position behind the drogue or the boom before contact', 'ECHELON LEFT / RIGHT': 'Positions on the tanker\'s left wing before AAR and on the right wing after AAR', BREAKAWAY: 'Emergency separation call during AAR', TOBOGGAN: 'Request to the tanker for a slow descent at refuelling speed (300–500 ft/min)', 'DRY / WET CONTACT': 'Contact without / with fuel transfer', 'NOSE COLD': 'Radar on standby', 'SWITCHES SAFE': 'Armament selected safe / off', MARSA: 'Military assumes responsibility for separation of aircraft inside the formation', EMCON: 'Emission control: restrictions on radio and electronic emissions (options 1–4)', HAAR: 'Helicopter air-to-air refuelling' });
+Object.assign(GLOSSARY, { RAMROD: '10-letter word without repeated letters used to pass numbers on the radio (each letter = one digit, first letter = 0)', SMI: 'Slow mover interception: intercept of light aircraft, helicopters or ultralights flying low and slow (fighters + helicopter)', 'ALPHA CHECK': 'Check of the bearing and range of the bullseye from the aircraft', ANGELS: 'Altitude of friendly aircraft in thousands of feet (ANGELS 18 = 18000 ft)', PLAYTIME: 'Time the aircraft can stay in the area of operations (hours + minutes)', PICTURE: 'Tactical situation of the area, normally in BULLSEYE format', BRAA: 'Bearing, range, altitude and aspect of a contact from the fighter', BOGEY: 'Unidentified aircraft', BANDIT: 'Aircraft identified as enemy; does not imply clearance to engage', HOSTILE: 'Enemy aircraft; clearance to engage implied', JUDY: 'Radar contact on the target: the fighter (or receiver) completes the intercept on its own', TALLY: 'Visual contact on the target', COMMIT: 'Start an intercept against a target', 'BUSTER / GATE': 'BUSTER: military power; GATE: maximum power', STRANGLE: 'Switch off the equipment named (STRANGLE PARROT = transponder off)', PARROT: 'Military IFF transponder', 'KNOCK IT OFF': 'Stop all activity for safety reasons', TERMINATE: 'Stop the engagement when the training objective is achieved', 'T-SCRAMBLE': 'TANGO scramble: simulated QRA scramble ordered for training', VID: 'Visual identification of the intercepted aircraft', 'EXIT GATE': 'Departure gate 15 NM from the alert base (NOVEMBER, ECHO, SIERRA, WHISKEY) giving the first heading after take-off', 'IOAT / VOAT': 'Operational air traffic flying under instrument (IOAT) or visual (VOAT) rules', BarCAP: 'Barrier combat air patrol protecting an airspace for a set time', HAVCAP: 'High asset value CAP protecting AEW, tankers and ISR aircraft', ResCAP: 'Rescue CAP protecting the CSAR forces and the isolated personnel', TarCAP: 'Target CAP near a ground target, protecting the attack aircraft', ForCAP: 'Force CAP: escort of the strike forces', ARIP: 'Air refuelling initial point: where tanker and receivers start the rendezvous', ARCP: 'Air refuelling control point: where the receivers arrive astern / in observation of the tanker', ARCT: 'Air refuelling control time at the ARCP', 'ANCHOR POINT': 'Reference point on which the tanker pattern is built', 'BASE AAR ALTITUDE': 'Altitude of the (lowest) tanker during the refuelling', ASTERN: 'Stabilised position behind the drogue or the boom before contact', 'ECHELON LEFT / RIGHT': 'Positions on the tanker\'s left wing before AAR and on the right wing after AAR', BREAKAWAY: 'Emergency separation call during AAR', TOBOGGAN: 'Request to the tanker for a slow descent at refuelling speed (300–500 ft/min)', 'DRY / WET CONTACT': 'Contact without / with fuel transfer', 'NOSE COLD': 'Radar on standby', 'SWITCHES SAFE': 'Armament selected safe / off', MARSA: 'Military assumes responsibility for separation of aircraft inside the formation', EMCON: 'Emission control: restrictions on radio and electronic emissions (options 1–4)', HAAR: 'Helicopter air-to-air refuelling' });
 Object.assign(GLOSSARY, { COAU: 'Unified air operations centre – coordinates the state firefighting fleet and issues the air support requests', TBT: 'Ground-air-ground radio link between the DOS and the aircraft', BAT: 'Buster Air Traffic – state aircraft with civil registration on urgent public safety, customs or civil protection missions', OPAREA: 'Flight plan item 18 indicator giving the place of operations', DATUM: 'Reference point, line or area used to plan a search', CSP: 'Commence search point', SITREP: 'Situation report from the on-scene coordinator to the RCC', AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
 const ROLE_DESC = {
   SEAD: 'Locate and neutralise SAM sites and radars to open the corridor for the strike package.',
@@ -4075,9 +4096,10 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
       h6('VID report – order of the data'); bullets(['1. Aircraft type', '2. Colours and / or markings', '3. Heading', '4. Flight level', '5. Speed', '6. Weapons on board and configuration (military aircraft)', '7. Registration']); }
     if (G.card) { h1('GCI briefing card'); table([{ h: '', w: .26 }, { h: 'BLUE', w: .37 }, { h: 'RED / TARGET', w: .37 }], G.card.map(r => [{ t: r[0], bold: true }, r[1], r[2]]), { size: 7.5 }); }
     if (G.blocks || G.kill.length) { h1('Block deconfliction, kill criteria and regeneration'); if (G.blocks) para(`BLUE block ${G.blocks.blue}, RED block ${G.blocks.red}. ${G.blocks.note} Example: "${G.ctl}, BLUE BLOCK ${G.blocks.blue.replace('–', '-')}, RED BLOCK ${G.blocks.red.replace('–', '-')}, REPORT READY FOR ALPHA CHECK".`); if (G.kill.length) bullets(G.kill); }
-    h1('Authentication tables'); para('Given at the briefing. GCI1: the station that authenticates picks a letter in the first column and a letter in the same row; the other station answers with the letter just below it. GCI2: the station gives the first and the third of three consecutive letters of a line; the other answers with the letter between them.', { size: 8 });
-    h6('Method GCI1'); table([{ h: '', w: .07 }, ...Array.from({ length: 12 }, (_, k) => ({ h: String(k + 1), w: .93 / 12 }))], G.auth.gci1.map(r => [{ t: r[0], bold: true }, ...r.slice(1)]), { size: 8 });
-    h6('Method GCI2'); table([{ h: 'Line', w: .1 }, { h: 'Letters', w: .9 }], G.auth.gci2.map((l, k) => [{ t: String(k + 1), bold: true }, l.split('').join(' ')]), { size: 8 });
+    if (t.auth && t.auth.on) { h1('Authentication'); para('Authentication REQUIRED. Given at the briefing. Authentication table: the station that authenticates gives the 1st and the 3rd of three consecutive letters of a line; the other station answers with the letter between them (and then authenticates back).', { size: 8 });
+    h6('Authentication table'); table([{ h: 'Line', w: .1 }, { h: 'Letters', w: .9 }], t.auth.table.lines.map((l, k) => [{ t: String(k + 1), bold: true }, l.split('').join(' ')]), { size: 8 });
+      h6(`RAMROD ${t.auth.ramrod}`); table([{ h: 'Digit', w: .1 }, ...Array.from({ length: 10 }, (_, k) => ({ h: String(k), w: .09 }))], [[{ t: 'Letter', bold: true }, ...t.auth.ramrod.split('')]], { size: 8 });
+      para(`Examples: ${t.auth.examples.map(([n, c]) => `${n} = ${c}`).join(' · ')}. Abort codes and other numbers are passed with the RAMROD letters.`, { size: 8 }); } else { h1('Authentication'); para('Authentication NOT REQUIRED for this event.'); }
     if (t.caps && t.caps.length) { h1('CAPs'); table([{ h: 'CAP', w: .16 }, { h: 'Flight', w: .12 }, { h: 'Type', w: .14 }, { h: 'Anchor', w: .24 }, { h: 'Inbound / leg / turn', w: .2 }, { h: 'Levels', w: .14 }], t.caps.map(c => [c.name, c.cs, c.type, c.anchor, `${String(c.inbound).padStart(3, '0')} / ${c.leg} NM / ${c.turn}`, c.alt]), { size: 7.5 }); }
     h1('Control checklists');
     h5('Air interception'); bullets(G.checklists.intercept.map((x, k) => `${k + 1}. ${x}`)); h5('CAP control'); bullets(G.checklists.cap.map((x, k) => `${k + 1}. ${x}`)); h5('AAR control'); bullets(G.checklists.aar.map((x, k) => `${k + 1}. ${x}`));
@@ -4198,6 +4220,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
         h6('Attack'); bullets(T.control === 3 ? ['CLEARED TO ENGAGE (or CONTINUE DRY)', 'Aircraft: COMMENCING ENGAGEMENT … ENGAGEMENT COMPLETE'] : ['REPORT LEAVING IP – aircraft: LEAVING IP, HEADING ___', T.control === 1 ? 'VISUAL, CONTINUE, CALL IN' : 'CONTINUE, CALL IN', `Aircraft: IN HOT, HEADING ___ (within ${n.restr[0].replace('FINAL ATTACK HEADING ', '')})`, T.method === 'SHOF' ? 'CONTINUE DRY (show of force)' : 'CLEARED HOT – or ABORT / CONTINUE DRY', 'Aircraft: OFF TARGET']);
         h6('BDA'); table([{ h: 'Call sign', w: .2 }, { h: 'Intent met', w: .14 }, { h: 'Location', w: .3 }, { h: 'TOT', w: .12 }, { h: 'Results', w: .24 }], [[n.f.cs, 'YES / NO', casLoc(n.tgt.pos), '', '']], { size: 8 });
       }
+      if (t && t.auth && t.auth.on) { h1('Authentication'); para(`Authentication REQUIRED. RAMROD ${t.auth.ramrod}: abort codes and other numbers are passed with these letters.`, { size: 8 }); table([{ h: 'Digit', w: .1 }, ...Array.from({ length: 10 }, (_, k) => ({ h: String(k), w: .09 }))], [[{ t: 'Letter', bold: true }, ...t.auth.ramrod.split('')]], { size: 8 }); }
       h1('Brevity reminder'); table([{ h: 'Call', w: .3 }, { h: 'Meaning', w: .7 }], brev.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
     }
     return { pdf, tocMap: {}, custom: !!assets.fonts };
@@ -4230,6 +4253,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   if (has(/CSAR|PERSONNEL/)) { used.add('CSAR'); used.add('ISOP'); } if (has(/RESCORT/)) used.add('RESCORT'); if (has(/AAR/)) used.add('AAR');
   if (has(/AEW/)) used.add('AEW'); if (!PROF().sober || has(/QRA|AEW/)) used.add('GCI'); if (has(/AIRDROP|INSERT|LOGISTICS/)) used.add('DZ / LZ'); if (has(/LOWSLOW|HELO/)) used.add('LOW & SLOW');
   if (has(/ANTISHIP|NAVAL/)) used.add('ASuW'); if (has(/MPA/)) used.add('MPA');
+  if (t && t.auth && t.auth.on) used.add('RAMROD');
   if (t && t.gci) ['ALPHA CHECK', 'ANGELS', 'PLAYTIME', 'PICTURE', 'BRAA', 'BOGEY', 'BANDIT', 'HOSTILE', 'JUDY', 'TALLY', 'COMMIT', 'BUSTER / GATE', 'STRANGLE', 'PARROT', 'KNOCK IT OFF', 'TERMINATE'].forEach(k => used.add(k));
   if (t && t.gci && t.gci.scr.length) ['T-SCRAMBLE', 'VID', 'EXIT GATE', 'IOAT / VOAT'].forEach(k => used.add(k)); if (t && t.gci && t.gci.scr.some(q => q.smi)) used.add('SMI'); if (t && t.caps && t.caps.length) t.caps.forEach(c => used.add(c.type));
   if (t && t.aar) ['ARIP', 'ARCP', 'ARCT', 'ANCHOR POINT', 'BASE AAR ALTITUDE', 'ASTERN', 'ECHELON LEFT / RIGHT', 'BREAKAWAY', 'TOBOGGAN', 'DRY / WET CONTACT', 'NOSE COLD', 'SWITCHES SAFE', 'MARSA', 'EMCON'].forEach(k => used.add(k)); if (t && t.aar && t.aar.cards.some(c => c.haar)) used.add('HAAR');
@@ -4551,7 +4575,8 @@ function buildPayload(includeBrief) {
   // public material never carries people's names or VIDs
   sc.roster = { pilots: (sc.roster.pilots || []).map(p => ({ id: p.id, typeRaw: p.typeRaw })), controllers: (sc.roster.controllers || []).map(c => ({ id: c.id, pref: c.pref })) };
   sc.cas = casPublic(sc.cas); sc.pr = prPublic(sc.pr); sc.sar = sarPublic(sc.sar); sc.aib = aibPublic(sc.aib);
-  if (sc.t) { delete sc.t.cas; sc.t.warnings = []; sc.t.flights.forEach(f => f.pilots = []); sc.t.c2.forEach(c => { c.controller = /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) ? 'Open' : 'Assigned'; }); }
+  if (sc.meta) { delete sc.meta.ramrod; delete sc.meta.auth; } // authentication material never goes public
+  if (sc.t) { delete sc.t.auth; if (sc.t.gci) delete sc.t.gci.auth; sc.t.spins = (sc.t.spins || []).map(x => /^Authentication: REQUIRED/.test(x) ? 'Authentication: REQUIRED (authentication table and RAMROD given at the briefing).' : x); delete sc.t.cas; sc.t.warnings = []; sc.t.flights.forEach(f => f.pilots = []); sc.t.c2.forEach(c => { c.controller = /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) ? 'Open' : 'Assigned'; }); }
   if (sc.asp) sc.asp = { source: sc.asp.source, loaded: sc.asp.loaded, zones: RES(), freqs: [], bullseyes: bulSel(), tracks: [...pubTracks('AEW'), ...pubTracks('AAR')] }; // only the reserved areas, the event bullseye and the tracks the event uses
   if (!includeBrief) sc.t = null;
   mpGet(); sc.mp = JSON.parse(JSON.stringify(S.mp));
@@ -4813,7 +4838,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

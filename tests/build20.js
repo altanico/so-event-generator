@@ -37,7 +37,7 @@ if(!r.cs.length||r.cs.some(x=>!/^(GA|HL|HA|GI|BA)\d\d@(LIRS|LIPS|LIBV|LICT|LIBA)
 if(!r.scr||!r.scr.every(x=>/T-SCRAMBLE ORDER/.test(x)&&/TANGO SCRAMBLE ORDER/.test(x)&&/\[\.{8,}\]/.test(x))) fail.push('scramble messages '+(r.scr||[]).slice(0,1)); if(!r.inj) fail.push('no injects');
 if(/hijack|unlawful|illecit/i.test(r.json)) fail.push('unlawful acts mentioned');
 const [dg]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.evaluate(()=>APP.exportGciPack())]); await dg.saveAs('b20_gci.pdf');
-let txt=execSync('pdftotext b20_gci.pdf -').toString(); for (const k of ['TANGO SCRAMBLE','Staff injects','Target briefs','GCI briefing card','Method GCI1','Air interception','You have been intercepted']) if(!txt.includes(k)) fail.push('GCI pack missing '+k); if(/HIJACK|hijack/.test(txt)) fail.push('HIJACK in the GCI pack');
+let txt=execSync('pdftotext b20_gci.pdf -').toString(); for (const k of ['TANGO SCRAMBLE','Staff injects','Target briefs','GCI briefing card','Authentication table','Air interception','You have been intercepted']) if(!txt.includes(k)) fail.push('GCI pack missing '+k); if(/HIJACK|hijack/.test(txt)) fail.push('HIJACK in the GCI pack');
 // AAR: RV ALPHA with a GCI, ECHO without; boom / drogue pairing; DARDO / FALCO never tankers
 r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('CT'); APP.S.resMode='auto'; APP.setEvents(['AAR']); APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x EF-2000\n2x F-35A\n1x KC-767\n1x KC-130J'); APP.tailor();
   const t=APP.S.t; o.rv=t.aar.cards.map(c=>c.rv); o.pair=t.flights.filter(f=>f.task==='RECEIVER').map(f=>f.type+'>'+(t.flights.find(x=>x.id===f.tanker)||{}).type); o.tk=t.flights.filter(f=>f.task==='AAR').map(f=>f.cs);

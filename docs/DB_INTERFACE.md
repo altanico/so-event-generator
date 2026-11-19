@@ -177,3 +177,8 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * Documents (public page, masterplan, decks) list only the tracks the event uses (`pubTracks`): areas reserved, chosen (`S.trkSel`) or flown in phase 3; the "Support" row is built from the requested roles (`supportRow`). The public payload carries only those tracks.
 * Bullseye: all bullseyes on the staff map (mission one highlighted, others clickable), mission bullseye on every map and document when the event uses one (`bullShown`).
 * Intercept targets: high-performance (jet / turboprop) by default; ID variant `tgt: SMI` adds slow movers (light aircraft, helicopters) and the SMI helicopter role.
+
+## v1.18.1 additions
+
+* `S.meta.auth` (true / false / null = default: on, off for civil events) and `S.meta.ramrod` (10-letter word, letter n = digit n). Phase 3 adds `S.t.auth = { on, ramrod, table: { lines }, examples }` and an "Authentication:" SPINS line; CAS tasks carry `abort: 'ABORT CODE XY (nn)'` when authentication is on.
+* The public payload drops `meta.auth`, `meta.ramrod`, `t.auth`, `t.gci.auth`; the public SPINS line only says that the material is given at the briefing.
