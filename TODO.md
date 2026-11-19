@@ -25,10 +25,6 @@
 - AMC = event GCI/AWACS; OSC = first RESCORT, otherwise the downed pilot's wingman.
 - 9-line MEDEVAC: line 8 always "A – military"; line 9 = terrain description (as in the manual example).
 
-## Aurora data layer (v1.2)
-- Default reserved areas from the Aurora sector file (lateral limits only, vertical limits TBC). Remove with the site handover (see docs/DB_INTERFACE.md).
-- Next if wanted: other Aurora files (VOR/NDB, IFR fixes, VFR points, airports) into the same removable layer; editable vertical limits in the staff page.
-
 ## Assumptions to verify
 - AIB (v1.1): S-64 and other civil-operated types use registration + BAT (the manual gives CAN only for the CL-415); CL-415 numbers start at CAN 15; registrations are random I-XXXX; default separation (fixed wing 1500-2000 ft AGL at the entry point, helicopters below 1000 ft AGL) and phraseology examples are ours, since annex "M" is not in the manual; scooping lakes from a built-in list (approximate centres), sea scooping from the coastline; locality / municipality / province / elevation filled by the staff (no gazetteer / DEM).
 - Fixed: land/sea test (`onLand`) never worked with the loaded coastline rings (also affected civil SAR placement).

@@ -609,12 +609,8 @@ function demoAirspace() {
     ...['260.100', '260.700', '261.300', '262.900', '263.500', '264.100', '265.700', '266.300', '267.900', '268.500', '269.100', '270.700'].map((f, i) => F(f, 'TAC', 'Inter-flight ' + (i + 1)))];
   return { source: 'demo', loaded: new Date().toISOString(), zones, freqs };
 }
-// --- Aurora layer (removable): lateral limits of R / D / TSA / TRA areas from the IVAO Aurora sector file, in data/aurora_zones.json.
-// Deleting that file (and data/aurora_src/) removes the layer: the app then uses the database / imported file / demo data.
-let AURORA = null;
-async function loadAurora() { try { const r = await fetch('data/aurora_zones.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json(); const d = parseAirspace(j); if (d.zones.length) AURORA = { ...d, label: j.source || 'Aurora' }; } catch (e) { } }
-const baseAsp = () => !S.asp || ['demo', 'aurora'].includes(S.asp.source);
-function defaultAirspace() { if (AURORA) setAirspace({ zones: AURORA.zones, freqs: [] }, 'aurora', { label: AURORA.label }); else setAirspace(demoAirspace(), 'demo'); }
+const baseAsp = () => !S.asp || S.asp.source === 'demo';
+function defaultAirspace() { setAirspace(demoAirspace(), 'demo'); }
 function parseAirspace(json) { // {zones|areas, frequencies|freqs} or a GeoJSON FeatureCollection
   const zones = [], freqs = [];
   const toPoly = g => {
@@ -2347,11 +2343,11 @@ function aspIssuesHtml() {
 }
 function aspCard() {
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
-  const src = !a ? 'nessuna' : a.source === 'aurora' ? 'Aurora (sectorfile IVAO, solo limiti laterali)' : a.source === 'demo' ? 'DEMO (zone fittizie)' : a.source === 'api' ? 'API database' : 'file importato';
+  const src = !a ? 'nessuna' : a.source === 'demo' ? 'DEMO (zone fittizie)' : a.source === 'api' ? 'API database' : 'file importato';
   return `<h2>Spazio aereo riservato</h2>
   <p class="muted">Zone R / D / TSA / TRA dal database della divisione: tutta la missione deve restare dentro quelle selezionate (deconflittazione con il traffico civile).</p>
   <div class="card"><div class="muted" style="font-size:12px">Fonte: <b>${src}</b> · ${LIB().length} zone · ${((a && a.freqs) || []).length} frequenze · ${BUL().length} bullseye · ${TRK().filter(t => t.kind === 'AAR').length} track AAR · ${TRK().filter(t => t.kind === 'AEW').length} track AEW${a ? ' · ' + new Date(a.loaded).toLocaleString() : ''}</div>
-  <div class="row" style="margin-top:6px;flex-wrap:wrap">${AURORA ? '<button class="b sm shrink" id="aspaur">Aree Aurora</button>' : ''}<button class="b sm shrink" id="aspdemo">Dati DEMO</button><label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label><button class="b sm shrink" id="aspauto">Seleziona zone nell'area</button></div>
+  <div class="row" style="margin-top:6px;flex-wrap:wrap"><button class="b sm shrink" id="aspdemo">Dati DEMO</button><label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label><button class="b sm shrink" id="aspauto">Seleziona zone nell'area</button></div>
   <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div>
   ${near.length ? `<table style="margin-top:8px"><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${near.slice(0, 40).map(z => `<tr><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${ZCOL[z.type]}"></span>${z.type}</td><td>${esc(z.name)}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}
   ${GEN() ? aspIssuesHtml() : ''}</div>`;
@@ -2729,7 +2725,6 @@ document.addEventListener('click', e => {
     case 'rth': { S.meta.theatre = pick(THEATRES).id; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
     case 'rfac': { const o = { ...S.factions }; S.factions = { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) }; FAC_ED = null; if (S.background) S.background = S.background.split(o.blue).join(S.factions.blue).split(o.red).join(S.factions.red); break; }
     case 'gen': generateGeneric(); return;
-    case 'aspaur': defaultAirspace(); renderAll(); toast('Aree Aurora caricate'); return;
     case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
@@ -3983,9 +3978,9 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
-loadLand(); loadAurora().then(() => renderAll());
+loadLand();
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, AUR: () => AURORA, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
