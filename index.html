@@ -2454,7 +2454,7 @@ function drawMap(fit) {
   nearZones().filter(z => z.type !== 'COR').forEach(z => { const r = (S.reserved || []).includes(z.id), col = ZCOL[z.type] || '#475569';
     const pl = add(L.polygon(z.poly, { color: col, weight: r ? 2 : 1, dashArray: r ? null : '4 4', fillOpacity: r ? .10 : .02, opacity: r ? .9 : .5 }));
     pl.bindTooltip(`${z.name} · ${z.type} · ${z.lower}–${z.upper}${r ? ' · RISERVATA' : ' · clic per riservarla'}`, { sticky: true });
-    if (TAB === 'scenario') pl.on('click', () => { if (ADDMODE) return; const set = new Set(S.reserved || []); set.has(z.id) ? set.delete(z.id) : set.add(z.id); S.reserved = [...set]; save(); renderPanel(); drawMap(); }); });
+    if (TAB === 'scenario') pl.on('click', e => { if (ADDMODE) return; const p = e && e.latlng ? [e.latlng.lat, e.latlng.lng] : centroid(z.poly), zs = zonesAt(p); if (zs.length > 1) return zonePick(p, zs); resToggle(z.id); }); });
   if (showZones) S.zones.forEach(z => {
     const col = z.side === 'BLUE' ? '#3b82f6' : '#ef4444';
     add(L.circle(z.center, { radius: z.r * 1000, color: col, weight: 1.5, dashArray: '6 6', fillOpacity: 0.07 }));
@@ -2534,6 +2534,36 @@ function aspIssuesHtml() {
   return `<div class="warn"><b>Deconflittazione: ${iss.length} elementi da sistemare</b><br>${iss.slice(0, 8).map(esc).join('<br>')}${iss.length > 8 ? '<br>…' : ''}
     <div class="row" style="margin-top:6px"><button class="b sm shrink" id="snapall">Riporta tutto dentro le zone</button><span></span></div></div>`;
 }
+// map click on overlapping areas: list every area under the point instead of toggling the top one
+const polyArea = poly => Math.abs(poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[1] * q[0] - q[1] * p[0]; }, 0)) / 2;
+const zonesAt = p => nearZones().concat(CUS()).filter((z, i, a) => a.indexOf(z) === i && z.type !== 'COR' && pip(p, z.poly)).sort((a, b) => polyArea(a.poly) - polyArea(b.poly));
+function resToggle(id) { const set = new Set(S.reserved || []); set.has(id) ? set.delete(id) : set.add(id); S.reserved = [...set]; save(); renderPanel(); drawMap(); }
+function zonePickHtml(zs) { const res = new Set(S.reserved || []);
+  return `<div style="min-width:220px"><b style="font-size:12px">${zs.length} aree sovrapposte qui</b><div class="muted" style="font-size:11px;margin-bottom:4px">Spunta quelle da riservare (dalla più piccola):</div>${zs.map(z => `<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0;cursor:pointer"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span><span>${esc(z.name)} <span class="muted">${esc(z.lower)}–${esc(z.upper)}</span></span></label>`).join('')}</div>`; }
+function zonePick(p, zs) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs)).openOn(MAP); }
+// zone list: filter by name/id, type, selection, range; sort by distance, name, type or lower limit
+const ZF = { q: '', type: '', sel: '', all: false, sort: 'dist' };
+const zfMatch = (z, res) => { const q = ZF.q.trim().toLowerCase();
+  return (!q || (z.name + ' ' + z.id + ' ' + (z.activity || '')).toLowerCase().includes(q)) && (!ZF.type || (ZF.type === 'custom' ? z.custom : z.type === ZF.type && !z.custom)) && (!ZF.sel || (ZF.sel === 'on') === res.has(z.id)); };
+function zfList(near) { const L0 = ZF.all ? LIB().filter(z => z.type !== 'COR') : near.concat(CUS().filter(c => !near.includes(c))), c = theatre().red.center;
+  const k = { dist: z => dist(c, centroid(z.poly)), name: z => z.name.toLowerCase(), type: z => (z.custom ? 'ZZ' : z.type) + ' ' + z.name.toLowerCase(), lo: z => zLo(z.lower) };
+  const f = k[ZF.sort] || k.dist; return L0.slice().sort((a, b) => { const x = f(a), y = f(b); return x < y ? -1 : x > y ? 1 : 0; }); }
+function zfApply() { const res = new Set(S.reserved || []); let n = 0, m = 0;
+  document.querySelectorAll('tr[data-zrow]').forEach(tr => { const z = LIB().find(x => x.id === tr.dataset.zrow); const ok = z && zfMatch(z, res); tr.hidden = !ok; m++; if (ok) n++; });
+  const c = $('#zfcount'); if (c) c.textContent = `${n} di ${m} mostrate`; }
+function zoneTableHtml(near, res) {
+  const list = zfList(near), types = [...new Set(list.filter(z => !z.custom).map(z => z.type))].sort(), shown = list.filter(z => zfMatch(z, res)).length;
+  const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`;
+  return `<div class="row" style="flex-wrap:wrap;align-items:flex-end;margin-top:6px;gap:6px">
+    <div style="flex:2 1 160px"><label>Cerca (nome o sigla)</label><input id="zfq" value="${esc(ZF.q)}" placeholder="es. R49, Salto di Quirra, INDIA"></div>
+    <div style="flex:1 1 90px"><label>Tipo</label><select id="zftype">${opt('', 'Tutti', ZF.type)}${types.map(t => opt(t, t, ZF.type)).join('')}${CUS().length ? opt('custom', 'Custom', ZF.type) : ''}</select></div>
+    <div style="flex:1 1 110px"><label>Stato</label><select id="zfsel">${opt('', 'Tutte', ZF.sel)}${opt('on', 'Selezionate', ZF.sel)}${opt('off', 'Non selezionate', ZF.sel)}</select></div>
+    <div style="flex:1 1 120px"><label>Ordina per</label><select id="zfsort">${opt('dist', 'Distanza dal teatro', ZF.sort)}${opt('name', 'Nome', ZF.sort)}${opt('type', 'Tipo', ZF.sort)}${opt('lo', 'Limite inferiore', ZF.sort)}</select></div>
+    <div style="flex:1 1 120px"><label>Elenco</label><select id="zfall">${opt('', 'Vicino al teatro', ZF.all ? 'x' : '')}${opt('1', 'Tutta Italia', ZF.all ? '1' : '')}</select></div></div>
+  <div class="row" style="flex-wrap:wrap;align-items:center;margin-top:4px"><span class="muted" style="font-size:12px" id="zfcount">${shown} di ${list.length} mostrate</span>
+    <button class="b sm shrink" id="zfon">Seleziona le mostrate</button><button class="b sm shrink" id="zfoff">Deseleziona le mostrate</button>${ZF.q || ZF.type || ZF.sel ? '<button class="b sm shrink" id="zfreset">Togli filtri</button>' : ''}</div>
+  ${list.length ? `<div style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
+}
 function aspCard() {
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
   const src = !a || a.source === 'none' || a.source === 'demo' ? 'nessuna (file AIP non caricato)' : a.source === 'aip' ? 'AIP Italia – aree militari (ENR 5 e SUP)' : a.source === 'api' ? 'API database' : 'file importato';
@@ -2546,9 +2576,9 @@ function aspCard() {
     <button class="b sm shrink ${S.resMode !== 'manual' ? 'primary' : ''}" id="resauto" title="Il generatore propone le aree in base a teatro ed evento">Proponile tu</button>
     <button class="b sm shrink ${S.resMode === 'manual' ? 'primary' : ''}" id="resman" title="Selezioni tu le aree: il generatore non le cambia">Le scelgo io</button>
     <button class="b sm shrink" id="resnone">Deseleziona tutte</button></div>
-  ${near.length ? `<div style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${near.filter(z => res.has(z.id)).concat(near.filter(z => !res.has(z.id)).slice(0, 40)).map(z => `<tr><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${ZCOL[z.type]}"></span>${z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table></div>
+  ${zoneTableHtml(near, res)}
   ${RES().filter(z => !z.custom).length >= 2 ? `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:6px"><span class="muted" style="font-size:12px;flex:1 1 220px">Unisci le aree selezionate in un'unica area custom con limiti verticali tuoi:</span>
-    <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Unisci</button></div>` : ''}` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}
+    <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Unisci</button></div>` : ''}
   ${cusHtml()}
   ${CORS().length ? `<div style="margin-top:8px"><b style="font-size:13px">Corridoi OAT (AIP ENR 5.2.2.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Per il trasferimento fra base e aree o come "aerovia" lungo una rotta. Proposti in automatico; clic per aggiungerli o toglierli (anche sulla mappa).</p>${CORS().map(z => `<button class="b sm shrink ${(S.cor || []).includes(z.id) ? 'primary' : ''}" data-cor="${esc(z.id)}" title="${esc(corLevels(z))}">${esc(z.name.replace(/^OAT corridor /, ''))}</button>`).join(' ')}</div>` : ''}
   ${CFG().length ? `<div style="margin-top:8px"><b style="font-size:13px">Configurazioni di attivazione simultanea (AIP ENR 5.1.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Le zone di questi gruppi si attivano da sole o solo nelle combinazioni elencate. Una combinazione non prevista viene corretta in automatico alla generazione.</p>
@@ -2835,7 +2865,7 @@ function facEdit(t, end) {
   S.factions[k] = nv; if (end) FAC_ED = null; save(); clearTimeout(facEdit._t); facEdit._t = setTimeout(() => drawMap(), 120);
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); });
+document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); } });
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.edit) {
@@ -2854,6 +2884,7 @@ document.addEventListener('change', e => {
     S.t[t.dataset.list] = ['codewords', 'timeline'].includes(t.dataset.list) ? lines.map(l => { const i = l.indexOf('='); return i < 0 ? [l, ''] : [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }) : lines;
     save(); return;
   }
+  if (['zftype', 'zfsel', 'zfsort', 'zfall'].includes(t.id)) { const k = t.id.slice(2); ZF[k] = k === 'all' ? !!t.value : t.value; renderPanel(); return; }
   if (t.dataset.res !== undefined) { const set = new Set(S.reserved || []); t.checked ? set.add(t.dataset.res) : set.delete(t.dataset.res); S.reserved = [...set]; save(); renderPanel(); drawMap(); return; }
   if (t.id === 'ptsurl') { lsSet('ivao-so-pts-url', t.value.trim()); return; }
   if (t.id === 'ptsfile' && t.files[0]) { t.files[0].text().then(txt => { try { const it = /^\s*[\[{]/.test(txt) && /"(points|fixes|lat|name)"/.test(txt.slice(0, 400)) ? parsePointsJson(JSON.parse(txt)) : parseSector(txt); if (!it.length) throw 0; setPoints(it, t.files[0].name); renderAll(); toast(`Importati ${it.length} punti`); } catch (err) { toast('File non riconosciuto: serve un sectorfile .sct o un JSON di punti'); } }); return; }
@@ -2950,6 +2981,9 @@ document.addEventListener('click', e => {
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'resauto': S.resMode = 'auto'; S.reserved = autoReserve(); S.cor = autoCor(); save(); renderAll(); toast('Aree proposte dal generatore'); return;
     case 'resman': S.resMode = 'manual'; save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
+    case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
+      S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); S.resMode = 'manual'; save(); renderAll(); return; }
+    case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); return;
     case 'resnone': S.resMode = 'manual'; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
     case 'genauto': S.resMode = 'auto'; generateGeneric(); return;
     case 'genman': S.resMode = 'manual'; generateGeneric(); return;
@@ -4214,7 +4248,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, cusLocked, manualRes, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, cusLocked, manualRes, zonesAt, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

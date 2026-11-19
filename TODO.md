@@ -27,6 +27,7 @@
 
 ## Reserved areas UI (v1.11)
 - Demo airspace removed. Before the first generation the staff chooses: areas proposed by the generator, or only the ticked ones (manual: the generator never changes them). "Deseleziona tutte" in the zone table; custom union uses the ticked areas.
+- v1.12: overlapping areas on the map open a pick list; zone table filters (name/id, type, state, all Italy) and sorting.
 
 ## AIP data layer (v1.3)
 - Default reserved areas = military R / D / TRA / TSA areas of AIP ENR 5.1.2-5.1.4 + ENR 5.1.4 configurations. Remove at the site handover (docs/DB_INTERFACE.md).

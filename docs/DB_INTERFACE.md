@@ -146,3 +146,4 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 
 * `S.resMode`: `'auto'` (the generator proposes the areas for theatre and event) or `'manual'` (only the areas the staff ticks; the generator never adds or swaps areas and clamps every element into them). Asked before the first generation.
 * "Deseleziona tutte" clears the selection and switches to manual. The custom-area union now uses the areas ticked in the zone table.
+* v1.12: map click on overlapping areas opens a list of every area under the point (smallest first) instead of toggling the top one. The zone table filters by name/id, type, state, near-theatre or all Italy, sorts by distance/name/type/lower limit, and can select or deselect the rows shown.

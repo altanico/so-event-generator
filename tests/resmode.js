@@ -25,4 +25,24 @@ await page.evaluate(()=>APP.renderAll()); if(!(await page.$('#cuscombo'))) fail.
 // auto mode proposes again
 r=await page.evaluate(()=>{ APP.S.custom=[]; APP.S.reserved=[]; APP.S.resMode='auto'; APP.generateGeneric(); APP.parseLines('4x F-35A\n2x AMX'); APP.tailor(); return APP.RES().length; });
 if(!r) fail.push('auto mode reserved nothing');
+
+// overlapping areas on the map: every area under the click is listed, none is toggled blindly
+r=await page.evaluate(()=>{ APP.S.meta.theatre='NE'; let hit=null; for (const z of APP.AIP().zones.filter(z=>z.type!=='COR')) { const c=z.poly[0], p=[c[0]+(z.poly[2][0]-c[0])*0.05, c[1]+(z.poly[2][1]-c[1])*0.05]; const zs=APP.zonesAt(p); if (zs.length>1) { hit={p,ids:zs.map(z=>z.id)}; break; } }
+  if (!hit) return null; const h=APP.zonePickHtml(APP.zonesAt(hit.p)); return {n:hit.ids.length, boxes:(h.match(/data-res=/g)||[]).length}; });
+if(!r) fail.push('no overlapping point found'); else if(r.boxes!==r.n) fail.push('pick list '+JSON.stringify(r));
+// list filters: search, type, state, select shown
+await page.evaluate(()=>{ APP.S.reserved=[]; APP.renderAll(); });
+await page.fill('#zfq','R49'); await page.waitForTimeout(100);
+r=await page.evaluate(()=>[...document.querySelectorAll('tr[data-zrow]:not([hidden])')].map(t=>t.dataset.zrow));
+if(!r.length||r.some(id=>!/R49/i.test(id))) fail.push('search filter: '+r.slice(0,5));
+await page.click('#zfon'); await page.waitForTimeout(100);
+r=await page.evaluate(()=>APP.S.reserved.slice()); if(!r.length||r.some(id=>!/R49/i.test(id))) fail.push('select shown: '+r.slice(0,5));
+await page.selectOption('#zfsel','on'); await page.waitForTimeout(100);
+if((await page.$$('tr[data-zrow]:not([hidden])')).length!==r.length) fail.push('state filter');
+await page.click('#zfreset'); await page.selectOption('#zftype','TSA'); await page.waitForTimeout(100);
+r=await page.evaluate(()=>[...document.querySelectorAll('tr[data-zrow]:not([hidden])')].map(t=>APP.S.asp.zones.find(z=>z.id===t.dataset.zrow)).map(z=>z&&z.type));
+if(!r.length||r.some(t=>t!=='TSA')) fail.push('type filter: '+r.slice(0,5));
+await page.selectOption('#zfall','1'); await page.selectOption('#zfsort','name'); await page.waitForTimeout(100);
+r=await page.evaluate(()=>({n:document.querySelectorAll('tr[data-zrow]').length, names:[...document.querySelectorAll('tr[data-zrow]:not([hidden]) td:nth-child(3)')].map(t=>t.firstChild.textContent)}));
+if(r.n<200) fail.push('all-Italy list '+r.n); if(r.names.join('|')!==r.names.slice().sort((a,b)=>a.toLowerCase()<b.toLowerCase()?-1:1).join('|')) fail.push('sort by name');
 console.log(fail.length?'"err": '+fail.join('; '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
