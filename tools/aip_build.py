@@ -159,6 +159,11 @@ for fn,sec,ex,ztype,trt in SUPS:
       'axis':pts,'wpt':['']*len(pts),'half':it['half'],'radio':'MIL / CIV ATS units (tactical coordination)','pref':[],'excl':'',
       'notes':f"Transit corridor ({ex}){extra}: {it['half']:g} NM each side of the centre line. Levels: {fix(it['lower'])}-{fix(it['upper'])}. Activity: {act.lower()}. Activated on tactical basis upon MIL/CIV coordination. Source: AIP Italia {sec}.",
       'poly':[[round(a,5),round(b,5)] for a,b in bufline(pts,it['half'])]})
+# Areas supplied by the staff (decimal degrees): data/aip_src/staff_areas.json
+for it in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','staff_areas.json'))):
+  code=re.sub(r'[^A-Z0-9]','',it['name'].upper())
+  zones.append({'id':'LI-'+code,'name':it['name'],'type':'TRA','lower':it['lower'],'upper':it['upper'],'activity':'Military air activity','use':['AIR'],'hours':'','amc':False,
+    'notes':'Exercise area supplied by the IVAO Italy SO staff (not in the AIP).','source':'aip','section':'Staff','poly':[[round(a,6),round(b,6)] for a,b in it['pts']]})
 CONF=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','tsa_configs.json')))
 json.dump({'source':'AIP Italia ENR 5.1.2 / 5.1.3 / 5.1.4 – military areas only','sections':{sec:air for _,sec,air in INPUTS},'zones':zones,'configs':CONF},open(OUT,'w'),ensure_ascii=False,separators=(',',':'))
 print(len(zones),'zones;',len(skipped),'skipped'); print('\n'.join('  - '+s for s in skipped))
