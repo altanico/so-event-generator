@@ -1,0 +1,17 @@
+[
+ {"id":"IONIO1","group":"Ionio TSA","zones":["LI-TSA420A","LI-TSA420B","LI-TSA421A","LI-TSA421B"]},
+ {"id":"IONIO2","group":"Ionio TSA","zones":["LI-TSA421A","LI-TSA421B","LI-TSA422A","LI-TSA422B"]},
+ {"id":"IONIO3","group":"Ionio TSA","zones":["LI-TSA420A","LI-TSA420B","LI-TSA421B","LI-TSA422B"]},
+ {"id":"IONIO4","group":"Ionio TSA","zones":["LI-TSA420B","LI-TSA421A","LI-TSA421B","LI-TSA422A","LI-TSA422B"]},
+ {"id":"IONIO5","group":"Ionio TSA","zones":["LI-TSA420A","LI-TSA420B","LI-TSA421A","LI-TSA421B","LI-TSA422A","LI-TSA422B","LI-TSA423A","LI-TSA423B"],"sup":true},
+ {"id":"CONF1 SICILIA","group":"Sicilia TSA","zones":["LI-TSA505","LI-TSA506"]},
+ {"id":"CONF2 SICILIA","group":"Sicilia TSA","zones":["LI-TSA507","LI-TSA508"]},
+ {"id":"CONF3 SICILIA","group":"Sicilia TSA","zones":["LI-TSA506","LI-TSA507"]},
+ {"id":"CONF4 SICILIA","group":"Sicilia TSA","zones":["LI-TSA505","LI-TSA508"]},
+ {"id":"CONF5 SICILIA","group":"Sicilia TSA","zones":["LI-TSA505","LI-TSA506","LI-TSA507","LI-TSA508"],"sup":true},
+ {"id":"CONF1 EST SARDEGNA","group":"Est Sardegna TSA/TRA (FL245 and above)","zones":["LI-TRA611A","LI-TRA611B","LI-TSA621A","LI-TSA621B","LI-TRA612","LI-TSA622","LI-TRA613","LI-TSA623"]},
+ {"id":"CONF2 EST SARDEGNA","group":"Est Sardegna TSA/TRA (FL245 and above)","zones":["LI-TRA613","LI-TSA623","LI-TRA614","LI-TSA624"]},
+ {"id":"CONF3 EST SARDEGNA","group":"Est Sardegna TSA/TRA (FL245 and above)","zones":["LI-TRA614","LI-TSA624","LI-TRA615","LI-TSA625"]},
+ {"id":"CONF4 EST SARDEGNA","group":"Est Sardegna TSA/TRA (FL245 and above)","zones":["LI-TRA611A","LI-TRA611B","LI-TSA621A","LI-TSA621B","LI-TRA612","LI-TSA622","LI-TRA615","LI-TSA625"]},
+ {"id":"CONF5 EST SARDEGNA","group":"Est Sardegna TSA/TRA (FL245 and above)","zones":["LI-TRA611A","LI-TRA611B","LI-TSA621A","LI-TSA621B","LI-TRA612","LI-TSA622","LI-TRA613","LI-TSA623","LI-TRA614","LI-TSA624","LI-TRA615","LI-TSA625"]}
+]

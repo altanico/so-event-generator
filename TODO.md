@@ -26,8 +26,8 @@
 - 9-line MEDEVAC: line 8 always "A – military"; line 9 = terrain description (as in the manual example).
 
 ## AIP data layer (v1.3)
-- Default reserved areas = military R areas of AIP ENR 5.1.2 (AIRAC 09 JUL 2026). Remove at the site handover (docs/DB_INTERFACE.md).
-- Waiting for: ENR 5.1.3 (D areas) and ENR 5.2 (TSA / TRA / CBA) to add with the same tools; update at each AIRAC.
+- Default reserved areas = military R / D / TRA / TSA areas of AIP ENR 5.1.2-5.1.4 + ENR 5.1.4 configurations. Remove at the site handover (docs/DB_INTERFACE.md).
+- Update at each AIRAC with tools/aip_*.py. ENR 5.2 (other military areas, e.g. CBA) can be added the same way if needed.
 - Skipped as not explicitly military: R22 Frosinone (helicopter training and test flights) – add if the staff wants it.
 
 ## Assumptions to verify

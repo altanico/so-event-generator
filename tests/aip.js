@@ -7,7 +7,7 @@ for (const withFile of [true,false]) { const ctx=await b.newContext({acceptDownl
   if(!withFile && u.includes('aip_zones.json'))return r.fulfill({status:404,body:''}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
  await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500);
  const r=await page.evaluate(()=>{const out=[]; for (const ev of [['MIX'],['CAS'],['AIB'],['SAR']]) for (const th of ['NE','NO','CT','SA','SI','PU']) { APP.S.meta.theatre=th; APP.setEvents(ev); APP.generateGeneric();
-   APP.parseLines('4x F-35A\n2x Eurofighter\n1x KC-767\n1x E-3\n2x HH-101\n2x CL-415\n2x AMX\n1x AW139'); APP.tailor(); out.push({k:ev+' '+th, src:APP.S.asp.source, n:APP.RES().length, iss:(APP.containmentIssues()||[]).length}); } return out;});
+   APP.parseLines('4x F-35A\n2x Eurofighter\n1x KC-767\n1x E-3\n2x HH-101\n2x CL-415\n2x AMX\n1x AW139'); APP.tailor(); out.push({k:ev+' '+th, src:APP.S.asp.source, n:APP.RES().length, iss:(APP.containmentIssues()||[]).length+APP.cfgIssues().length}); } return out;});
  for (const x of r) { if (x.src!==(withFile?'aip':'demo')) fail.push(`${x.k} source ${x.src}`); const civ=/AIB|SAR/.test(x.k); if (civ&&withFile ? x.n : !x.n) fail.push(`${x.k} reserved ${x.n}`); if (x.iss) fail.push(`${x.k} ${x.iss} containment issues`); }
  if (withFile) { await page.evaluate(()=>{ APP.S.meta.theatre='CT'; APP.setEvents(['MIX']); APP.generateGeneric(); APP.parseLines('4x F-35A\n2x Eurofighter\n1x KC-767\n1x E-3'); APP.tailor(); APP.renderAll(); });
   await page.click('[data-tab="export"]'); await page.waitForTimeout(200);

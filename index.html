@@ -614,7 +614,23 @@ function demoAirspace() {
 let AIPDATA = null;
 async function loadAip() { try { const r = await fetch('data/aip_zones.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json(); const d = parseAirspace(j); if (d.zones.length) AIPDATA = { ...d, label: j.source || 'AIP' }; } catch (e) { } }
 const baseAsp = () => !S.asp || ['demo', 'aip'].includes(S.asp.source);
-function defaultAirspace() { if (AIPDATA) setAirspace({ zones: AIPDATA.zones, freqs: [] }, 'aip', { label: AIPDATA.label }); else setAirspace(demoAirspace(), 'demo'); }
+function defaultAirspace() { if (AIPDATA) setAirspace({ zones: AIPDATA.zones, freqs: [], configs: AIPDATA.configs }, 'aip', { label: AIPDATA.label }); else setAirspace(demoAirspace(), 'demo'); }
+// --- simultaneous activation configurations (AIP ENR 5.1.4): zones of a group may be active singly or only in one of the listed combinations
+const CFG = () => (S.asp && S.asp.configs) || [];
+const cfgGroups = () => [...new Set(CFG().map(c => c.group))];
+function fixConfigs(ids) {
+  let set = new Set(ids || []);
+  for (const g of cfgGroups()) { const cs = CFG().filter(c => c.group === g), gz = new Set(cs.flatMap(c => c.zones)), sel = [...set].filter(z => gz.has(z));
+    if (sel.length <= 1 || cs.some(c => c.zones.length === sel.length && sel.every(z => c.zones.includes(z)))) continue;
+    const best = cs.map(c => ({ c, o: sel.filter(z => c.zones.includes(z)).length })).filter(x => x.o > 0).sort((a, b) => ((a.c.sup ? 1 : 0) - (b.c.sup ? 1 : 0)) || (b.o - a.o) || (a.c.zones.length - b.c.zones.length))[0].c; // configurations needing an AIP Supplement only as a last resort
+    gz.forEach(z => set.delete(z)); best.zones.forEach(z => set.add(z)); }
+  return [...set];
+}
+const activeConfigs = () => { const r = new Set(S.reserved || []); return CFG().filter(c => c.zones.every(z => r.has(z))).filter((c, i, a) => !a.some(d => d !== c && d.group === c.group && d.zones.length > c.zones.length && c.zones.every(z => d.zones.includes(z)))); };
+function cfgIssues() { const r = new Set(S.reserved || []), out = [];
+  for (const g of cfgGroups()) { const cs = CFG().filter(c => c.group === g), sel = [...new Set(cs.flatMap(c => c.zones))].filter(z => r.has(z));
+    if (sel.length > 1 && !cs.some(c => c.zones.length === sel.length && sel.every(z => c.zones.includes(z)))) out.push(`${g}: la combinazione ${sel.map(z => z.replace('LI-', '')).join(' + ')} non è una configurazione AIP`); }
+  return out; }
 function parseAirspace(json) { // {zones|areas, frequencies|freqs} or a GeoJSON FeatureCollection
   const zones = [], freqs = [];
   const toPoly = g => {
@@ -635,7 +651,8 @@ function parseAirspace(json) { // {zones|areas, frequencies|freqs} or a GeoJSON 
     return pos ? { name: String(b.name).toUpperCase(), pos, ref: String(b.ref ?? b.navaid ?? ''), raw: b.raw || b.coords || '' } : null; }).filter(Boolean);
   const tracks = ((json && json.tracks) || []).filter(t => t && (t.kind === 'AAR' || t.kind === 'AEW'));
   const positions = parsePositions((json && (json.positions || json.atc)) || []);
-  return { zones, freqs, bullseyes, tracks, positions };
+  const configs = ((json && json.configs) || []).filter(c => c && c.id && Array.isArray(c.zones));
+  return { zones, freqs, bullseyes, tracks, positions, configs };
 }
 async function loadAirspaceApi(url, token) {
   const r = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
@@ -643,7 +660,7 @@ async function loadAirspaceApi(url, token) {
   return parseAirspace(await r.json());
 }
 function setAirspace(data, source, extra = {}) {
-  S.asp = { source, loaded: new Date().toISOString(), zones: data.zones, freqs: data.freqs, bullseyes: data.bullseyes || [], tracks: data.tracks || [], ...extra };
+  S.asp = { source, loaded: new Date().toISOString(), zones: data.zones, freqs: data.freqs, bullseyes: data.bullseyes || [], tracks: data.tracks || [], configs: data.configs || [], ...extra };
   if ((data.positions || []).length) S.positions = data.positions;
   S.reserved = autoReserve(); S.c2sel = null; save();
 }
@@ -655,7 +672,8 @@ const LIB = () => { const z = (S.asp && S.asp.zones) || []; if (!S.asp) return z
 const RES = () => LIB().filter(z => (S.reserved || []).includes(z.id));
 const nearZones = (km = 320) => { const c = theatre().red.center; return LIB().filter(z => dist(c, centroid(z.poly)) < km).sort((a, b) => dist(c, centroid(a.poly)) - dist(c, centroid(b.poly))); };
 const zArea = poly => { const c = centroid(poly), k = Math.cos(c[0] * Math.PI / 180) * 111.32; let a = 0; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) a += (poly[j][1] * k) * (poly[i][0] * 110.57) - (poly[i][1] * k) * (poly[j][0] * 110.57); return Math.abs(a / 2); };
-function autoReserve() { const g = geom(), real = S.asp && S.asp.source !== 'demo';
+function autoReserve() { return fixConfigs(autoReserve0()); }
+function autoReserve0() { const g = geom(), real = S.asp && S.asp.source !== 'demo';
   if (real && S.asp.source === 'aip' && PROF().civil) return []; // AIP layer = military areas only: civil events do not use them
   const T = new Set(reqTasks()), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : [])]);
   return LIB().filter(z => z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || zArea(z.poly) >= 40 || (z.use || []).some(u => want.has(u)))
@@ -705,7 +723,7 @@ function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area
   const fitQ = (q, alt) => { const a = flRange(alt); return !a || (a[1] <= zLimit(q.upper) && !(a[0] < zLo(q.lower) && zLo(q.lower) > 0)); };
   t.airspace.forEach(a => { if (!SNAP_AST.includes(a.type) || a.pub || !a.alt || RES().some(q => fitQ(q, a.alt))) return; // no reserved area for this level: add the nearest one that has it
     const c = LIB().filter(q => q.type !== 'P' && (q.type !== 'IND' || a.type === 'ORBIT') && fitQ(q, a.alt)).map(q => [q, dist(a.pts[0], centroid(q.poly))]).filter(x => x[1] < 250).sort((x, y) => x[1] - y[1])[0];
-    if (c) S.reserved = [...new Set([...(S.reserved || []), c[0].id])]; });
+    if (c) S.reserved = fixConfigs([...new Set([...(S.reserved || []), c[0].id])]); });
   t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub && a.alt) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
 function snapAll() {
   S.zones.forEach(z => z.center = snapRes(z.center));
@@ -2362,6 +2380,9 @@ function aspCard() {
   <div class="row" style="margin-top:6px;flex-wrap:wrap">${AIPDATA ? '<button class="b sm shrink" id="aspaip">Zone AIP</button>' : ''}<button class="b sm shrink" id="aspdemo">Dati DEMO</button><label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label><button class="b sm shrink" id="aspauto">Seleziona zone nell'area</button></div>
   <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div>
   ${near.length ? `<table style="margin-top:8px"><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${near.slice(0, 40).map(z => `<tr><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${ZCOL[z.type]}"></span>${z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}
+  ${CFG().length ? `<div style="margin-top:8px"><b style="font-size:13px">Configurazioni di attivazione simultanea (AIP ENR 5.1.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Le zone di questi gruppi si attivano da sole o solo nelle combinazioni elencate. Una combinazione non prevista viene corretta in automatico alla generazione.</p>
+    ${cfgGroups().map(g => `<div style="margin:4px 0"><span class="muted" style="font-size:12px">${esc(g)}:</span> ${CFG().filter(c => c.group === g).map(c => `<button class="b sm shrink ${activeConfigs().includes(c) ? 'primary' : ''}" data-cfg="${esc(c.id)}" title="${esc(c.zones.map(z => z.replace('LI-', '')).join(' + '))}${c.sup ? ' – richiede un Supplemento AIP' : ''}">${esc(c.id)}${c.sup ? ' *' : ''}</button>`).join(' ')}</div>`).join('')}
+    ${cfgIssues().length ? `<div class="warn" style="margin-top:6px">${cfgIssues().map(esc).join('<br>')}</div>` : ''}</div>` : ''}
   ${GEN() ? aspIssuesHtml() : ''}</div>`;
 }
 function ptsCard() {
@@ -2715,6 +2736,8 @@ document.addEventListener('click', e => {
   if (t.dataset.tab) { TAB = t.dataset.tab; ADDMODE = ''; renderAll(); return; }
   if (t.dataset.sub) { SUBTAB = t.dataset.sub; renderPanel(); return; }
   if (t.dataset.copy !== undefined) { try { navigator.clipboard.writeText(t.dataset.copy).then(() => toast('Copiato')); } catch (err) { toast('Copia non disponibile'); } return; }
+  if (t.dataset.cfg) { const c = CFG().find(x => x.id === t.dataset.cfg); if (c) { const gz = new Set(CFG().filter(x => x.group === c.group).flatMap(x => x.zones)), on = activeConfigs().includes(c);
+    S.reserved = (S.reserved || []).filter(z => !gz.has(z)).concat(on ? [] : c.zones); save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
   if (t.dataset.sarpack) { exportSarPack(t.dataset.sarpack, t); return; }
@@ -3472,6 +3495,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   if (!mpOn('res')) { } else if (rz.length) { h6('Reserved airspace (deconfliction)');
     para('All exercise activity is contained inside the following reserved areas and within their vertical limits. Outside them normal GAT rules apply and exercise aircraft transit as regular traffic.');
     table([{ h: 'Area', w: .24 }, { h: 'Type', w: .24 }, { h: 'Lower', w: .12 }, { h: 'Upper', w: .12 }, { h: 'Notes', w: .28 }], rz.map(z => [{ t: z.name, bold: true }, ZTYPES[z.type] || z.type, z.lower, z.upper, z.notes || '']));
+    { const ac = activeConfigs(); if (ac.length) para(`Simultaneous activation (AIP ENR 5.1.4 configurations): ${ac.map(c => `${c.id} (${c.zones.map(z => z.replace('LI-', '')).join(' + ')})${c.sup ? ' – requires a specific AIP Supplement' : ''}`).join('; ')}.`, { size: 8 }); }
     const iss = containmentIssues(); if (iss && iss.length) para(`Note: ${iss.length} element(s) still to be deconflicted by the staff.`, { font: F.ital, size: 8 }); }
   else para('Reserved airspace: to be confirmed (NOTAM / AUP).', { font: F.ital, size: 8 });
   { const sel = String(S.meta.bullseye || '').toUpperCase();
@@ -3993,7 +4017,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, AIP: () => AIPDATA, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

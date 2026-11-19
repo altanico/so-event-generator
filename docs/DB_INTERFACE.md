@@ -110,20 +110,26 @@ I ruoli di evento (GCI, RCC, dispatch EMS, DOS, cella soccorsi) restano callsign
 
 ## v1.3 – AIP layer (temporary, removable)
 
-Until the division database is connected, the default reserved areas are the **military** restricted areas of AIP Italia ENR 5.1.2
-(AIRAC 09 JUL 2026), with their real vertical limits.
+Until the division database is connected, the default reserved areas are the **military** areas of AIP Italia, with their real vertical limits:
+ENR 5.1.2 restricted (R), ENR 5.1.3 danger (D), ENR 5.1.4 temporary reserved (TRA / TSA, cross-border EUC and D35 CRIT included).
+AIRAC of the latest pages: 5.1.2 and 5.1.3 24 DEC 2026, 5.1.4 01 OCT 2026.
 
 | File | Content |
 |---|---|
-| `data/aip_src/LI-ENR_5.1.2.pdf` | Source AIP section |
-| `tools/aip_extract.py`, `tools/aip_build.py` | `python3 tools/aip_extract.py data/aip_src/LI-ENR_5.1.2.pdf /tmp/raw.json && python3 tools/aip_build.py /tmp/raw.json data/aip_zones.json "09 JUL 2026"` (needs pdfplumber) |
-| `data/aip_zones.json` | 120 areas (`source: "aip"`, ids `LI-R…`), extra fields `activity` (English), `use` tags (`AIR`, `FIRING`, `A2G`, `PARA`, `HELO`, `UAV`, `TOW`), `hours` (Italian/English, staff only) |
+| `data/aip_src/LI-ENR_5.1.2.pdf`, `LI-ENR_5.1.3.pdf`, `LI-ENR_5.1.4.pdf` | Source AIP sections |
+| `data/aip_src/tsa_configs.json` | Simultaneous activation configurations at the end of ENR 5.1.4 (IONIO1-5, CONF1-5 SICILIA, CONF1-5 EST SARDEGNA; `sup: true` = needs an AIP Supplement) |
+| `tools/aip_extract.py`, `tools/aip_build.py` | Extraction (needs pdfplumber) – see the usage lines at the top of each script |
+| `data/aip_zones.json` | 222 areas (`source: "aip"`, ids `LI-R…`, `LI-D…`, `LI-TRA…`, `LI-TSA…`, `LI-EUC…`) + `configs` |
 
-* Kept: areas whose activity is military (military air activity, firing, State aircraft, Army helicopters, military parachuting, military UA).
-  Skipped: security overflight bans, archaeological areas, gliding / free flight / VDS, captive balloon, civil UA testing, company test flights, U-space.
+Extra zone fields: `activity` (English), `use` tags (`AIR`, `FIRING`, `A2G`, `A2A`, `AAR`, `ASW`, `PARA`, `HELO`, `UAV`, `TOW`, `SUPERSONIC`),
+`hours` (Italian/English, staff only), `amc` (AMC manageable), `section`. A file or API may also send `configs: [{id, group, zones: [ids], sup}]`.
+
+* Kept: areas whose activity is military (military air activity, firing, air-to-air, AAR, ASW, State aircraft, Army helicopters, military parachuting, military UA).
+  Skipped (39): security overflight bans, archaeological areas, gliding / free flight / VDS, captive balloons, laser, volcanic activity, kite generators, civil UA testing, company test flights, U-space.
 * Lines along a coastline or border are drawn as straight segments; circles and arcs are computed from centre and radius.
 * Selection: areas at the front / red area or within 60 km; for CAS / strike / SEAD also firing ranges within 150 km, for airdrop parachuting areas,
   for CSAR / MEDEVAC helicopter areas. CAP / tracks / orbits with no reserved area at their level get the nearest area that has it (max 250 km).
+  If two or more areas of a configuration group are selected, the selection becomes the closest AIP configuration (those needing a Supplement only as a last resort).
   Civil-only events do not use these military areas.
 * No frequencies (stay TBD). Load order: database API / imported file → AIP file if present → demo data.
 * **To remove the layer**: delete `data/aip_zones.json`, `data/aip_src/` and `tools/aip_*.py`.

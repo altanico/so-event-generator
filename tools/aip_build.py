@@ -1,9 +1,11 @@
-# Step 2 of 2: keeps only the military areas (military / firing / State aircraft / Army / military UA), parses lateral limits
-# (points, circles, arcs), vertical limits, activity and hours, and writes the generator's airspace JSON.
-# Usage: python3 tools/aip_build.py /tmp/raw.json data/aip_zones.json "09 JUL 2026"
+# Step 2 of 2: keeps only the military areas (military / firing / State aircraft / Army / military UA / AAR / air combat / ASW),
+# parses lateral limits (points, circles, arcs), vertical limits, activity, hours, and adds the simultaneous activation
+# configurations of ENR 5.1.4 (data/aip_src/tsa_configs.json). Output: the generator's airspace JSON.
+# Usage (each input: raw.json:SECTION:AIRAC of the latest page):
+#   python3 tools/aip_build.py data/aip_zones.json "/tmp/r512.json:ENR 5.1.2:24 DEC 2026" "/tmp/r513.json:ENR 5.1.3:24 DEC 2026" "/tmp/r514.json:ENR 5.1.4:01 OCT 2026"
 # Remove the AIP layer by deleting data/aip_zones.json, data/aip_src/ and tools/aip_*.py.
 import json, re, math, sys
-e=json.load(open(sys.argv[1])); AIRAC=sys.argv[3] if len(sys.argv)>3 else ''
+OUT=sys.argv[1]; INPUTS=[a.split(':') for a in sys.argv[2:]]  # raw.json:ENR 5.1.2:24 DEC 2026
 P=r'(\d{2})°(\d{2})\'(\d{2}(?:\.\d+)?)"([NS])\s*(\d{3})°(\d{2})\'(\d{2}(?:\.\d+)?)"([EW])'
 def pt(m): la=int(m[0])+int(m[1])/60+float(m[2])/3600; lo=int(m[4])+int(m[5])/60+float(m[6])/3600; return [la*(-1 if m[3]=='S' else 1), lo*(-1 if m[7]=='W' else 1)]
 def km(u,v): return float(v)*{'NM':1.852,'KM':1.0,'M':0.001}[u.upper()]
@@ -53,33 +55,46 @@ def english(c3):
     t=' '.join(c3)
     m=re.search(r'(Heavy|Firing|Military|Air/ground|Area|VDS|Free|Captive|Helicopters?|UA |UAS|Civil|Hang|Test|Heavy|State|Intensa)',t)
     # English part starts at first capitalised English keyword after the Italian text
-    for kw in ['Heavy','Firing','Military','Air/ground','UA military','Test flights','Helicopters','Captive','Free flight','Civil','UAS','Area','Areas','Hang','inside']:
+    for kw in ['UAV military','Heavy','Air to air','Anti-submarine','Firing','Military','Air/ground','UA military','Test flights','Helicopters','Captive','Free flight','Civil','UAS','Area','Areas','Hang','inside']:
         i=t.find(kw)
         if i>0: return t[i:].strip()
     return t
-MIL=re.compile(r'militar|military|tir[oi] a fuoco|firing|aeromobili di Stato|State aircraft|E\.I\.|Italian Army|APR militare',re.I)
+MIL=re.compile(r'militar|military|tir[oi] a fuoco|tiri aria|firing|aeromobili di Stato|State aircraft|E\.I\.|Italian Army|APR militare|rifornimento in volo|refuelling|combattimento aereo|antisommergibil',re.I)
 def tags(a):
     a=a.lower(); s=[]
     if 'air/ground' in a or 'firing' in a: s.append('FIRING')
     if 'air/ground' in a: s.append('A2G')
     if 'parachute' in a: s.append('PARA')
     if 'helicopter' in a: s.append('HELO')
-    if 'ua ' in a or 'ua military' in a or 'rpas' in a or 'ua military' in a: s.append('UAV')
+    if 'ua ' in a or 'uav' in a or 'ua military' in a or 'rpas' in a or 'ua military' in a: s.append('UAV')
     if 'towing' in a: s.append('TOW')
+    if 'refuelling' in a: s.append('AAR')
+    if 'air to air firing' in a or 'air-to-air' in a or 'combat training' in a or 'air to air' in a and 'firing' in a: s.append('A2A')
+    if 'anti-submarine' in a: s.append('ASW')
+    if 'supersonic' in a: s.append('SUPERSONIC')
     if 'heavy military air' in a or 'military air activity' in a or 'state aircraft' in a or 'military air traffic' in a: s.append('AIR')
     return s
 zones=[]; skipped=[]
-for x in e:
+TYPE={'R':'R','D':'D','TSA':'TSA','TRA':'TRA','CBA':'CBA','EUC':'TRA'}
+for RAW,SEC,AIRAC in INPUTS:
+  for x in json.load(open(RAW)):
     head=re.sub(r'\s+',' ',x['head']).strip(); act_it_en=' '.join(x['c3'])
-    m=re.match(r'LI (R\s?[\d]+\s?(?:/\s?\w+|\w)?)\s*-?\s*(.*)',head)
-    code=re.sub(r'\s+','',m.group(1)).replace('/',''); name=m.group(2).strip()
-    if not MIL.search(act_it_en) or re.search(r'civil',act_it_en,re.I): skipped.append(f'{code} {name}: {english(x["c3"])}'); continue
+    m=re.match(r'(?:LI(?:/(L\w))? ?)?((?:R|D|TSA|TRA|CBA|EUC)\s?\d+\s?(?:/\s?\w+|\s?bis\b|\w(?=\s|$))?)\s*-?\s*(.*)',head)
+    xb,code,name=m.group(1),re.sub(r'\s+','',m.group(2)).replace('/',''),m.group(3).strip()
+    z=re.search(r'Zona "(\w)"',name)
+    if z: code+=z.group(1)
+    pre=re.match(r'[A-Z]+',code).group(0)
+    if not MIL.search(act_it_en) or re.search(r'civil',act_it_en,re.I): skipped.append(f'{SEC} {code} {name}: {english(x["c3"])}'); continue
     poly,notes=geom(' '.join(x['c1']))
-    if len(poly)<3: skipped.append(f'{code} {name}: GEOMETRY?'); continue
-    up,lo=limits(x['c2']); act=english(x['c3'])
-    rem=' '.join(x['c4']); hr=re.search(r'1\)\s*HR:\s*(.*?)(?:\s2\)|$)',rem); 
-    zones.append({'id':'LI-'+code,'name':f'{code} {name}','type':'R','lower':lo,'upper':up,'activity':act.rstrip('.'),'use':tags(act),
-      'hours':(hr.group(1)[:160] if hr else ''),'notes':(f'{act.rstrip(".")}. ' + ('Lateral limit partly along a coastline / border: drawn as straight lines. ' if notes else '') + f'Source: AIP Italia ENR 5.1.2{(" (AIRAC "+AIRAC+")") if AIRAC else ""}.').strip(),
-      'source':'aip','poly':[[round(a,5),round(b,5)] for a,b in poly]})
-json.dump({'source':f'AIP Italia ENR 5.1.2 – restricted areas, military only{(" (AIRAC "+AIRAC+")") if AIRAC else ""}','zones':zones},open(sys.argv[2],'w'),ensure_ascii=False,separators=(',',':'))
+    if len(poly)<3: skipped.append(f'{SEC} {code} {name}: GEOMETRY?'); continue
+    up,lo=limits(x['c2']); act=english(x['c3']).rstrip('.')
+    rem=' '.join(x['c4']); hr=re.search(r'HR:\s*(.*?)(?:\s\d\)|$)',rem)
+    cross={'LD':'Cross-border area with Croatia (Zagreb). ','EUC':'Cross-border area with Switzerland (lead AMC: Swiss AMC). '}.get('EUC' if pre=='EUC' else xb,'')
+    zones.append({'id':'LI-'+code,'name':(f'{code} {name}' if name else code).replace('LI/LD ',''),'type':TYPE[pre],'lower':lo,'upper':up,'activity':act,'use':tags(act),
+      'hours':(hr.group(1)[:160] if hr else ''),'amc':bool(re.search(r'AMC',rem)),
+      'notes':(f'{act}. ' + cross + ('Lateral limit partly along a coastline / border: drawn as straight lines. ' if notes else '') + f'Source: AIP Italia {SEC} (AIRAC {AIRAC}).').strip(),
+      'source':'aip','section':SEC,'poly':[[round(a,5),round(b,5)] for a,b in poly]})
+import os
+CONF=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','tsa_configs.json')))
+json.dump({'source':'AIP Italia ENR 5.1.2 / 5.1.3 / 5.1.4 – military areas only','sections':{sec:air for _,sec,air in INPUTS},'zones':zones,'configs':CONF},open(OUT,'w'),ensure_ascii=False,separators=(',',':'))
 print(len(zones),'zones;',len(skipped),'skipped'); print('\n'.join('  - '+s for s in skipped))
