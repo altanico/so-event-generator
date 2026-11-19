@@ -1,7 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
-- (none – waiting for the staff)
+- [ ] **Bullseye markers not clickable + bullseye list** (staff 19 Nov, screenshot): on the staff map the grey bullseye markers are drawn BEFORE the reserved / AIP areas, so the area polygons are on top and take the click (the click toggles the area instead). Fix: bullseye layer in its own map pane above the areas (and above corridors / tracks), slightly bigger marker with the name visible on hover. Step 3 "Bullseye (dalla lista)" is an input with a datalist (the list only shows while typing): make it a select with every bullseye, nearest to the theatre first, with the distance (e.g. "SPIDER – 35 NM"). Test: the bullseye pane exists and is above the overlay pane; the select lists all BUL() names.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## On hold (wait for the go-ahead)
