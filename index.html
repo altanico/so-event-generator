@@ -3991,7 +3991,7 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
-loadLand(); loadAip().then(() => { if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
+loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
 window.APP = { AIRPORTS, AIP: () => AIPDATA, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
