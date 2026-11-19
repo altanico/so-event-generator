@@ -641,6 +641,7 @@ function holdRing(e1a, e1b, e2a, e2b) { // end 1 = e1a/e1b, end 2 = e2a/e2b; leg
   const arrows = legs.map(([x, y]) => ({ p: [(x[0] + y[0]) / 2, (x[1] + y[1]) / 2], brg: bearing(x, y) }));
   return { ring, arrows, turn: 'LEFT' }; }
 function holdLoop(a) { // a: TRACK airspace element or a published track definition
+  if (a.cor) { const arrows = a.pts.slice(1).map((q, k) => ({ p: [(a.pts[k][0] + q[0]) / 2, (a.pts[k][1] + q[1]) / 2], brg: bearing(a.pts[k], q) })); return { line: a.pts, ring: null, arrows, marks: [[a.pts[0], 'ENTRY'], [a.pts[a.pts.length - 1], 'EXIT']], turn: '' }; } // AAR corridor: en route, no holding
   const t = a.kind === 'AAR' ? a : a.trk ? TRK().find(x => x.id === a.trk) : null;
   if (t && t.ap1) { const h = holdRing(t.ap1, t.tp1, t.ap2, t.tp2); h.marks = [[t.ap1, 'AP1'], [t.tp1, 'TP1'], [t.ap2, 'AP2'], [t.tp2, 'TP2']]; return h; }
   const p = a.pts[0], q = a.pts[a.pts.length - 1], b = bearing(p, q), w = (a.w || 7) * 1.852 / 2; // inbound leg on the right of the axis, outbound on the left
@@ -648,6 +649,7 @@ function holdLoop(a) { // a: TRACK airspace element or a published track definit
 const capLoop = a => holdLoop({ pts: [dest(a.pts[0], a.cap.inbound + 180, a.cap.leg * 1.852), a.pts[0]], w: 5 }); // CAP racetrack: inbound (HOT) leg ends at the anchor
 const arrowPts = (x, size = 3) => [dest(x.p, x.brg + 150, size), x.p, dest(x.p, x.brg - 150, size)];
 const trkShape = t => holdLoop(t).ring;
+const holdPts = h => h.ring || h.line;
 const aarNear = () => thChosen() ? TRK().filter(t => t.kind === 'AAR' && dist(geom().front, trkCenter(t)) <= TRK_RANGE.AAR).sort((a, b) => dist(geom().front, trkCenter(a)) - dist(geom().front, trkCenter(b))) : [];
 const aarWanted = () => REL().aar;
 function trkToggle(id) { const t = TRK().find(x => x.id === id); if (!t) return; const sel = new Set(S.trkSel || []), res = new Set(S.reserved || []);
@@ -1101,7 +1103,7 @@ function genEventElements(c) {
     const extra = ['Procedure briefed step by step, dry contacts first.', 'Standard cycle with one emergency break-away drill.', 'EMCON (radio silence) join-up and one receiver at low fuel.'][lvl];
     tankers.forEach(tk => { const rs = recvs.filter(r => r.tanker === tk.id), trk = airspace.find(a => a.type === 'TRACK' && a.flight === tk.id);
       SR('AAR', `${tk.cs} tanker${rs.length ? ' with ' + fls(rs) : ''}`, [tk, ...rs],
-        `${tk.cs} (${tk.type}) flies ${trk ? trk.name + ', ' + trk.alt : 'the briefed track'}. Receivers: ${rs.map(r => `${r.cs} (${r.size} × ${r.type})`).join('; ') || 'none assigned'}. Rendezvous, join-up, dry contact, wet contact one aircraft at a time (maximum 2 on the boom/basket), offload as briefed, break-away and rejoin. ${extra}`,
+        `${tk.cs} (${tk.type}) ${trk && trk.cor ? `flies the AAR corridor ${trk.name} like an airway from the entry (${fmtLL(trk.pts[0])}) to the exit (${fmtLL(trk.pts[trk.pts.length - 1])}), ${trk.alt}; receivers join en route and follow the tanker (no holding pattern in the corridor)` : 'flies ' + (trk ? trk.name + ', ' + trk.alt + ' (holding, left turns)' : 'the briefed track')}. Receivers: ${rs.map(r => `${r.cs} (${r.size} × ${r.type})`).join('; ') || 'none assigned'}. Rendezvous, join-up, dry contact, wet contact one aircraft at a time (maximum 2 on the boom/basket), offload as briefed, break-away and rejoin. ${extra}`,
         'Safe join-up and separation; contact made with every receiver; fuel states reported; radio discipline kept.'); });
   }
   // --- HAAR training (Manuale AAR: helicopter air-to-air refuelling in the dedicated HAAR areas) ---
@@ -1492,7 +1494,9 @@ function generateElements(flights) {
     return { z: c.z, d: c.bd, pts: [c.pts[i0], c.pts[i1]], alt: `${c.z.blocks[0][0]}-${c.z.blocks[0][1]}` }; };
   by('AAR').forEach((fl, i) => { let t = pickTrack('AAR', usedT); const ct = corTrack();
     if (t && ct && ct.d + 30 < dist(g.front, trkCenter(t))) t = null; // the AIP corridor is nearer than the published track
-    if (!t && ct) { corUse[ct.z.id] = (corUse[ct.z.id] || 0) + 1; S.reserved = S.reserved || []; if (!S.reserved.includes(ct.z.id)) S.reserved.push(ct.z.id); A('TRACK', `Track ${ct.z.name}`, ct.pts, { flight: fl.id, alt: ct.alt, cor: ct.z.id }); return; }
+    if (!t && ct) { corUse[ct.z.id] = (corUse[ct.z.id] || 0) + 1; S.reserved = S.reserved || []; if (!S.reserved.includes(ct.z.id)) S.reserved.push(ct.z.id);
+      const bp = ap(fl.base) || g.front, ax = dist(bp, ct.z.axis[0]) <= dist(bp, ct.z.axis[ct.z.axis.length - 1]) ? ct.z.axis.slice() : ct.z.axis.slice().reverse(); // AAR corridor: flown like an airway, entry = end nearest the base
+      A('TRACK', ct.z.name, ax, { flight: fl.id, alt: ct.alt, cor: ct.z.id }); return; }
     if (t) { usedT.add(t.id); useZ(t); A('TRACK', `Track ${t.id}`, [t.ap1, t.ap2], { flight: fl.id, alt: trkAlt(t), pub: true, trk: t.id, loop: [t.ap1, t.tp2, t.ap2, t.tp1] }); }
     else { const c = toBlue(g.front, 90 + i * 25); A('TRACK', `Track ${pick(WORDS)}`, [dest(c, g.dir + 90, 30), dest(c, g.dir - 90, 30)], { flight: fl.id, alt: 'FL220-260' }); } });
   by('AEW').forEach(fl => { const t = pickTrack('AEW', usedT);
@@ -2534,18 +2538,18 @@ function applyAAR(t) {
   const perTrack = {}, cards = tks.map((tk, i) => { const haar = tk.task === 'HAAR', rs = t.flights.filter(f => f.tanker === tk.id && ['RECEIVER', 'HAARRCV'].includes(f.task));
     const trk = t.airspace.find(a => a.type === 'TRACK' && a.flight === tk.id), def = trk && trk.trk ? TRK().find(x => x.id === trk.trk) : null;
     const v = haar ? ((S.variants && S.variants.HAAR && S.variants.HAAR.rv) || ['D'])[0] : ((S.variants && S.variants.AAR && S.variants.AAR.rv) || ['AUTO'])[0];
-    const rv = haar ? v : v === 'AUTO' ? (gciOn ? 'A' : 'E') : v;
+    const cor = !!(trk && trk.cor), rv = haar ? v : v === 'AUTO' ? (gciOn ? 'A' : cor ? 'G' : 'E') : cor && v === 'E' ? 'G' : v; // AAR corridor: en route, RV ECHO (anchor) becomes GOLF
     const key = trk ? trk.name : 'X', k = perTrack[key] = (perTrack[key] || 0) + 1;
     let alt; if (haar) alt = '2000 FT'; else if (def) { const lv = Math.min(def.hi, Math.max(def.lo, 180)) + (k - 1) * 30; alt = `FL${Math.min(lv, def.hi)}`; } else { const r = flRange(trk && trk.alt) || [220, 260]; alt = `FL${Math.min(r[1], r[0] + (k - 1) * 30)}`; }
     const h = trk ? holdLoop(trk) : null, inb = h ? Math.round(h.arrows[0].brg) : null, course = def ? def.course : inb != null ? `${String(inb).padStart(3, '0')}/${String((inb + 180) % 360).padStart(3, '0')}` : '';
-    const leg = def ? def.leg : trk ? Math.round(dist(trk.pts[0], trk.pts[trk.pts.length - 1]) / 1.852) : '', width = def ? def.width : trk && trk.w ? trk.w : 7;
+    const leg = def ? def.leg : trk ? Math.round(routeKm(trk.pts) / 1.852) : '', width = def ? def.width : trk && trk.w ? trk.w : 7;
     const alts = TRK().filter(x => x.kind === 'AAR' && def && x.id !== def.id).sort((a, b) => dist(trkCenter(a), trkCenter(def)) - dist(trkCenter(b), trkCenter(def)))[0];
-    const anchor = def ? fmtLL(def.ap1) : trk ? fmtLL(trk.pts[trk.pts.length - 1]) : BLANK;
-    const arip = ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(dest(trk.pts[0], bearing(trk.pts[trk.pts.length - 1], trk.pts[0]), (rv === 'D' ? 10 : 30) * 1.852)) : rv === 'F' ? `${BLANK} (1 min after the tanker's TOC)` : 'NA';
-    const arcp = rv === 'E' ? anchor : ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(trk.pts[0]) : 'NA';
-    const start = 15 + i * 5, card = [['RV TYPE', RV_EN[rv], 'EMCON', '1'], ['AAR TIME', totClock(start), 'END AAR', totClock(start + 45)], ['AR ENTRY POINT', 'NA', 'AR EXIT POINT', 'NA'], ['ANCHOR POINT', anchor, 'ARIP', arip],
-      ['AAR PATTERN', `LENGTH ${leg} NM · WIDTH ${width} NM · TURN LEFT · INB/OUTB ${course}`, '', ''], ['AAR TRK', trk ? trk.name.replace(/^Track /, '') : BLANK, 'ALTN AAR TRK', alts ? alts.id : 'NA'],
-      ['ARCP', arcp, 'ARCT', rv === 'E' ? `${totClock(start)}, then every 15 min` : ['B', 'C', 'G', 'D'].includes(rv) ? totClock(start) : 'NA'], ['AAR ALT', haar ? `${alt} (tanker) – receivers join ${'low 300 ft below'}` : `${alt} (base AAR altitude) – receivers ${alt.startsWith('FL') ? 'FL' + (+alt.slice(2) - 10) : '1000 ft below'} until visual`, 'AAR SPD', haar ? 'Receivers 115 KIAS (ARIP → ARCP)' : '270 KIAS'],
+    const anchor = cor ? 'NA (en route)' : def ? fmtLL(def.ap1) : trk ? fmtLL(trk.pts[trk.pts.length - 1]) : BLANK, corCp = cor ? dest(trk.pts[0], bearing(trk.pts[0], trk.pts[1]), Math.min(20 * 1.852, dist(trk.pts[0], trk.pts[1]) * 0.5)) : null;
+    const arip = cor ? `${fmtLL(trk.pts[0])} (corridor entry)` : ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(dest(trk.pts[0], bearing(trk.pts[trk.pts.length - 1], trk.pts[0]), (rv === 'D' ? 10 : 30) * 1.852)) : rv === 'F' ? `${BLANK} (1 min after the tanker's TOC)` : 'NA';
+    const arcp = cor ? fmtLL(corCp) : rv === 'E' ? anchor : ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(trk.pts[0]) : 'NA';
+    const start = 15 + i * 5, card = [['RV TYPE', RV_EN[rv], 'EMCON', '1'], ['AAR TIME', totClock(start), 'END AAR', totClock(start + 45)], ['AR ENTRY POINT', cor ? fmtLL(trk.pts[0]) : 'NA', 'AR EXIT POINT', cor ? fmtLL(trk.pts[trk.pts.length - 1]) : 'NA'], ['ANCHOR POINT', anchor, 'ARIP', arip],
+      ['AAR PATTERN', cor ? `NA – the tanker flies the corridor like an airway (${leg} NM from entry to exit); receivers join en route and follow` : `LENGTH ${leg} NM · WIDTH ${width} NM · TURN LEFT · INB/OUTB ${course}`, '', ''], ['AAR TRK', trk ? trk.name.replace(/^Track /, '') : BLANK, 'ALTN AAR TRK', alts ? alts.id : 'NA'],
+      ['ARCP', arcp, 'ARCT', cor ? totClock(start) : rv === 'E' ? `${totClock(start)}, then every 15 min` : ['B', 'C', 'G', 'D'].includes(rv) ? totClock(start) : 'NA'], ['AAR ALT', haar ? `${alt} (tanker) – receivers join ${'low 300 ft below'}` : `${alt} (base AAR altitude) – receivers ${alt.startsWith('FL') ? 'FL' + (+alt.slice(2) - 10) : '1000 ft below'} until visual`, 'AAR SPD', haar ? 'Receivers 115 KIAS (ARIP → ARCP)' : '270 KIAS'],
       ['AAR FREQ', BLANK, 'AA TAC CHAN', BLANK], ['TANKER C/S', `${tk.cs} (${tk.type}, ${aarSys(tk.type) || 'drogue'})`, '', ''], ...rs.map(r => ['RECEIVERS C/S', `${r.cs} (${r.size} × ${r.type}) – ${stationOf(tk, r)}`, 'OFFLOAD', `≈ ${offloadKg(r) * r.size} kg`]),
       ['AAR ABORT', 'NA', 'SPARE', 'NA'], ['RECEIVERS ALTN', [...new Set(rs.map(r => r.base).filter(Boolean))].join(' / ') || BLANK, 'TANK ALTN', tk.base || BLANK], ['AGENCIES', ctl || 'NIL (no GCI on station)', '', ''], ['NOTE', haar ? HAAR_RULES[1] : 'Receivers report fuel state and intentions after AAR in echelon left.', '', '']];
     if (haar) card.splice(5, 0, ['TRAIL DST', '< 2 NM after the turn', 'JOIN-UP', 'LOW (300 ft below) / HIGH (200 ft above)']);
@@ -2555,7 +2559,7 @@ function applyAAR(t) {
     if (['B', 'C'].includes(rv)) ph.push([`${RV_EN[rv]} – initial call and DF`, [[`${r0.cs}, ${tk.cs}`, `FOR RV ${rv === 'B' ? 'BRAVO' : 'CHARLIE'}, MY LEVEL ${alt}, WHEN CLEARED YOUR LEVEL ${BLANK}, SET AA TACAN ${BLANK}, MODE 3 ${BLANK}, TIMING ${BLANK}`], [`${tk.cs}, ${r0.cs}`, 'READBACK, NOSE COLD, SWITCHES SAFE'], [`${r0.cs}, ${tk.cs}`, 'TRANSMIT FOR DF'], [`${tk.cs}, ${r0.cs}`, 'TRANSMITTING FOR DF'], [`${r0.cs}, ${tk.cs}`, `TURN LEFT HEADING ${BLANK}`]]]);
     ph.push([`Tanker phase – ${boom ? 'BOOM' : 'PROBE AND DROGUE'}`, boom ? [[`${tk.cs}, ${r0.cs}`, 'CLEAR TO JOIN ECHELON LEFT, CONFIRM NOSE COLD, SWITCHES SAFE'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ASTERN'], [`${r0.cs}, ${tk.cs}`, 'ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED CONTACT WET (or DRY)'], [`${tk.cs}, ${r0.cs}`, '30 FT … 20 FT … 10 FT … 5 FT'], [`${r0.cs}, ${tk.cs}`, 'CONTACT'], [`${r0.cs}, ${tk.cs}`, 'REFUELLING COMPLETED, REQUEST DISCONNECT'], [`${tk.cs}, ${r0.cs}`, 'CLEARED TO DISCONNECT, REPORT ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ECHELON RIGHT'], [`${r0.cs}, ${tk.cs}`, 'ECHELON RIGHT, READY TO LEAVE'], [`${tk.cs}, ${r0.cs}`, `OFFLOAD ${BLANK} KG, CLEAR TO LEAVE, 1000 FT HIGHER${gc ? `, CONTACT ${gc} ON ${BLANK}` : ''}`]]
       : [[`${tk.cs}, ${r0.cs}`, `CLEAR TO JOIN ECHELON LEFT, ${st.split(' (')[0]} IN USE, CONFIRM NOSE COLD, SWITCHES SAFE`], [`${r0.cs}, ${tk.cs}`, 'ECHELON LEFT, REQUEST CONTACT WET'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ASTERN'], [`${r0.cs}, ${tk.cs}`, 'ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED CONTACT WET'], [`${r0.cs}, ${tk.cs}`, 'REFUELLING COMPLETED'], [`${tk.cs}, ${r0.cs}`, 'CLEARED TO DISCONNECT, REPORT ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ECHELON RIGHT'], [`${r0.cs}, ${tk.cs}`, 'ECHELON RIGHT, READY TO LEAVE'], [`${tk.cs}, ${r0.cs}`, `OFFLOAD ${BLANK} KG, CLEAR TO LEAVE${gc ? `, CONTACT ${gc} ON ${BLANK}` : ''}`]]]);
-    return { tanker: tk.cs, haar, rv, alt, card, how: RV_HOW[rv] || [], ph, receivers: rs.map(r => r.cs), track: trk ? trk.name : '' }; });
+    return { tanker: tk.cs, haar, rv, alt, card, cor, how: RV_HOW[rv] || [], ph, receivers: rs.map(r => r.cs), track: trk ? trk.name : '' }; });
   t.aar = { cards, emcon: 1, rules: AAR_RULES, haarRules: cards.some(c => c.haar) ? HAAR_RULES : [] };
   const sp = t.spins || (t.spins = []);
   cards.forEach(c => sp.push(`${c.tanker}: ${RV_EN[c.rv]}, ${c.alt}${c.receivers.length ? ', receivers ' + c.receivers.join(', ') : ''} – AAR card in the AAR pack.`));
@@ -2776,7 +2780,7 @@ function drawMap(fit) {
       if (a.type === 'CAP' && a.cap) { const h = capLoop(a); add(L.polygon(h.ring, { color: c, weight: 1.5, dashArray: '6 4', fillOpacity: .03 })).bindTooltip(`${a.name} · ${a.capType || 'CAP'} · ${a.alt}`); h.arrows.forEach(x => add(L.polyline(arrowPts(x, 2), { color: c, weight: 2 }))); }
       if (a.type === 'FLOT') { }
       else if (a.type === 'ROUTE') { add(L.polyline(a.pts, { color: a.kind === 'LOW' ? '#16a34a' : '#7c3aed', weight: 3, opacity: .85, dashArray: a.kind === 'LOW' ? '8 5' : null })).bindTooltip(a.name); a.pts.forEach((q, i) => add(L.circleMarker(q, { radius: 5, color: '#111', weight: 1, fillColor: '#fff', fillOpacity: 1 })).bindTooltip((a.names || [])[i] || '')); }
-      else if (a.type === 'TRACK') { const h = holdLoop(a); add(L.polygon(h.ring, { color: c, weight: 3, opacity: .85, fillOpacity: .05 })).bindTooltip(`${a.name} · ${a.alt || ''} · left turns`); h.arrows.forEach(x => add(L.polyline(arrowPts(x), { color: c, weight: 3 }))); h.marks.forEach(([q, l]) => add(L.circleMarker(q, { radius: 3, color: c, weight: 2 })).bindTooltip(l)); }
+      else if (a.type === 'TRACK') { const h = holdLoop(a); add(h.line ? L.polyline(h.line, { color: c, weight: 4, opacity: .85 }) : L.polygon(h.ring, { color: c, weight: 3, opacity: .85, fillOpacity: .05 })).bindTooltip(`${a.name} · ${a.alt || ''} · ${h.line ? 'en route along the corridor' : 'left turns'}`); h.arrows.forEach(x => add(L.polyline(arrowPts(x), { color: c, weight: 3 }))); h.marks.forEach(([q, l]) => add(L.circleMarker(q, { radius: 3, color: c, weight: 2 })).bindTooltip(l)); }
       else if (a.type === 'KILLBOX') { const p = a.pts[0], h = a.size / 2; add(L.polygon([dest(dest(p, 0, h), 90, h), dest(dest(p, 0, h), 270, h), dest(dest(p, 180, h), 270, h), dest(dest(p, 180, h), 90, h)], { color: '#CA8A04', weight: 1.5, fillOpacity: .05 })).bindTooltip(a.name); }
       else if (a.type === 'BULLSEYE') { add(L.circle(a.pts[0], { radius: 18520, color: '#D97706', weight: 1, fill: false })); add(L.marker(a.pts[0], { icon: icon('#f59e0b', '◎', a.name, 'circle', 16) })); }
       else add(L.marker(a.pts[0], { icon: icon(c, a.type[0], a.name, 'circle', 14) })).bindTooltip(AST[a.type]);
@@ -3561,7 +3565,7 @@ async function renderMap(mode, opt = {}) {
       if (a.type === 'CAP' && a.cap) { const h = capLoop(a); line(h.ring.concat([h.ring[0]]), K2('#38bdf8'), 2, [8, 6]); h.arrows.forEach(x => line(arrowPts(x, 2), K2('#38bdf8'), 2.5)); }
       if (a.type === 'FLOT') { }
       else if (a.type === 'ROUTE') { line(a.pts, K2(a.kind === 'LOW' ? '#4ade80' : '#a78bfa'), 3.5, a.kind === 'LOW' ? [10, 6] : null); a.pts.forEach((q, i) => { dot(q, '#ffffff', 5); const [x, y] = P(q); label((a.names || [])[i] || '', x + 8, y - 6, K2('#e5e7eb'), 15); }); }
-      else if (a.type === 'TRACK') { const h = holdLoop(a); line(h.ring.concat([h.ring[0]]), K2('#38bdf8'), 3.5); h.arrows.forEach(x => line(arrowPts(x), K2('#38bdf8'), 3.5)); const [x, y] = P(h.ring[0]); label(a.name, x + 6, y - 6, K2('#bae6fd'), 16); }
+      else if (a.type === 'TRACK') { const h = holdLoop(a); line(h.line || h.ring.concat([h.ring[0]]), K2('#38bdf8'), 3.5); h.arrows.forEach(x => line(arrowPts(x), K2('#38bdf8'), 3.5)); const [x, y] = P(holdPts(h)[0]); label(a.name, x + 6, y - 6, K2('#bae6fd'), 16); }
       else if (a.type === 'KILLBOX') { const [x, y] = P(a.pts[0]); const s = a.size * kmPx(a.pts[0][0]); c.strokeStyle = K2('#facc15'); c.lineWidth = 2; c.strokeRect(x - s / 2, y - s / 2, s, s); label(a.name, x - s / 2, y - s / 2 - 5, K2('#fde68a'), 16); }
       else if (a.type === 'BULLSEYE') { circle(a.pts[0], 18.52, K2('#fbbf24'), null); circle(a.pts[0], 37.04, K2('rgba(251,191,36,.5)'), null); const [x, y] = P(a.pts[0]); label('◎ ' + a.name, x + 6, y + 16, K2('#fde68a'), 16); }
       else { dot(a.pts[0], '#0ea5e9', 6); const [x, y] = P(a.pts[0]); label(a.name, x + 9, y + 4, K2('#bae6fd'), 16, false); }
@@ -4054,7 +4058,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     const A = t.aar, card = c => table([{ h: 'Item', w: .2 }, { h: 'Value', w: .38 }, { h: 'Item', w: .16 }, { h: 'Value', w: .26 }], c.card.map(r => [{ t: r[0], bold: true }, r[1], { t: r[2], bold: true }, r[3]]), { size: 7.5 });
     const dlg = rows => table([{ h: 'Station', w: .26 }, { h: 'Transmission', w: .74 }], rows.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 7.5 });
     for (const c of A.cards) { newPage(); h1(`AAR card – ${c.tanker}${c.haar ? ' (rotary wing)' : ''}`);
-      const png = jsel.maps && jsel.maps[c.tanker]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4; para('AAR pattern: legs, LEFT turns and direction of flight (arrows); AP / TP points of the published track.', { size: 7.5 }); } catch (e) { } }
+      const png = jsel.maps && jsel.maps[c.tanker]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4; para(c.cor ? 'AAR corridor flown like an airway: route from the entry to the exit, arrow = direction of flight (no holding pattern).' : 'AAR pattern: legs, LEFT turns and direction of flight (arrows); AP / TP points of the published track.', { size: 7.5 }); } catch (e) { } }
       card(c); h6(`${RV_EN[c.rv]} – how it is flown`); bullets(c.how);
       for (const [title, rows] of c.ph) { h6(title); dlg(rows); } }
     newPage(); h1('General rules'); bullets(A.rules); if (A.haarRules.length) { h5('Helicopter AAR (HAAR)'); bullets(A.haarRules); }
@@ -4342,7 +4346,7 @@ async function exportAarPack(btn) {
   if (btn) btn.disabled = true; toast('Generazione AAR pack…');
   try { const assets = await mpAssets(), maps = {};
     for (const c of S.t.aar.cards) { const tk = S.t.flights.find(f => f.cs === c.tanker), trk = tk && S.t.airspace.find(a => a.type === 'TRACK' && a.flight === tk.id);
-      if (trk) { const m = await renderMap('brief', { light: true, w: 1300, h: 760, focus: holdLoop(trk).ring, minPad: 0.08 }); if (m) maps[c.tanker] = dataUrlBytes(m); } }
+      if (trk) { const m = await renderMap('brief', { light: true, w: 1300, h: 760, focus: holdPts(holdLoop(trk)), minPad: 0.08 }); if (m) maps[c.tanker] = dataUrlBytes(m); } }
     const r = await buildMasterplanPdf(null, assets, null, { kind: 'aar', maps });
     await download(`${fileBase()}_AAR_pack.pdf`, new Blob([await r.pdf.save()], { type: 'application/pdf' })); toast('AAR pack generato'); } catch (err) { console.error(err); toast('Errore: ' + err.message); }
   if (btn) btn.disabled = false;
@@ -4636,7 +4640,7 @@ function initPublicMap() {
       if (a.type === 'CAP' && a.cap) { const h = capLoop(a); add(L.polygon(h.ring, { color: '#0284C7', weight: 1.5, dashArray: '6 4', fillOpacity: .03 })); h.arrows.forEach(x => add(L.polyline(arrowPts(x, 2), { color: '#0284C7', weight: 2 }))); }
       if (a.type === 'FLOT') { }
       else if (a.type === 'ROUTE') { add(L.polyline(a.pts, { color: a.kind === 'LOW' ? '#16a34a' : '#7c3aed', weight: 3, dashArray: a.kind === 'LOW' ? '8 5' : null })).bindTooltip(a.name); a.pts.forEach((q, i) => add(L.circleMarker(q, { radius: 5, color: '#111', weight: 1, fillColor: '#fff', fillOpacity: 1 })).bindTooltip((a.names || [])[i] || '')); }
-      else if (a.type === 'TRACK') { const h = holdLoop(a); h.ring.forEach(q => pts.push(q)); add(L.polygon(h.ring, { color: '#0284C7', weight: 3, fillOpacity: .05 })).bindTooltip(`${a.name} · ${a.alt || ''}`); h.arrows.forEach(x => add(L.polyline(arrowPts(x), { color: '#0284C7', weight: 3 }))); }
+      else if (a.type === 'TRACK') { const h = holdLoop(a); holdPts(h).forEach(q => pts.push(q)); add((h.line ? L.polyline : L.polygon)(holdPts(h), { color: '#0284C7', weight: 3, fillOpacity: .05 })).bindTooltip(`${a.name} · ${a.alt || ''}`); h.arrows.forEach(x => add(L.polyline(arrowPts(x), { color: '#0284C7', weight: 3 }))); }
       else if (a.type === 'KILLBOX') { const p = a.pts[0], h = a.size / 2; add(L.polygon([dest(dest(p, 0, h), 90, h), dest(dest(p, 0, h), 270, h), dest(dest(p, 180, h), 270, h), dest(dest(p, 180, h), 90, h)], { color: '#CA8A04', weight: 1.5, fillOpacity: .05 })).bindTooltip(a.name); }
       else if (a.type === 'BULLSEYE') { add(L.circle(a.pts[0], { radius: 18520, color: '#D97706', weight: 1, fill: false })); add(L.marker(a.pts[0], { icon: icon('#f59e0b', '◎', a.name, 'circle', 16) })); }
       else add(L.marker(a.pts[0], { icon: icon('#0284C7', a.type[0], a.name, 'circle', 14) })).bindTooltip(AST[a.type]);

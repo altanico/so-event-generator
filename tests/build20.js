@@ -42,7 +42,7 @@ let txt=execSync('pdftotext b20_gci.pdf -').toString(); for (const k of ['TANGO 
 r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('CT'); APP.S.resMode='auto'; APP.setEvents(['AAR']); APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x EF-2000\n2x F-35A\n1x KC-767\n1x KC-130J'); APP.tailor();
   const t=APP.S.t; o.rv=t.aar.cards.map(c=>c.rv); o.pair=t.flights.filter(f=>f.task==='RECEIVER').map(f=>f.type+'>'+(t.flights.find(x=>x.id===f.tanker)||{}).type); o.tk=t.flights.filter(f=>f.task==='AAR').map(f=>f.cs);
   APP.S.c2sel.forEach(c=>c.on=true); APP.S.c2sel.push({id:'g',key:'GCI',on:true,role:'GCI',cs:'PIOPPO RADAR',freq:'136.200'}); APP.S.roster.controllers=[{id:'c1',name:'Mario',pref:'GCI'}]; APP.tailor(); o.rvA=APP.S.t.aar.cards.map(c=>c.rv); o.card=JSON.stringify(APP.S.t.aar.cards[0].card); return o; });
-if(r.rv.some(x=>x!=='E')) fail.push('RV without GCI '+r.rv); if(r.rvA.some(x=>x!=='A')) fail.push('RV with GCI '+r.rvA);
+if(r.rv.some(x=>!['E','G'].includes(x))) fail.push('RV without GCI '+r.rv); if(r.rvA.some(x=>x!=='A')) fail.push('RV with GCI '+r.rvA);
 if(r.pair.some(p=>/F-35A>KC-130J/.test(p))) fail.push('boom receiver on a drogue tanker '+r.pair); if(r.tk.some(c=>/DARDO|FALCO/.test(c))) fail.push('DARDO/FALCO tanker');
 for (const k of ['RV TYPE','ANCHOR POINT','AAR ALT','TANKER C/S','RECEIVERS C/S']) if(!r.card.includes(k)) fail.push('AAR card missing '+k);
 const [da]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.evaluate(()=>APP.exportAarPack())]); await da.saveAs('b20_aar.pdf');
@@ -51,4 +51,10 @@ txt=execSync('pdftotext b20_aar.pdf -').toString(); for (const k of ['AAR card',
 r=await page.evaluate(()=>{ APP.S.custom=[]; APP.setTheatre('NE'); APP.S.resMode='auto'; APP.setEvents(['HAAR']); APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-130J\n2x HH-101\n2x HH-60W\n1x KC-767'); APP.tailor();
   const t=APP.S.t; return { res:APP.RES().map(z=>z.id), tk:t.flights.filter(f=>f.task==='HAAR').map(f=>f.type), rc:t.flights.filter(f=>f.task==='HAARRCV').map(f=>f.type), card:t.aar&&t.aar.cards.map(c=>c.rv+'/'+c.haar), iss:(APP.containmentIssues()||[]).length }; });
 if(!r.res.length||r.res.some(id=>!/D266/.test(id))) fail.push('HAAR areas '+r.res); if(r.tk.join()!=='KC-130J') fail.push('HAAR tanker '+r.tk); if(r.rc.length!==2) fail.push('HAAR receivers '+r.rc); if(!r.card||r.card[0]!=='D/true') fail.push('HAAR card '+r.card); if(r.iss) fail.push('HAAR containment '+r.iss);
+
+// AAR corridor: flown like an airway (no holding), entry / exit on the card, RV GOLF without a GCI
+r=await page.evaluate(()=>{ APP.S.custom=[]; APP.setTheatre('SA'); APP.S.resMode='auto'; APP.setEvents(['AAR']); APP.S.variants.AAR={rv:['AUTO']}; APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x EF-2000\n1x KC-767\n1x A330 MRTT'); APP.tailor();
+  const t=APP.S.t, cor=t.airspace.filter(a=>a.type==='TRACK'&&a.cor); return { n:cor.length, ring:cor.map(a=>!!APP.holdLoop(a).ring), axis:cor.map(a=>{ const z=APP.AIP().zones.find(q=>q.id===a.cor); return a.pts.length===z.axis.length; }), cards:t.aar.cards.filter(c=>c.cor).map(c=>c.rv+'|'+JSON.stringify(c.card)), ser:t.serials.filter(x=>x.kind==='AAR').map(x=>x.text).join(' ') }; });
+if(!r.n) fail.push('no tanker in an AAR corridor (SA)'); else { if(r.ring.some(Boolean)) fail.push('holding drawn in an AAR corridor'); if(r.axis.some(x=>!x)) fail.push('corridor route is not the whole axis');
+  if(r.cards.some(c=>!c.startsWith('G|')||!/corridor entry/.test(c)||/LENGTH .* TURN LEFT/.test(c))) fail.push('corridor AAR card '+r.cards[0].slice(0,120)); if(!/like an airway/.test(r.ser)) fail.push('corridor serial text'); }
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();

@@ -1,8 +1,8 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
-- [ ] **AAR corridors (ENR 5.2.2.1): no holding pattern.** Staff 19 Nov: in an AAR corridor the tanker flies the corridor like an airway and the receivers follow / join en route. When a tanker is given a corridor: draw its element as a route along the corridor axis (entry point → exit point, direction arrows, block level), not as a racetrack; AAR card: AR ENTRY / EXIT POINT = corridor ends, AAR TRK = corridor, pattern NA, ARIP / ARCP at the entry; serial text and phraseology "en route". Published tracks (AURORA, TERRA…) keep the holding. Phase-1 map unchanged (corridors are areas). Test: no TRACK racetrack on a corridor.
-  - To confirm with the staff: RV type in a corridor – proposal: RV ALPHA if a GCI is staffed, otherwise RV GOLF (en route) instead of ECHO (ECHO needs an anchor point).
+- [x] **AAR corridors (ENR 5.2.2.1): no holding pattern** (v1.17.1). Staff 19 Nov: in an AAR corridor the tanker flies the corridor like an airway and the receivers follow / join en route. When a tanker is given a corridor: draw its element as a route along the corridor axis (entry point → exit point, direction arrows, block level), not as a racetrack; AAR card: AR ENTRY / EXIT POINT = corridor ends, AAR TRK = corridor, pattern NA, ARIP / ARCP at the entry; serial text and phraseology "en route". Published tracks (AURORA, TERRA…) keep the holding. Phase-1 map unchanged (corridors are areas). Test: no TRACK racetrack on a corridor.
+  - RV type in a corridor (staff OK): RV ALPHA if a GCI is staffed, otherwise RV GOLF (en route); ECHO chosen by hand becomes GOLF in a corridor.
 - Still open with the staff: list of variants for the other event types (proposed ones implemented: ID QRA/CAP, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## On hold (wait for the go-ahead)
