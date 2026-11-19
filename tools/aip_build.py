@@ -92,7 +92,7 @@ for RAW,SEC,AIRAC in INPUTS:
     rem=' '.join(x['c4']); hr=re.search(r'HR:\s*(.*?)(?:\s\d\)|$)',rem)
     cross={'LD':'Cross-border area with Croatia (Zagreb). ','EUC':'Cross-border area with Switzerland (lead AMC: Swiss AMC). '}.get('EUC' if pre=='EUC' else xb,'')
     zones.append({'id':'LI-'+code,'name':(f'{code} {name}' if name else code).replace('LI/LD ',''),'type':TYPE[pre],'lower':lo,'upper':up,'activity':act,'use':tags(act),
-      'hours':(hr.group(1)[:160] if hr else ''),'amc':bool(re.search(r'AMC',rem)),
+      'hours':'','amc':bool(re.search(r'AMC',rem)),
       'notes':(f'{act}. ' + cross + ('Lateral limit partly along a coastline / border: drawn as straight lines. ' if notes else '') + f'Source: AIP Italia {SEC} (AIRAC {AIRAC}).').strip(),
       'source':'aip','section':SEC,'poly':[[round(a,5),round(b,5)] for a,b in poly]})
 import os
@@ -110,9 +110,29 @@ for c in COR:
 # Very low level tactical areas (ENR 5.2.2.6): not reserved areas – permeable to other traffic – used as D areas for low-level navigation
 LOW=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','low_level_areas.json')))
 for a in LOW:
-  zones.append({'id':'LI-AT'+a['name'].replace(' ',''),'name':'AT '+a['name'],'type':'D','lower':'500 FT AGL','upper':'TBC','activity':'Very low level military aircraft activity – tactical area','use':['LOWLEVEL'],'hours':'MON-FRI 0600-2200 (0500-2100) over land and within 3 NM of the coast; H24 beyond 3 NM','amc':False,
-    'notes':'Tactical area for very low level military flying: minimum 500 ft AGL for fixed wing (1000 ft AGL elsewhere, 2000 ft AGL over the Alps), 150 ft AGL for helicopters. Not a reserved area: other traffic may be present (handled as a danger area). MON-FRI except holidays, 0600-2200 (0500-2100). Stay outside class A-E airspace, ATZ and aerodrome circuits unless cleared. Source: AIP Italia ENR 5.2.2.6 (AIRAC 30 NOV 2023).',
+  zones.append({'id':'LI-AT'+a['name'].replace(' ',''),'name':'AT '+a['name'],'type':'D','lower':'500 FT AGL','upper':'TBC','activity':'Very low level military aircraft activity – tactical area','use':['LOWLEVEL'],'hours':'','amc':False,
+    'notes':'Tactical area for very low level military flying: minimum 500 ft AGL for fixed wing (1000 ft AGL elsewhere, 2000 ft AGL over the Alps), 150 ft AGL for helicopters. Not a reserved area: other traffic may be present (handled as a danger area). Stay outside class A-E airspace, ATZ and aerodrome circuits unless cleared. Source: AIP Italia ENR 5.2.2.6 (AIRAC 30 NOV 2023).',
     'source':'aip','section':'ENR 5.2.2.6','poly':a['poly']})
+# OAT corridors (ENR 5.2.2.4): transit between areas / airway-like reservation along a route. Stored as type COR with the centre line.
+def dm(v,lon=False):
+  v=str(v).zfill(7 if lon else 6); d=int(v[:3] if lon else v[:2]); r=v[3:] if lon else v[2:]; return d+int(r[:2])/60+int(r[2:4])/3600
+def bufline(pts,half_nm):
+  w=half_nm*1.852; L=[];R=[]
+  for i,p in enumerate(pts):
+    if i==0: b=brg(p,pts[1])
+    elif i==len(pts)-1: b=brg(pts[i-1],p)
+    else:
+      b1=brg(pts[i-1],p); b2=brg(p,pts[i+1]); b=(b1+((b2-b1+540)%360-180)/2)%360
+    L.append(dest(p,b-90,w)); R.append(dest(p,b+90,w))
+  # round ends
+  return L+[dest(pts[-1],brg(pts[-2],pts[-1]),w)]+R[::-1]+[dest(pts[0],brg(pts[1],pts[0]),w)]
+OATC=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','oat_corridors.json')))
+for c in OATC:
+  pts=[[dm(a),dm(b,True)] for _,a,b in c['pts']]
+  zones.append({'id':'LI-COR'+c['id'],'name':c['name'],'type':'COR','lower':c['lower'],'upper':c['upper'],'activity':'Operational air traffic corridor','use':['TRANSIT'],'hours':'','amc':False,
+    'axis':[[round(a,5),round(b,5)] for a,b in pts],'wpt':[n for n,_,_ in c['pts']],'half':c['half'],'radio':c['radio'],'pref':c.get('pref',[]),'excl':('LI-COR'+c['excl']) if c.get('excl') else '',
+    'notes':f"OAT corridor, {c['fir']} FIR: {c['half']} NM each side of the centre line. Levels: {c['levels']}. Radio: {c['radio']}. {c['notes']} Source: AIP Italia ENR 5.2.2.4.",
+    'source':'aip','section':'ENR 5.2.2.4','poly':[[round(a,5),round(b,5)] for a,b in bufline(pts,c['half'])]})
 CONF=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','tsa_configs.json')))
 json.dump({'source':'AIP Italia ENR 5.1.2 / 5.1.3 / 5.1.4 – military areas only','sections':{sec:air for _,sec,air in INPUTS},'zones':zones,'configs':CONF},open(OUT,'w'),ensure_ascii=False,separators=(',',':'))
 print(len(zones),'zones;',len(skipped),'skipped'); print('\n'.join('  - '+s for s in skipped))

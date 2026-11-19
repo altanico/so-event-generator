@@ -119,11 +119,12 @@ AIRAC of the latest pages: 5.1.2 and 5.1.3 24 DEC 2026, 5.1.4 01 OCT 2026.
 | `data/aip_src/LI-ENR_5.1.2.pdf`, `LI-ENR_5.1.3.pdf`, `LI-ENR_5.1.4.pdf` | Source AIP sections |
 | `data/aip_src/LI-ENR_5.2.2.1.pdf`, `data/aip_src/aar_corridors.json` | AAR corridors (ALPHA, BRAVO, DELTA, ECHO, ADRIATICO, ADRIATICO HIGH, TIRRENO): levels / blocks / widths from the AIP; lateral limits from the AIP for DELTA and ADRIATICO, from the IVAO Aurora sector file for the others (their route points are not in ENR 5.2.2.1); `axis` = centre line |
 | `data/aip_src/LI-ENR_5.2.2.6.pdf`, `data/aip_src/low_level_areas.json` | Very low level tactical areas (AT PIEMONTE, EMILIA, TOSCANA, MARCHE NORD, MOLISE, BASILICATA, SICILIA NORD, SICILIA SUD): not reserved, permeable to other traffic, stored as type `D`, tag `LOWLEVEL`, lower 500 ft AGL (helicopters 150 ft AGL), upper TBC |
+| `data/aip_src/LI-ENR_5.2.2.4.pdf`, `data/aip_src/oat_corridors.json` | OAT corridors YANKEE, ALPHA 1 / 2, BRAVO, CHARLIE, TC-PERDA HIGH / MED / LOW: centre line (`axis`, waypoint names `wpt`), half width, levels (TBC where the AIP says "coordinated", with `pref` levels), radio, mutual exclusion `excl`; stored as type `COR` |
 | `data/aip_src/tsa_configs.json` | Simultaneous activation configurations at the end of ENR 5.1.4 (IONIO1-5, CONF1-5 SICILIA, CONF1-5 EST SARDEGNA; `sup: true` = needs an AIP Supplement) |
 | `tools/aip_extract.py`, `tools/aip_build.py` | Extraction (needs pdfplumber) – see the usage lines at the top of each script |
-| `data/aip_zones.json` | 239 areas (R22 Frosinone included by staff decision; 8 AAR corridor zones, type `AAR`, with `blocks` and `axis`) (`source: "aip"`, ids `LI-R…`, `LI-D…`, `LI-TRA…`, `LI-TSA…`, `LI-EUC…`) + `configs` |
+| `data/aip_zones.json` | 247 areas (R22 Frosinone included by staff decision; 8 AAR corridor zones, type `AAR`, with `blocks` and `axis`) (`source: "aip"`, ids `LI-R…`, `LI-D…`, `LI-TRA…`, `LI-TSA…`, `LI-EUC…`) + `configs` |
 
-Extra zone fields: `activity` (English), `use` tags (`AIR`, `FIRING`, `A2G`, `A2A`, `AAR`, `ASW`, `PARA`, `HELO`, `UAV`, `TOW`, `SUPERSONIC`),
+Activation hours are not used (staff decision: the areas can always be used). Extra zone fields: `activity` (English), `use` tags (`AIR`, `FIRING`, `A2G`, `A2A`, `AAR`, `ASW`, `PARA`, `HELO`, `UAV`, `TOW`, `SUPERSONIC`),
 `hours` (Italian/English, staff only), `amc` (AMC manageable), `section`. A file or API may also send `configs: [{id, group, zones: [ids], sup}]`.
 
 * Kept: areas whose activity is military (military air activity, firing, air-to-air, AAR, ASW, State aircraft, Army helicopters, military parachuting, military UA).
@@ -135,5 +136,6 @@ Extra zone fields: `activity` (English), `use` tags (`AIR`, `FIRING`, `A2G`, `A2
   Civil-only events do not use these military areas.
 * AAR corridors: an element is inside a corridor only within one of its level blocks (the two blocks are never used together). A tanker gets a 50 NM track on the axis of the nearest corridor, at its upper block, when the corridor is nearer the front than the published tanker tracks.
 * Low-level navigation: the AT tactical areas within 220 km are selected and every low-level route stays inside one of them (fixed wing 500-1000 ft AGL, helicopters 150-500 ft AGL); the serial reminds that the area is not reserved. Theatres without an AT area nearby (NE, SA) keep the routes in the reserved areas.
+* OAT corridors are never used to place exercise elements. They are proposed (`S.cor`) when they join a BLUE base and a reserved area, or two separate reserved areas (transit), or for IFR navigation / airlift near the front (airway-like reservation: the IFR route starts along the corridor). The staff toggles them in the airspace card or on the map; the masterplan lists them (route, width, levels, radio).
 * No frequencies (stay TBD). Load order: database API / imported file → AIP file if present → demo data.
 * **To remove the layer**: delete `data/aip_zones.json`, `data/aip_src/` and `tools/aip_*.py`.
