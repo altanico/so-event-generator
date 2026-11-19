@@ -11,7 +11,6 @@ the staff page and can be moved back inside automatically.
 |---|---|---|
 | REST API | Staff page → "API database (URL)" + optional token (sent as `Authorization: Bearer <token>`) | Works when the page is hosted on the division site (CORS enabled). Inside claude.ai external calls are blocked: use the file. The token is kept only in the staff's browser and never published. |
 | File | Staff page → "Importa JSON / GeoJSON" | An export of the same JSON from the database. |
-| Demo | Staff page → "Dati DEMO" | Fictitious areas and UHF frequencies for testing only. |
 
 ## JSON format (GET response or file)
 
@@ -140,5 +139,10 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * AAR corridors: an element is inside a corridor only within one of its level blocks (the two blocks are never used together). A tanker gets a 50 NM track on the axis of the nearest corridor, at its upper block, when the corridor is nearer the front than the published tanker tracks.
 * Low-level navigation: the AT tactical areas within 220 km are selected and every low-level route stays inside one of them (fixed wing 500-1000 ft AGL, helicopters 150-500 ft AGL); the serial reminds that the area is not reserved. Theatres without an AT area nearby (NE, SA) keep the routes in the reserved areas.
 * OAT corridors are never used to place exercise elements. They are proposed (`S.cor`) when they join a BLUE base and a reserved area, or two separate reserved areas (transit), or for IFR navigation / airlift near the front (airway-like reservation: the IFR route starts along the corridor). The staff toggles them in the airspace card or on the map; the masterplan lists them (route, width, levels, radio).
-* No frequencies (stay TBD). Load order: database API / imported file → AIP file if present → demo data.
+* No frequencies (stay TBD). Load order: database API / imported file → AIP file if present → no zones (demo data removed in v1.11).
 * **To remove the layer**: delete `data/aip_zones.json`, `data/aip_src/` and `tools/aip_*.py`.
+
+## Reserved-area selection (v1.11)
+
+* `S.resMode`: `'auto'` (the generator proposes the areas for theatre and event) or `'manual'` (only the areas the staff ticks; the generator never adds or swaps areas and clamps every element into them). Asked before the first generation.
+* "Deseleziona tutte" clears the selection and switches to manual. The custom-area union now uses the areas ticked in the zone table.

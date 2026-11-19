@@ -589,6 +589,7 @@ const TRK_RANGE = { AEW: 450, AAR: 350 };
 function trkInArea(kind) { const f = geom().front; return TRK().filter(t => t.kind === kind && dist(f, trkCenter(t)) <= TRK_RANGE[kind]).sort((a, b) => dist(f, trkCenter(a)) - dist(f, trkCenter(b))); }
 function pickTrack(kind, used) {
   if (cusLocked()) return null;
+  if (manualRes()) { const res = new Set(S.reserved || []), c = TRK().filter(t => t.kind === kind && !used.has(t.id) && trkZones(t).length && trkZones(t).every(z => res.has(z.id))); return c.sort((a, b) => dist(geom().front, trkCenter(a)) - dist(geom().front, trkCenter(b)))[0] || null; }
   const res = new Set(S.reserved || []), f = geom().front;
   const c = TRK().filter(t => t.kind === kind && !used.has(t.id)).map(t => ({ t, d: dist(f, trkCenter(t)), r: trkZones(t).some(z => res.has(z.id)) })).filter(x => x.d <= TRK_RANGE[kind]);
   c.sort((a, b) => (b.r - a.r) || a.d - b.d); return c.length ? c[0].t : null;
@@ -599,27 +600,12 @@ function orbitShapes(a) { const r = (a.rad || 15) * 1.852, out = a.pts.map(p => 
   if (a.pts.length > 1) { const b = bearing(a.pts[0], a.pts[1]); [90, -90].forEach(sg => out.push([dest(a.pts[0], b + sg, r), dest(a.pts[1], b + sg, r)])); }
   return out; }
 function bullSelectHtml() { return `<datalist id="bulllist">${BUL().map(b => `<option value="${esc(b.name)}">`).join('')}</datalist>`; }
-function demoAirspace() {
-  const g = geom(), id = g.th.id;
-  const zones = [
-    { id: `DEMO-${id}-TSA1`, name: `TSA DEMO-${id}1`, type: 'TSA', lower: 'GND', upper: 'FL245', poly: ring(g.redC, g.r * 1.25) },
-    { id: `DEMO-${id}-TRA2`, name: `TRA DEMO-${id}2`, type: 'TRA', lower: 'GND', upper: 'FL360', poly: ring(dest(g.front, g.dir, 45), 50) },
-    { id: `DEMO-${id}-TRA3`, name: `TRA DEMO-${id}3`, type: 'TRA', lower: 'FL190', upper: 'FL320', poly: ring(dest(g.front, g.dir, 115), 50) },
-    { id: `DEMO-${id}-R4`, name: `R DEMO-${id}4`, type: 'R', lower: 'GND', upper: 'FL300', poly: ring(g.sea, 45) },
-    { id: `DEMO-${id}-D5`, name: `D DEMO-${id}5`, type: 'D', lower: 'GND', upper: 'UNL', poly: ring(g.outside, 45) },
-  ].map(z => ({ ...z, notes: 'Fictitious demo area – replace with database data' }));
-  const F = (freq, use, name) => ({ freq, unit: 'UHF', use, station: '', name: name + ' (DEMO)' });
-  const freqs = [F('251.000', 'GCI', 'GCI primary'), F('252.300', 'GCI', 'GCI secondary'), F('285.600', 'CAS', 'JTAC'), F('282.800', 'CSAR', 'Rescue'),
-    F('276.400', 'AAR', 'Tanker 1'), F('277.200', 'AAR', 'Tanker 2'),
-    ...['260.100', '260.700', '261.300', '262.900', '263.500', '264.100', '265.700', '266.300', '267.900', '268.500', '269.100', '270.700'].map((f, i) => F(f, 'TAC', 'Inter-flight ' + (i + 1)))];
-  return { source: 'demo', loaded: new Date().toISOString(), zones, freqs };
-}
 // --- AIP layer (removable): military restricted areas from AIP Italia ENR 5.1.2, in data/aip_zones.json (built by tools/aip_*.py).
 // Deleting that file (and data/aip_src/) removes the layer: the app then uses the database / imported file / demo data.
 let AIPDATA = null;
 async function loadAip() { try { const r = await fetch('data/aip_zones.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json(); const d = parseAirspace(j); if (d.zones.length) AIPDATA = { ...d, label: j.source || 'AIP' }; } catch (e) { } }
-const baseAsp = () => !S.asp || ['demo', 'aip'].includes(S.asp.source);
-function defaultAirspace() { if (AIPDATA) setAirspace({ zones: AIPDATA.zones, freqs: [], configs: AIPDATA.configs }, 'aip', { label: AIPDATA.label }); else setAirspace(demoAirspace(), 'demo'); }
+const baseAsp = () => !S.asp || ['demo', 'aip', 'none'].includes(S.asp.source);
+function defaultAirspace() { if (AIPDATA) setAirspace({ zones: AIPDATA.zones, freqs: [], configs: AIPDATA.configs }, 'aip', { label: AIPDATA.label }); else setAirspace({ zones: [], freqs: [] }, 'none'); }
 // --- simultaneous activation configurations (AIP ENR 5.1.4): zones of a group may be active singly or only in one of the listed combinations
 const CFG = () => (S.asp && S.asp.configs) || [];
 const cfgGroups = () => [...new Set(CFG().map(c => c.group))];
@@ -667,7 +653,7 @@ async function loadAirspaceApi(url, token) {
 function setAirspace(data, source, extra = {}) {
   S.asp = { source, loaded: new Date().toISOString(), zones: data.zones, freqs: data.freqs, bullseyes: data.bullseyes || [], tracks: data.tracks || [], configs: data.configs || [], ...extra };
   if ((data.positions || []).length) S.positions = data.positions;
-  S.reserved = autoReserve(); S.cor = autoCor(); S.c2sel = null; save();
+  S.reserved = S.resMode === 'manual' && !cusLocked() ? (S.reserved || []).filter(id => LIB().some(z => z.id === id)) : autoReserve(); S.cor = autoCor(); S.c2sel = null; save();
 }
 // ---- geometry ----
 function pip(p, poly) { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [yi, xi] = poly[i], [yj, xj] = poly[j]; if (((yi > p[0]) !== (yj > p[0])) && (p[1] < (xj - xi) * (p[0] - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
@@ -741,10 +727,10 @@ function containmentIssues() {
 function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area whose vertical limits contain their altitude
   if (!t || !RES().length) return;
   const fitQ = (q, alt) => { const a = flRange(alt); return !a || zFit(q, a); };
-  if (cusLocked()) { const lk = cusLocked(); t.airspace.forEach(a => { if (!SNAP_AST.includes(a.type) || a.pub || !a.alt || lk.some(q => fitQ(q, a.alt))) return;
+  if (cusLocked() || manualRes()) { const lk = cusLocked() || manualRes(); t.airspace.forEach(a => { if (!SNAP_AST.includes(a.type) || a.pub || !a.alt || lk.some(q => fitQ(q, a.alt))) return;
       const z = lk.find(q => a.pts.some(p => pip(p, q.poly))) || lk[0], lo = zLo(z.lower), hi = Math.min(zLimit(z.upper), 600), r = flRange(a.alt) || [lo, hi];
       let a0 = Math.max(r[0], lo), a1 = Math.min(r[1], hi); if (a0 > a1) { a1 = hi; a0 = Math.max(lo, hi - 40); } a.alt = a0 === a1 ? `FL${String(a0).padStart(3, '0')}` : `FL${String(a0).padStart(3, '0')}-FL${String(a1).padStart(3, '0')}`; }); }
-  t.airspace.forEach(a => { if (cusLocked() || !SNAP_AST.includes(a.type) || a.pub || !a.alt || RES().some(q => fitQ(q, a.alt))) return; // no reserved area for this level: add the nearest one that has it
+  t.airspace.forEach(a => { if (cusLocked() || manualRes() || !SNAP_AST.includes(a.type) || a.pub || !a.alt || RES().some(q => fitQ(q, a.alt))) return; // no reserved area for this level: add the nearest one that has it
     const c = LIB().filter(q => q.type !== 'P' && q.type !== 'COR' && (q.type !== 'IND' || a.type === 'ORBIT') && fitQ(q, a.alt)).map(q => [q, dist(a.pts[0], centroid(q.poly))]).filter(x => x[1] < 250).sort((x, y) => x[1] - y[1])[0];
     if (c) S.reserved = fixConfigs([...new Set([...(S.reserved || []), c[0].id])]); });
   t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
@@ -1196,7 +1182,8 @@ function defaultBases(th = theatre()) {
 function generateGeneric() {
   const th = theatre();
   defaultBases(th);
-  if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length) S.reserved = autoReserve();
+  if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length && S.resMode !== 'manual') S.reserved = autoReserve();
+  if (S.resMode === 'manual' && !(S.reserved || []).length && !cusLocked()) toast('Nessuna area riservata selezionata: selezionale nella lista e usa "Riporta tutto dentro le zone"');
   if (cusLocked()) S.reserved = cusLocked().map(c => c.id);
   S.cor = autoCor();
   S.meta.bullseye = nearestBull().name;
@@ -1348,8 +1335,8 @@ function generateElements(flights) {
   if (S.cats.includes('SHORAD')) { const n = { EASY: 1, MEDIUM: 2, HARD: 3 }[D]; for (let i = 0; i < n; i++) T(i % 2 ? 'AAA' : 'MANPADS', zc('SHORAD', 0.8)); }
   // Support airspace
   const usedT = new Set(), useZ = t => trkZones(t).forEach(z => { S.reserved = S.reserved || []; if (!S.reserved.includes(z.id)) S.reserved.push(z.id); });
-  const corUse = {}, corTrack = () => { if (cusLocked()) return null; // AIP air refuelling corridor nearest the front: a 50 NM segment of its axis at its (upper) block
-    const cs = LIB().filter(z => z.type === 'AAR' && (z.axis || []).length > 1).map(z => { const pts = []; z.axis.forEach((p, k) => { if (!k) return; const a = z.axis[k - 1], d = dist(a, p), n = Math.max(1, Math.round(d / 2)); for (let j = 0; j <= n; j++) pts.push(dest(a, bearing(a, p), d * j / n)); });
+  const corUse = {}, corTrack = () => { if (cusLocked()) return null; const man = manualRes(); // AIP air refuelling corridor nearest the front: a 50 NM segment of its axis at its (upper) block
+    const cs = LIB().filter(z => z.type === 'AAR' && (z.axis || []).length > 1 && (!man || (S.reserved || []).includes(z.id))).map(z => { const pts = []; z.axis.forEach((p, k) => { if (!k) return; const a = z.axis[k - 1], d = dist(a, p), n = Math.max(1, Math.round(d / 2)); for (let j = 0; j <= n; j++) pts.push(dest(a, bearing(a, p), d * j / n)); });
       let bi = 0, bd = Infinity; pts.forEach((p, k) => { const d = dist(g.front, p); if (d < bd) { bd = d; bi = k; } }); return { z, pts, bi, bd }; }).filter(c => c.bd < 350).sort((a, b) => ((corUse[a.z.id] || 0) - (corUse[b.z.id] || 0)) || (a.bd - b.bd));
     if (!cs.length) return null; const c = cs[0], n = (corUse[c.z.id] || 0) + 1, half = 23, shift = (n - 1) * 50;
     let i0 = Math.max(0, Math.min(c.pts.length - 1, c.bi - half + shift)), i1 = Math.max(0, Math.min(c.pts.length - 1, c.bi + half + shift)); if (i1 - i0 < 10) { i0 = Math.max(0, i1 - 2 * half); }
@@ -2146,6 +2133,7 @@ function renderAIB() {
 
 // ===================== Custom areas (combined published areas / drawn / around the threats) and NOTAM =====================
 const CUS = () => S.custom || [];
+const manualRes = () => S.resMode === 'manual' && !cusLocked() && RES().length ? RES() : null; // staff-selected areas: never changed by the generator
 const cusLocked = () => { const c = (S.custom || []).filter(x => x.poly && x.poly.length > 2); return S.cusLock && c.length ? c : null; }; // "everything inside the custom areas"
 const cusNum = () => { const used = new Set(CUS().map(c => c.code)); for (const w of NATO) if (!used.has(w)) return w; return 'X' + (CUS().length + 1); };
 function hullPts(pts) { // convex hull (monotone chain) on [lat, lon]
@@ -2220,14 +2208,12 @@ function cusFromScenario(marginKm = 5) { // one polygon around the whole scenari
 function cusFinishDraw() { const d = S.cusDraft || []; if (d.length < 3) return null; S.cusDraft = []; ADDMODE = ''; return cusAdd(cusMake('draw', d.map(roundMin))); }
 function cusHtml() {
   const o = (v, l) => l.map(([k, t]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${t}</option>`).join('');
-  return `<div class="card" style="margin-top:10px"><b>Aree custom</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Aree non pubblicate create per l'evento: entrano nelle aree riservate e nel NOTAM (con i vertici lat/long se non sono pubblicate).</p>
+  return `<div class="card" style="margin-top:10px"><b>Aree custom (non pubblicate)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Aree create per l'evento, in aggiunta a quelle AIP della lista: disegnale sulla mappa, falle racchiudere tutto lo scenario oppure unisci le aree selezionate qui sopra. Entrano nelle aree riservate e nel NOTAM con i vertici lat/long.</p>
   ${CUS().length ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;margin:4px 0 8px"><input type="checkbox" id="cuslock" style="width:auto" ${S.cusLock ? 'checked' : ''}> Tutta l'esercitazione dentro le aree custom (vale alla prossima generazione / adattamento)</label>` : ''}
   ${CUS().map(c => `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px"><div><label>${c.kind === 'combo' ? 'Combinata' : c.kind === 'draw' ? 'Disegnata' : 'Tutto lo scenario'}</label><input data-cus="${c.id}" data-cf="name" value="${esc(c.name)}"></div>
     <div style="max-width:90px"><label>Tipo</label><select data-cus="${c.id}" data-cf="type">${o(c.type, [['TSA', 'TSA'], ['TRA', 'TRA'], ['R', 'R'], ['D', 'D']])}</select></div>
     <div style="max-width:120px"><label>Limite inf.</label><input data-cus="${c.id}" data-cf="lower" value="${esc(c.lower)}"></div><div style="max-width:120px"><label>Limite sup.</label><input data-cus="${c.id}" data-cf="upper" value="${esc(c.upper)}"></div>
     <button class="b sm shrink" data-cusdel="${c.id}">Elimina</button></div>${c.kind === 'combo' && !c.joined ? '<div class="warn" style="font-size:12px">Le aree scelte non sono adiacenti: il perimetro mostrato è l\'inviluppo convesso; il NOTAM elenca le singole aree.</div>' : ''}`).join('')}
-  <div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:6px"><div style="min-width:240px"><label>Combina aree esistenti (Ctrl/⌘ per sceglierne più di una)</label><select id="cusparts" multiple size="5">${nearZones().filter(z => !z.custom).slice(0, 80).map(z => `<option value="${esc(z.id)}">${esc(z.name)} (${esc(z.lower)}-${esc(z.upper)})</option>`).join('')}</select></div>
-    <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Crea area combinata</button></div>
   <div class="row" style="flex-wrap:wrap;margin-top:6px">${ADDMODE === 'cus:draw' ? `<span class="muted" style="font-size:12px">Clic sulla mappa per i vertici (${(S.cusDraft || []).length})</span><button class="b sm shrink primary" id="cusclose">Chiudi area</button><button class="b sm shrink" id="cuscancel">Annulla</button>` : '<button class="b sm shrink" id="cusdraw">Disegna sulla mappa</button>'}
     <button class="b sm shrink" id="cusscen" ${GEN() ? '' : 'disabled'}>Area che contiene tutto lo scenario</button></div></div>`;
 }
@@ -2550,13 +2536,19 @@ function aspIssuesHtml() {
 }
 function aspCard() {
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
-  const src = !a ? 'nessuna' : a.source === 'aip' ? 'AIP Italia ENR 5.1.2 (zone R militari)' : a.source === 'demo' ? 'DEMO (zone fittizie)' : a.source === 'api' ? 'API database' : 'file importato';
+  const src = !a || a.source === 'none' || a.source === 'demo' ? 'nessuna (file AIP non caricato)' : a.source === 'aip' ? 'AIP Italia – aree militari (ENR 5 e SUP)' : a.source === 'api' ? 'API database' : 'file importato';
   return `<h2>Spazio aereo riservato</h2>
   <p class="muted">Zone R / D / TSA / TRA dal database della divisione: tutta la missione deve restare dentro quelle selezionate (deconflittazione con il traffico civile).</p>
   <div class="card"><div class="muted" style="font-size:12px">Fonte: <b>${src}</b> · ${LIB().length} zone · ${((a && a.freqs) || []).length} frequenze · ${BUL().length} bullseye · ${TRK().filter(t => t.kind === 'AAR').length} track AAR · ${TRK().filter(t => t.kind === 'AEW').length} track AEW${a ? ' · ' + new Date(a.loaded).toLocaleString() : ''}</div>
-  <div class="row" style="margin-top:6px;flex-wrap:wrap">${AIPDATA ? '<button class="b sm shrink" id="aspaip">Zone AIP</button>' : ''}<button class="b sm shrink" id="aspdemo">Dati DEMO</button><label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label><button class="b sm shrink" id="aspauto">Seleziona zone nell'area</button></div>
+  <div class="row" style="margin-top:6px;flex-wrap:wrap">${AIPDATA && S.asp && S.asp.source !== 'aip' ? '<button class="b sm shrink" id="aspaip">Torna alle zone AIP</button>' : ''}<label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label></div>
   <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div>
-  ${near.length ? `<table style="margin-top:8px"><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${near.slice(0, 40).map(z => `<tr><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${ZCOL[z.type]}"></span>${z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}
+  <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center"><span style="font-size:13px"><b>Aree riservate</b> (${RES().length} selezionate):</span>
+    <button class="b sm shrink ${S.resMode !== 'manual' ? 'primary' : ''}" id="resauto" title="Il generatore propone le aree in base a teatro ed evento">Proponile tu</button>
+    <button class="b sm shrink ${S.resMode === 'manual' ? 'primary' : ''}" id="resman" title="Selezioni tu le aree: il generatore non le cambia">Le scelgo io</button>
+    <button class="b sm shrink" id="resnone">Deseleziona tutte</button></div>
+  ${near.length ? `<div style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${near.filter(z => res.has(z.id)).concat(near.filter(z => !res.has(z.id)).slice(0, 40)).map(z => `<tr><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${ZCOL[z.type]}"></span>${z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table></div>
+  ${RES().filter(z => !z.custom).length >= 2 ? `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:6px"><span class="muted" style="font-size:12px;flex:1 1 220px">Unisci le aree selezionate in un'unica area custom con limiti verticali tuoi:</span>
+    <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Unisci</button></div>` : ''}` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}
   ${cusHtml()}
   ${CORS().length ? `<div style="margin-top:8px"><b style="font-size:13px">Corridoi OAT (AIP ENR 5.2.2.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Per il trasferimento fra base e aree o come "aerovia" lungo una rotta. Proposti in automatico; clic per aggiungerli o toglierli (anche sulla mappa).</p>${CORS().map(z => `<button class="b sm shrink ${(S.cor || []).includes(z.id) ? 'primary' : ''}" data-cor="${esc(z.id)}" title="${esc(corLevels(z))}">${esc(z.name.replace(/^OAT corridor /, ''))}</button>`).join(' ')}</div>` : ''}
   ${CFG().length ? `<div style="margin-top:8px"><b style="font-size:13px">Configurazioni di attivazione simultanea (AIP ENR 5.1.4)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Le zone di questi gruppi si attivano da sole o solo nelle combinazioni elencate. Una combinazione non prevista viene corretta in automatico alla generazione.</p>
@@ -2608,7 +2600,9 @@ function renderScenario() {
   <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>` : ''}
   ${step(R.threats ? 5 : 4, 'Postazioni ATC / C2', '')}
   ${c2Card()}
-  ${GEN() ? '' : `<div class="row" style="margin-top:14px"><button class="b primary" id="gen">Genera scenario</button><button class="b shrink" id="newscn">Nuovo</button></div>`}
+  ${GEN() ? '' : S.resMode ? `<div class="row" style="margin-top:14px"><button class="b primary" id="gen">Genera scenario</button><button class="b shrink" id="newscn">Nuovo</button></div><p class="muted" style="font-size:12px;margin:4px 0">Aree riservate: ${cusLocked() ? 'solo le aree custom' : S.resMode === 'manual' ? `scelte da te (${RES().length})` : 'proposte dal generatore'} – si cambia nel riquadro dello spazio aereo.</p>`
+    : `<div class="card" style="margin-top:14px"><b>Prima di generare: le aree riservate</b><p class="muted" style="margin:4px 0 8px;font-size:12px">${cusLocked() ? 'Ci sono aree custom: tutta l\'esercitazione sarà dentro di esse.' : 'Le propongo io in base a teatro ed evento, oppure usi solo quelle che hai selezionato nella lista?'}</p>
+      <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" id="genauto">Proponile tu e genera</button><button class="b shrink" id="genman">Uso le mie (${RES().length}) e genera</button><button class="b shrink" id="newscn">Nuovo</button></div></div>`}
   ${GEN() ? `
   <h2>Basi</h2>
   <label><span class="dot" style="background:var(--blue)"></span>Basi BLUE (ICAO, separati da virgola)</label><input id="bb" value="${esc(S.blueBases.join(', '))}">
@@ -2922,7 +2916,7 @@ document.addEventListener('click', e => {
   if (t.dataset.cfg) { const c = CFG().find(x => x.id === t.dataset.cfg); if (c) { const gz = new Set(CFG().filter(x => x.group === c.group).flatMap(x => x.zones)), on = activeConfigs().includes(c);
     S.reserved = (S.reserved || []).filter(z => !gz.has(z)).concat(on ? [] : c.zones); save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.cusdel) { S.custom = CUS().filter(c => c.id !== t.dataset.cusdel); if (!S.custom.length) S.cusLock = false; S.reserved = (S.reserved || []).filter(z => z !== t.dataset.cusdel); save(); renderPanel(); drawMap(); return; }
-  if (t.id === 'cuscombo') { const ids = [...document.querySelectorAll('#cusparts option')].filter(o => o.selected).map(o => o.value); if (!ids.length) return toast('Scegli una o più aree');
+  if (t.id === 'cuscombo') { const ids = RES().filter(z => !z.custom).map(z => z.id); if (ids.length < 2) return toast('Seleziona almeno due aree');
     const c = cusFromParts(ids, ($('#cuslo').value || '').trim(), ($('#cusup').value || '').trim()); toast(c ? `${c.name} creata` : 'Impossibile combinare le aree'); renderPanel(); drawMap(); return; }
   if (t.id === 'cusdraw') { ADDMODE = 'cus:draw'; S.cusDraft = []; renderPanel(); drawMap(); toast('Clic sulla mappa per aggiungere i vertici'); return; }
   if (t.id === 'cuscancel') { ADDMODE = ''; S.cusDraft = []; save(); renderPanel(); drawMap(); return; }
@@ -2953,8 +2947,12 @@ document.addEventListener('click', e => {
     case 'rfac': { const o = { ...S.factions }; S.factions = { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) }; FAC_ED = null; if (S.background) S.background = S.background.split(o.blue).join(S.factions.blue).split(o.red).join(S.factions.red); break; }
     case 'gen': generateGeneric(); return;
     case 'aspaip': defaultAirspace(); renderAll(); toast('Zone AIP caricate'); return;
-    case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
+    case 'resauto': S.resMode = 'auto'; S.reserved = autoReserve(); S.cor = autoCor(); save(); renderAll(); toast('Aree proposte dal generatore'); return;
+    case 'resman': S.resMode = 'manual'; save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
+    case 'resnone': S.resMode = 'manual'; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
+    case 'genauto': S.resMode = 'auto'; generateGeneric(); return;
+    case 'genman': S.resMode = 'manual'; generateGeneric(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
     case 'aibregen': genAIB(); if (S.t) { applyAIB(S.t); } save(); renderAll(true); toast('Scenari AIB generati'); return;
     case 'sarregen': genSAR(); if (S.t) applySAR(S.t); save(); renderAll(true); toast('Scenari SAR generati'); return;
@@ -4216,7 +4214,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, cusLocked, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, cusLocked, manualRes, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
