@@ -106,3 +106,18 @@ Il generatore non inventa più callsign ATC. Le postazioni reali arrivano dal da
 ```
 CSV: intestazione `callsign,name,frequency,type,fir`. Se `type` manca viene ricavato dal suffisso del callsign (`_APP`, `_TWR`, `_CTR`), l'ICAO dal prefisso.
 I ruoli di evento (GCI, RCC, dispatch EMS, DOS, cella soccorsi) restano callsign di esercitazione modificabili; la frequenza viene dal pool `frequencies` del database.
+
+## v1.2 – Aurora layer (temporary, removable)
+
+Until the division database is connected, the default reserved areas come from the IVAO Aurora sector file:
+
+| File | Content |
+|---|---|
+| `data/aurora_src/italy.restrict`, `data/aurora_src/italy.danger` | Original Aurora area files (R, D, TSA, TRA, AAR, AT areas) |
+| `tools/aurora_to_json.js` | Converter: `node tools/aurora_to_json.js data/aurora_src/italy.restrict data/aurora_src/italy.danger > data/aurora_zones.json` |
+| `data/aurora_zones.json` | Converted zones in the JSON format above (`source: "aurora"`, ids `AUR-…`) |
+
+* Only lateral limits: the sector file has no vertical limits, so `lower` / `upper` are `TBC` (outputs show TBC; checks never block an element on a TBC limit).
+* INDIA areas are skipped (built in with their AIP vertical limits). No frequencies come from the sector file: they stay TBD until the database or an import provides them.
+* Load order: database API / imported file (chosen by the staff) → Aurora file if present → demo data.
+* **To remove the layer**: delete `data/aurora_zones.json`, `data/aurora_src/` and `tools/aurora_to_json.js`. Nothing else changes: the app checks for the file at start-up and simply falls back. The site can serve its own data at the same API (format above).

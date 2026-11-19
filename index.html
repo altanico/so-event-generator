@@ -609,6 +609,12 @@ function demoAirspace() {
     ...['260.100', '260.700', '261.300', '262.900', '263.500', '264.100', '265.700', '266.300', '267.900', '268.500', '269.100', '270.700'].map((f, i) => F(f, 'TAC', 'Inter-flight ' + (i + 1)))];
   return { source: 'demo', loaded: new Date().toISOString(), zones, freqs };
 }
+// --- Aurora layer (removable): lateral limits of R / D / TSA / TRA areas from the IVAO Aurora sector file, in data/aurora_zones.json.
+// Deleting that file (and data/aurora_src/) removes the layer: the app then uses the database / imported file / demo data.
+let AURORA = null;
+async function loadAurora() { try { const r = await fetch('data/aurora_zones.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json(); const d = parseAirspace(j); if (d.zones.length) AURORA = { ...d, label: j.source || 'Aurora' }; } catch (e) { } }
+const baseAsp = () => !S.asp || ['demo', 'aurora'].includes(S.asp.source);
+function defaultAirspace() { if (AURORA) setAirspace({ zones: AURORA.zones, freqs: [] }, 'aurora', { label: AURORA.label }); else setAirspace(demoAirspace(), 'demo'); }
 function parseAirspace(json) { // {zones|areas, frequencies|freqs} or a GeoJSON FeatureCollection
   const zones = [], freqs = [];
   const toPoly = g => {
@@ -648,7 +654,9 @@ const pbox = poly => [Math.min(...poly.map(p => p[0])), Math.max(...poly.map(p =
 const LIB = () => { const z = (S.asp && S.asp.zones) || []; if (!S.asp) return z; const k = new Set(z.flatMap(q => [normK(q.id), normK(q.name)])); return z.concat(BUILTIN_ZONES.filter(q => !k.has(normK(q.id)) && !k.has(normK(q.name)))); };
 const RES = () => LIB().filter(z => (S.reserved || []).includes(z.id));
 const nearZones = (km = 320) => { const c = theatre().red.center; return LIB().filter(z => dist(c, centroid(z.poly)) < km).sort((a, b) => dist(c, centroid(a.poly)) - dist(c, centroid(b.poly))); };
-function autoReserve() { const g = geom(); return LIB().filter(z => z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < 140)).map(z => z.id); }
+const zArea = poly => { const c = centroid(poly), k = Math.cos(c[0] * Math.PI / 180) * 111.32; let a = 0; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) a += (poly[j][1] * k) * (poly[i][0] * 110.57) - (poly[i][1] * k) * (poly[j][0] * 110.57); return Math.abs(a / 2); };
+function autoReserve() { const g = geom(), real = S.asp && S.asp.source !== 'demo';
+  return LIB().filter(z => z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || zArea(z.poly) >= 40) && (pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < (real ? 60 : 140))).map(z => z.id); }
 const inRes = p => { const r = RES(); return !r.length || r.some(z => pip(p, z.poly)); };
 const zoneAt = p => RES().find(z => pip(p, z.poly));
 function sampleRes(center, rKm) {
@@ -656,8 +664,10 @@ function sampleRes(center, rKm) {
   for (let i = 0; i < 300; i++) { const p = randIn(center, rKm); if (inRes(p)) return p; }
   return snapRes(center);
 }
-function snapRes(p) {
-  const r = RES(); if (!r.length || inRes(p)) return p;
+function snapRes(p, alt) {
+  const fit = q => { const a = flRange(alt); return !a || (a[1] <= zLimit(q.upper) && !(a[0] < zLo(q.lower) && zLo(q.lower) > 0)); };
+  let r = RES(); if (alt) { const f = r.filter(fit); if (f.length) r = f; }
+  if (!r.length || r.some(z => pip(p, z.poly))) return p;
   let best = null, bd = Infinity;
   for (const z of r) { const b = pbox(z.poly); for (let i = 0; i < 300; i++) { const q = [b[0] + Math.random() * (b[1] - b[0]), b[2] + Math.random() * (b[3] - b[2])]; if (!pip(q, z.poly)) continue; const d = dist(p, q); if (d < bd) { bd = d; best = q; } } }
   return best ? [+best[0].toFixed(5), +best[1].toFixed(5)] : p;
@@ -667,27 +677,32 @@ function flRange(s) { s = String(s || '').toUpperCase(); if (!s || s === '-') re
   if (!v.length) for (const m of s.matchAll(/(\d{3,5})\s?FT/g)) v.push(+m[1] / 100);
   if (/^\s*</.test(s) && v.length) return [0, Math.max(...v)];
   return v.length ? [Math.min(...v), Math.max(...v)] : null; }
-const zLimit = s => { const r = flRange(s); return r ? (/UNL/.test(String(s).toUpperCase()) ? 999 : r[1]) : 0; };
+const zLo = s => /TBC|TBD/i.test(String(s)) ? 0 : zLimit(s); // unknown vertical limits (sector file data) never block an element
+const zLimit = s => { if (/TBC|TBD/i.test(String(s))) return 999; const r = flRange(s); return r ? (/UNL/.test(String(s).toUpperCase()) ? 999 : r[1]) : 0; };
 function containmentIssues() {
   if (!RES().length) return null;
   const out = [], chk = (label, p, alt) => {
-    const z = zoneAt(p); if (!z) { out.push(`${label}: fuori dalle zone riservate`); return; }
+    const zs = RES().filter(q => pip(p, q.poly)); if (!zs.length) { out.push(`${label}: fuori dalle zone riservate`); return; }
     const a = flRange(alt); if (!a) return;
+    const fits = q => a[1] <= zLimit(q.upper) && !(a[0] < zLo(q.lower) && zLo(q.lower) > 0); // overlapping areas: one that contains the altitude is enough
+    if (zs.some(fits)) return; const z = zs[0];
     if (a[1] > zLimit(z.upper)) out.push(`${label}: quota ${alt} oltre il limite superiore di ${z.name} (${z.upper})`);
-    if (a[0] < zLimit(z.lower) && zLimit(z.lower) > 0) out.push(`${label}: quota ${alt} sotto il limite inferiore di ${z.name} (${z.lower})`);
+    if (a[0] < zLo(z.lower) && zLo(z.lower) > 0) out.push(`${label}: quota ${alt} sotto il limite inferiore di ${z.name} (${z.lower})`);
   };
   S.zones.forEach(z => chk(`Zona ${z.name}`, z.center));
   if (S.t) {
     S.t.threats.forEach(x => chk(`${x.id} ${x.name}`, x.pos));
-    S.t.objectives.filter(o => o.type !== 'ALIFT').forEach(o => chk(`${o.id} ${o.name}`, o.pos));
+    S.t.objectives.filter(o => o.type !== 'ALIFT' && o.type !== 'WATER').forEach(o => chk(`${o.id} ${o.name}`, o.pos));
     S.t.airspace.filter(a => SNAP_AST.includes(a.type) && !a.pub).forEach(a => a.pts.forEach((p, i) => chk(`${a.name}${a.pts.length > 1 ? ' #' + (i + 1) : ''}`, p, a.alt)));
   }
   return out;
 }
+function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area whose vertical limits contain their altitude
+  if (!t || !RES().length) return; t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub && a.alt) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
 function snapAll() {
   S.zones.forEach(z => z.center = snapRes(z.center));
-  if (S.t) { S.t.threats.forEach(x => x.pos = snapRes(x.pos)); S.t.objectives.forEach(o => { if (o.type !== 'ALIFT') o.pos = snapRes(o.pos); });
-    S.t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub) a.pts = a.pts.map(snapRes); }); }
+  if (S.t) { S.t.threats.forEach(x => x.pos = snapRes(x.pos)); S.t.objectives.forEach(o => { if (o.type !== 'ALIFT' && o.type !== 'WATER') o.pos = snapRes(o.pos); });
+    S.t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
   save();
 }
 // ---- frequencies ----
@@ -1125,7 +1140,7 @@ function defaultBases(th = theatre()) {
 function generateGeneric() {
   const th = theatre();
   defaultBases(th);
-  if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else if (!(S.reserved || []).length) S.reserved = autoReserve();
+  if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length) S.reserved = autoReserve();
   S.meta.bullseye = nearestBull().name;
   if (!S.c2sel) S.c2sel = proposeC2();
   S.gen = true; S.zones = genZones(); S.background = genBackground(); S.t = null;
@@ -2074,7 +2089,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); fitAirspace(S.t);
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -2083,7 +2098,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); fitAirspace(S.t);
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -2332,11 +2347,11 @@ function aspIssuesHtml() {
 }
 function aspCard() {
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
-  const src = !a ? 'nessuna' : a.source === 'demo' ? 'DEMO (zone fittizie)' : a.source === 'api' ? 'API database' : 'file importato';
+  const src = !a ? 'nessuna' : a.source === 'aurora' ? 'Aurora (sectorfile IVAO, solo limiti laterali)' : a.source === 'demo' ? 'DEMO (zone fittizie)' : a.source === 'api' ? 'API database' : 'file importato';
   return `<h2>Spazio aereo riservato</h2>
   <p class="muted">Zone R / D / TSA / TRA dal database della divisione: tutta la missione deve restare dentro quelle selezionate (deconflittazione con il traffico civile).</p>
   <div class="card"><div class="muted" style="font-size:12px">Fonte: <b>${src}</b> · ${LIB().length} zone · ${((a && a.freqs) || []).length} frequenze · ${BUL().length} bullseye · ${TRK().filter(t => t.kind === 'AAR').length} track AAR · ${TRK().filter(t => t.kind === 'AEW').length} track AEW${a ? ' · ' + new Date(a.loaded).toLocaleString() : ''}</div>
-  <div class="row" style="margin-top:6px;flex-wrap:wrap"><button class="b sm shrink" id="aspdemo">Dati DEMO</button><label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label><button class="b sm shrink" id="aspauto">Seleziona zone nell'area</button></div>
+  <div class="row" style="margin-top:6px;flex-wrap:wrap">${AURORA ? '<button class="b sm shrink" id="aspaur">Aree Aurora</button>' : ''}<button class="b sm shrink" id="aspdemo">Dati DEMO</button><label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label><button class="b sm shrink" id="aspauto">Seleziona zone nell'area</button></div>
   <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div>
   ${near.length ? `<table style="margin-top:8px"><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${near.slice(0, 40).map(z => `<tr><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${ZCOL[z.type]}"></span>${z.type}</td><td>${esc(z.name)}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}
   ${GEN() ? aspIssuesHtml() : ''}</div>`;
@@ -2673,7 +2688,7 @@ document.addEventListener('change', e => {
   if (t.dataset.map !== undefined && CSV_PENDING) { CSV_PENDING.map[+t.dataset.map] = t.value; return; }
   const id = t.id;
   if (id === 'op') S.meta.op = t.value;
-  if (id === 'theatre') { S.meta.theatre = t.value; defaultBases(); S.c2sel = null; if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name; if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (id === 'theatre') { S.meta.theatre = t.value; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name; if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (id === 'bull') { S.meta.bullseye = t.value.toUpperCase();
     if (S.t) { const el = S.t.airspace.find(a => a.type === 'BULLSEYE'); if (el) { el.name = `BULLSEYE ${S.meta.bullseye}`; el.pts = [bullPos()]; }
       if (S.t.spins && S.t.spins[0]) S.t.spins[0] = `Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}${(bullOf(S.meta.bullseye) || {}).ref ? ' (' + bullOf(S.meta.bullseye).ref + ')' : ''}. Threat calls in BULLSEYE format.`; } }
@@ -2711,9 +2726,10 @@ document.addEventListener('click', e => {
   const v = id => ($('#' + id) || {}).value || '';
   switch (t.id) {
     case 'rop': S.meta.op = 'OPERATION ' + pick(OP_A) + ' ' + pick(OP_B); break;
-    case 'rth': { S.meta.theatre = pick(THEATRES).id; defaultBases(); S.c2sel = null; if (!S.asp || S.asp.source === 'demo') setAirspace(demoAirspace(), 'demo'); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+    case 'rth': { S.meta.theatre = pick(THEATRES).id; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
     case 'rfac': { const o = { ...S.factions }; S.factions = { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) }; FAC_ED = null; if (S.background) S.background = S.background.split(o.blue).join(S.factions.blue).split(o.red).join(S.factions.red); break; }
     case 'gen': generateGeneric(); return;
+    case 'aspaur': defaultAirspace(); renderAll(); toast('Aree Aurora caricate'); return;
     case 'aspdemo': setAirspace(demoAirspace(), 'demo'); renderAll(); toast('Zone e frequenze DEMO caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
@@ -3967,9 +3983,9 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
-loadLand();
+loadLand(); loadAurora().then(() => renderAll());
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, AUR: () => AURORA, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

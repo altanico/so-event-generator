@@ -1,6 +1,6 @@
 {
   "name": "so-event-generator",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "description": "IVAO Italy Special Operations – training event and mission generator (single-page app)",
   "scripts": {
