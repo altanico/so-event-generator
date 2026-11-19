@@ -676,9 +676,9 @@ const zArea = poly => { const c = centroid(poly), k = Math.cos(c[0] * Math.PI / 
 function autoReserve() { return fixConfigs(autoReserve0()); }
 function autoReserve0() { const g = geom(), real = S.asp && S.asp.source !== 'demo';
   if (real && S.asp.source === 'aip' && PROF().civil) return []; // AIP layer = military areas only: civil events do not use them
-  const T = new Set(reqTasks()), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : [])]);
+  const T = new Set(reqTasks()), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : []), ...(T.has('LOWNAV') ? ['LOWLEVEL'] : [])]);
   return LIB().filter(z => z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || zArea(z.poly) >= 40 || (z.use || []).some(u => want.has(u)))
-    && (pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < (real ? 60 : 140) || (real && (z.use || []).some(u => want.has(u)) && dist(g.front, centroid(z.poly)) < 150))).map(z => z.id); }
+    && (pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < (real ? 60 : 140) || (real && (z.use || []).some(u => want.has(u)) && dist(g.front, centroid(z.poly)) < ((z.use || []).includes('LOWLEVEL') ? 220 : 150)))).map(z => z.id); }
 const inRes = p => { const r = RES(); return !r.length || r.some(z => pip(p, z.poly)); };
 const zoneAt = p => RES().find(z => pip(p, z.poly));
 function sampleRes(center, rKm) {
@@ -727,7 +727,7 @@ function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area
   t.airspace.forEach(a => { if (!SNAP_AST.includes(a.type) || a.pub || !a.alt || RES().some(q => fitQ(q, a.alt))) return; // no reserved area for this level: add the nearest one that has it
     const c = LIB().filter(q => q.type !== 'P' && (q.type !== 'IND' || a.type === 'ORBIT') && fitQ(q, a.alt)).map(q => [q, dist(a.pts[0], centroid(q.poly))]).filter(x => x[1] < 250).sort((x, y) => x[1] - y[1])[0];
     if (c) S.reserved = fixConfigs([...new Set([...(S.reserved || []), c[0].id])]); });
-  t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub && a.alt) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
+  t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
 function snapAll() {
   S.zones.forEach(z => z.center = snapRes(z.center));
   if (S.t) { S.t.threats.forEach(x => x.pos = snapRes(x.pos)); S.t.objectives.forEach(o => { if (o.type !== 'ALIFT' && o.type !== 'WATER') o.pos = snapRes(o.pos); });
@@ -929,16 +929,19 @@ const SYL = ['KO', 'RA', 'MI', 'TU', 'LE', 'SO', 'VA', 'NI', 'DE', 'PO', 'GA', '
 const synthName = used => { let n; do { n = pick(SYL) + pick(SYL) + pick(['N', 'R', 'S', 'T', 'L']); } while (used.has(n)); used.add(n); return n; };
 function inReserved(p) { const R = RES(); return R.length ? R.some(z => z.poly && pip(p, z.poly)) : dist(p, geom().front) < 120; }
 // route of n reference points chained between 8 and 70 km, all inside the reserved areas
-function routePoints(n, st, prefer) {
-  const g = geom(); st.used = st.used || new Set(); st.syn = st.syn || 0;
-  let pool = pointsAll().filter(x => !/APT/.test(x[1]) || POINTS.items.length === 0).filter(x => inReserved([x[2], x[3]]));
+function routePoints(n, st, prefer, zs) { // zs: keep the route inside these areas (e.g. very low level tactical areas)
+  const g = geom(); st.used = st.used || new Set(); st.syn = st.syn || 0; zs = (zs || []).filter(z => z.poly);
+  const inZ = p => zs.length ? zs.some(z => pip(p, z.poly)) : inReserved(p);
+  const inside = (base, rKm) => { const z = zs.slice().sort((a, b) => dist(base, centroid(a.poly)) - dist(base, centroid(b.poly)))[0], b = pbox(z.poly);
+    for (let i = 0; i < 400; i++) { const q = [b[0] + Math.random() * (b[1] - b[0]), b[2] + Math.random() * (b[3] - b[2])]; if (pip(q, z.poly) && (i > 200 || dist(base, q) <= rKm)) return q; } return centroid(z.poly); };
+  let pool = pointsAll().filter(x => !/APT/.test(x[1]) || POINTS.items.length === 0).filter(x => inZ([x[2], x[3]]));
   if (prefer) { const pf = pool.filter(x => prefer.test(x[1])); if (pf.length >= n) pool = pf; }
   const out = []; let cur = null;
   for (let i = 0; i < n; i++) {
     let c = pool.filter(x => !st.used.has(x[0]) && !out.some(o => o.name === x[0]));
     if (cur) { const near = c.filter(x => { const d = dist(cur.pos, [x[2], x[3]]); return d >= 8 && d <= 70; }); if (near.length) c = near; else c = []; }
     if (c.length) { const x = pick(c); cur = { name: x[0], pos: [x[2], x[3]], type: x[1] }; }
-    else { const base = cur ? cur.pos : g.front; const p = snapRes(cur ? dest(base, Math.random() * 360, 15 + Math.random() * 30) : sampleRes(base, 35));
+    else { const base = cur ? cur.pos : g.front; const p = zs.length ? inside(base, cur ? 40 : 1e4) : snapRes(cur ? dest(base, Math.random() * 360, 15 + Math.random() * 30) : sampleRes(base, 35));
       cur = { name: synthName(st.used), pos: p, type: 'WPT', syn: true }; st.syn++; }
     st.used.add(cur.name); out.push(cur);
   }
@@ -994,11 +997,12 @@ function genEventElements(c) {
     const app = ['ILS', 'RNAV (GNSS)', 'VOR', 'NDB'][Math.min(3, lvl + (i % 2))], arr = (S.blueBases.filter(b => b !== fl.base)[0]) || fl.base;
     SR('NAV', `${fl.cs} – IFR route`, [fl], `${fl.base || 'Departure'} → ${rp.map(x => x.name).join(' → ')} (${Math.round(routeKm(rp.map(x => x.pos)) / 1.852)} NM), ${alt}. Hold at ${rp[Math.min(1, rp.length - 1)].name}, then ${app} approach at ${arr}, missed approach and second approach.`,
       'Route and level kept; ATC clearances read back; holding entered correctly; approach flown to minima.'); });
-  by('LOWNAV').forEach((fl, i) => { const n = [4, 5, 6][lvl], rp = routePoints(n, st, /VFR|FIX|VOR|NDB/);
+  const lowZ = RES().filter(z => (z.use || []).includes('LOWLEVEL')); // AIP ENR 5.2.2.6 tactical areas: not reserved, permeable to other traffic
+  by('LOWNAV').forEach((fl, i) => { const n = [4, 5, 6][lvl], zs = lowZ.length ? [lowZ.slice().sort((a, b) => dist(g.front, centroid(a.poly)) - dist(g.front, centroid(b.poly)))[i % lowZ.length]] : null, rp = routePoints(n, st, /VFR|FIX|VOR|NDB/, zs);
     synAll += rp.filter(x => x.syn).length;
-    const tot = 15 + 5 * i;
-    A('ROUTE', `Low-level route ${fl.cs}`, rp.map(x => x.pos), { flight: fl.id, alt: '500-1000 ft AGL', names: rp.map(x => x.name), kind: 'LOW' });
-    SR('LOWNAV', `${fl.cs} – low-level route`, [fl], `${rp.map(x => x.name).join(' → ')} (${Math.round(routeKm(rp.map(x => x.pos)) / 1.852)} NM), 500–1000 ft AGL. Time over ${rp[rp.length - 1].name}: H+${tot}. ${['Heading and speed given for each leg.', 'Leg times given, speed to be adjusted.', 'Only the waypoints and the TOT are given.'][lvl]}`,
+    const tot = 15 + 5 * i, heli = fl.cat === 'HELO', band = zs ? (heli ? '150-500 ft AGL' : '500-1000 ft AGL') : '500-1000 ft AGL';
+    A('ROUTE', `Low-level route ${fl.cs}`, rp.map(x => x.pos), { flight: fl.id, alt: band, names: rp.map(x => x.name), kind: 'LOW' });
+    SR('LOWNAV', `${fl.cs} – low-level route`, [fl], `${zs ? `Inside ${zs[0].name} (AIP ENR 5.2.2.6 tactical area – not a reserved area: other traffic may be present, keep a good lookout; stay outside class A-E airspace, ATZ and aerodrome circuits unless cleared). ` : ''}${rp.map(x => x.name).join(' → ')} (${Math.round(routeKm(rp.map(x => x.pos)) / 1.852)} NM), ${band.replace('-', '–')}. Time over ${rp[rp.length - 1].name}: H+${tot}. ${['Heading and speed given for each leg.', 'Leg times given, speed to be adjusted.', 'Only the waypoints and the TOT are given.'][lvl]}`,
       'Route flown inside the area; height respected; TOT met within ±1 minute.'); });
   if (synAll) warnings.push(`Rotte di navigazione: ${synAll} punti sono sintetici (nessun punto del sectorfile dentro le zone riservate). Importa il sectorfile per usare i punti reali.`);
   // --- civil: SAR ---

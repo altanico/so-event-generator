@@ -107,6 +107,12 @@ for c in COR:
       'blocks':c['blocks'],'axis':ax,'activity':'Air refuelling corridor for military aircraft','use':['AAR'],'hours':'','amc':False,
       'notes':f"Air refuelling corridor. Route: {c['route']}{'; width '+str(c['width'])+' NM' if c['width'] else ''}. Levels: {lv}. {c['notes']} Source: AIP Italia ENR 5.2.2.1 (AIRAC 20 MAR 2025); lateral limits: {c['lat']}.",
       'source':'aip','section':'ENR 5.2.2.1','poly':poly})
+# Very low level tactical areas (ENR 5.2.2.6): not reserved areas – permeable to other traffic – used as D areas for low-level navigation
+LOW=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','low_level_areas.json')))
+for a in LOW:
+  zones.append({'id':'LI-AT'+a['name'].replace(' ',''),'name':'AT '+a['name'],'type':'D','lower':'500 FT AGL','upper':'TBC','activity':'Very low level military aircraft activity – tactical area','use':['LOWLEVEL'],'hours':'MON-FRI 0600-2200 (0500-2100) over land and within 3 NM of the coast; H24 beyond 3 NM','amc':False,
+    'notes':'Tactical area for very low level military flying: minimum 500 ft AGL for fixed wing (1000 ft AGL elsewhere, 2000 ft AGL over the Alps), 150 ft AGL for helicopters. Not a reserved area: other traffic may be present (handled as a danger area). MON-FRI except holidays, 0600-2200 (0500-2100). Stay outside class A-E airspace, ATZ and aerodrome circuits unless cleared. Source: AIP Italia ENR 5.2.2.6 (AIRAC 30 NOV 2023).',
+    'source':'aip','section':'ENR 5.2.2.6','poly':a['poly']})
 CONF=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','tsa_configs.json')))
 json.dump({'source':'AIP Italia ENR 5.1.2 / 5.1.3 / 5.1.4 – military areas only','sections':{sec:air for _,sec,air in INPUTS},'zones':zones,'configs':CONF},open(OUT,'w'),ensure_ascii=False,separators=(',',':'))
 print(len(zones),'zones;',len(skipped),'skipped'); print('\n'.join('  - '+s for s in skipped))
