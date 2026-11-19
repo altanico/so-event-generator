@@ -31,6 +31,7 @@
 - AAR corridors (ENR 5.2.2.1) added; route points BULAR, TIVUK, SUBOK, RONAB, ADUKA, TRP/SIG TACAN, ELB VORTAC: lateral limits taken from Aurora – replace with ENR 4.4 / 4.1 coordinates if available.
 
 ## Assumptions to verify
+- NOTAM: series W, first number 1001, validity H-30 to H+240 min, Q-codes QRRCA (R) / QRDCA (D) / QRTCA (TSA, TRA, custom, corridors), scope IV/BO/W – all editable or to confirm with the staff.
 - INDIA areas (AIP): levels read as the AEW operating levels – INDIA 2 FL310, INDIA 5 FL310 or above, INDIA 6 FL310 or FL290 (no published track), INDIA 7/8/9 FL290.
 - AIB (v1.1): S-64 and other civil-operated types use registration + BAT (the manual gives CAN only for the CL-415); CL-415 numbers start at CAN 15; registrations are random I-XXXX; default separation (fixed wing 1500-2000 ft AGL at the entry point, helicopters below 1000 ft AGL) and phraseology examples are ours, since annex "M" is not in the manual; scooping lakes from a built-in list (approximate centres), sea scooping from the coastline; locality / municipality / province / elevation filled by the staff (no gazetteer / DEM).
 - Fixed: land/sea test (`onLand`) never worked with the loaded coastline rings (also affected civil SAR placement).
