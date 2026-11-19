@@ -117,15 +117,17 @@ for a in LOW:
 def dm(v,lon=False):
   v=str(v).zfill(7 if lon else 6); d=int(v[:3] if lon else v[:2]); r=v[3:] if lon else v[2:]; return d+int(r[:2])/60+int(r[2:4])/3600
 def bufline(pts,half_nm):
+  # corridor outline: full half-width on both sides (mitred at the bends), flat ends cut perpendicular to the axis at the first / last point
+  import math
   w=half_nm*1.852; L=[];R=[]
   for i,p in enumerate(pts):
-    if i==0: b=brg(p,pts[1])
-    elif i==len(pts)-1: b=brg(pts[i-1],p)
+    if i==0: b=brg(p,pts[1]); k=w
+    elif i==len(pts)-1: b=brg(pts[i-1],p); k=w
     else:
-      b1=brg(pts[i-1],p); b2=brg(p,pts[i+1]); b=(b1+((b2-b1+540)%360-180)/2)%360
-    L.append(dest(p,b-90,w)); R.append(dest(p,b+90,w))
-  # round ends
-  return L+[dest(pts[-1],brg(pts[-2],pts[-1]),w)]+R[::-1]+[dest(pts[0],brg(pts[1],pts[0]),w)]
+      b1=brg(pts[i-1],p); b2=brg(p,pts[i+1]); d=(b2-b1+540)%360-180; b=(b1+d/2)%360
+      k=min(w/max(math.cos(math.radians(d/2)),1e-6),3*w)
+    L.append(dest(p,b-90,k)); R.append(dest(p,b+90,k))
+  return L+R[::-1]
 OATC=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','oat_corridors.json')))
 for c in OATC:
   pts=[[dm(a),dm(b,True)] for _,a,b in c['pts']]

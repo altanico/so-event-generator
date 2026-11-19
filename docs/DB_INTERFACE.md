@@ -161,3 +161,13 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## Hand-drawn theatre (v1.15)
 
 * `S.meta.theatre = 'CUSTOM'` with `S.thCustom` = { id, custom, poly, name, fir, region, view, red: {center, r, bases}, blue, sea, outside }, the same fields as a preset theatre. FIR and sea point come from the nearest preset theatre; on the site the FIR can come from the database instead.
+
+## v1.17 additions
+
+* Level band: `S.meta.levels = [bottom, upper]` (FL, 600 = UNL). Areas overlapping it (touching only = no) are listed / drawn / proposed.
+* Theatres: `main` = main BLUE base for military events (NE LIPS, NO LIPL, PU LIBV).
+* Event variants: `S.variants = { EVT: { group: [choices] } }` (see `VARIANTS`).
+* QRA: real alert bases (`QRA_BASES`: LIPS HLxx, LIRS GAxx, LIBV HAxx/GExx, LICT GIxx, LIBA BAxx); `S.t.gci` = scrambles, injects, authentication tables, control types, blocks, kill criteria, briefing card, phraseology → GCI pack. Scramble reasons never include unlawful acts.
+* GCI / AEW positions: LIVK_CRC_CTR PIOPPO RADAR 136.200 (north), LIRO_CRC_CTR BARCA RADAR 136.250 (south), LIZZ_AEW_CTR LEGION 136.400 (Manuale Guidacaccia v5). LEGION is reserved to the AEW.
+* AAR: `S.t.aar.cards` (RV type: ALPHA with a staffed GCI, otherwise ECHO; HAAR: DELTA), boom / drogue matching (`AAR_SYS`), AAR pack. HAAR areas: D266A/B/C.
+* Tracks are drawn as holdings (left turns) from the AP/TP points; OAT corridors have flat ends (`tools/aip_build.py` bufline).

@@ -241,9 +241,9 @@ const AIRPORTS = {
 // Theatres: real Italian airspace, fictional conflict geometry. FIR labels are indicative.
 const THEATRES = [
   {id:'NE',name:'Nord-Est – Friuli / Alto Adriatico',fir:'LIMM',region:'eastern Friuli and the Gulf of Trieste',
-   view:[45.7,12.7,8],red:{center:[45.92,13.45],r:40,bases:['LIPQ']},blue:['LIPA','LIPS','LIPZ','LIPX','LIPH'],sea:[45.45,13.05],outside:[44.95,13.55]},
+   view:[45.7,12.7,8],red:{center:[45.92,13.45],r:40,bases:['LIPQ']},main:'LIPS',blue:['LIPA','LIPS','LIPZ','LIPX','LIPH'],sea:[45.45,13.05],outside:[44.95,13.55]},
   {id:'NO',name:'Nord-Ovest – Liguria / Piemonte',fir:'LIMM',region:'western Liguria and southern Piedmont',
-   view:[44.6,8.5,8],red:{center:[44.3,7.95],r:45,bases:['LIMZ','LIMG']},blue:['LIMN','LIMC','LIMS','LIPL','LIMJ'],sea:[43.85,8.7],outside:[43.35,7.9]},
+   view:[44.6,8.5,8],red:{center:[44.3,7.95],r:45,bases:['LIMZ','LIMG']},main:'LIPL',blue:['LIMN','LIMC','LIMS','LIPL','LIMJ'],sea:[43.85,8.7],outside:[43.35,7.9]},
   {id:'CT',name:'Centro – Toscana / Lazio',fir:'LIRR',region:'northern Lazio (Tuscia, around Viterbo)',
    view:[42.5,11.7,8],red:{center:[42.33,12.2],r:45,bases:['LIRV','LIRG']},blue:['LIRS','LIRP','LIRJ','LIRQ'],sea:[42.0,11.5],outside:[42.35,13.3]},
   {id:'SA',name:'Sardegna',fir:'LIRR',region:'northern Sardinia (Gallura and Sassari)',
@@ -251,7 +251,7 @@ const THEATRES = [
   {id:'SI',name:'Sicilia',fir:'LIRR',region:'eastern Sicily (Catania plain and Etna)',
    view:[37.7,13.8,8],red:{center:[37.45,14.85],r:55,bases:['LICZ','LICC']},blue:['LICT','LICJ','LICG'],sea:[37.25,15.5],outside:[36.7,16.2]},
   {id:'PU',name:'Puglia – Salento / Canale d\'Otranto',fir:'LIBB',region:'the Salento peninsula',
-   view:[40.75,17.3,8],red:{center:[40.3,18.05],r:45,bases:['LIBN','LIBR']},blue:['LIBV','LIBD','LIBA','LIBG'],sea:[40.55,18.85],outside:[40.3,19.6]},
+   view:[40.75,17.3,8],red:{center:[40.3,18.05],r:45,bases:['LIBN','LIBR']},main:'LIBV',blue:['LIBV','LIBD','LIBA','LIBG'],sea:[40.55,18.85],outside:[40.3,19.6]},
 ];
 
 const ROLES = {SEAD:'SEAD/DEAD',STRIKE:'Strike / Interdiction',CAS:'Close Air Support',DCA:'Defensive Counter Air',
@@ -259,7 +259,7 @@ const ROLES = {SEAD:'SEAD/DEAD',STRIKE:'Strike / Interdiction',CAS:'Close Air Su
   ANTISHIP:'Anti-surface warfare',CSAR:'Combat SAR',RESCORT:'Rescue escort',INSERT:'Helo insertion',
   AIRLIFT:'Airlift',AIRDROP:'Airdrop',AAR:'Air-to-air refuelling',AEW:'AEW / airborne C2',MPA:'Maritime patrol',RECCE:'Recce / ISR',
   RECEIVER:'AAR receiver',IFRNAV:'Instrument navigation',LOWNAV:'Low-level navigation',SAR:'Search and rescue (SAR)',HEMS:'HEMS (helicopter emergency medical service)',
-  MEDEVAC:'Medevac',HOSPITAL:'Hospital transfer',HUMAN:'Humanitarian airlift',AIB:'Aerial firefighting (AIB)',STANDBY:'Standby / reserve'};
+  MEDEVAC:'Medevac',HOSPITAL:'Hospital transfer',HUMAN:'Humanitarian airlift',AIB:'Aerial firefighting (AIB)',TARGET:'Intercept target (role player)',HAAR:'Helicopter AAR tanker (HAAR)',HAARRCV:'HAAR receiver (helicopter)',STANDBY:'Standby / reserve'};
 
 // [type, category, roles, aliases]  – "tipo" aircraft: any sim variant is mapped by alias
 const AC = [
@@ -281,11 +281,17 @@ const AC = [
   ['AV-8B Harrier','ATTACK',['CAS','STRIKE'],['AV8B','AV8','HARRIER']],
   ['M-346','ATTACK',['LOWSLOW','CAS'],['M346','T346','MASTER']],
   ['MB-339','ATTACK',['LOWSLOW','CAS'],['MB339','T339']],
-  ['HH-101','HELO',['CSAR','INSERT'],['HH101','AW101','EH101','CAESAR','MERLIN']],
+  ['HH-101','HELO',['CSAR','INSERT','HAARRCV'],['HH101','HH101A','AW101','EH101','CAESAR','MERLIN']],
   ['HH-139','HELO',['CSAR','INSERT'],['HH139','AW139']],
   ['NH90','HELO',['INSERT','CSAR','AIRLIFT'],['NH90','UH90','TTH90','NFH90']],
-  ['CH-47 Chinook','HELO',['INSERT','AIRLIFT'],['CH47','ICH47','CHINOOK']],
-  ['UH-60 / HH-60','HELO',['CSAR','INSERT'],['UH60','HH60','BLACKHAWK','PAVEHAWK','S70']],
+  ['CH-47 Chinook','HELO',['INSERT','AIRLIFT'],['CH47','ICH47','CHINOOK','CH47F']],
+  ['UH-60 Black Hawk','HELO',['CSAR','INSERT'],['UH60','UH60M','BLACKHAWK','S70']],
+  ['HH-60G Pave Hawk','HELO',['CSAR','INSERT','HAARRCV'],['HH60','HH60G','PAVEHAWK','MH60G']],
+  ['HH-60W Jolly Green II','HELO',['CSAR','INSERT','HAARRCV'],['HH60W','JOLLYGREEN','JOLLYGREENII']],
+  ['MH-60M Black Hawk (SOAR)','HELO',['INSERT','CSAR','HAARRCV'],['MH60M','MH60','MH60L']],
+  ['MH-47G Chinook (SOAR)','HELO',['INSERT','AIRLIFT','HAARRCV'],['MH47','MH47G','MH47E']],
+  ['CH-53E / CH-53K','HELO',['INSERT','AIRLIFT','HAARRCV'],['CH53','CH53E','CH53K','KINGSTALLION','SUPERSTALLION','MH53']],
+  ['MV-22 / CV-22 Osprey','HELO',['INSERT','AIRLIFT','HAARRCV'],['V22','MV22','CV22','OSPREY']],
   ['AW169','HELO',['INSERT','CSAR'],['AW169','UH169']],
   ['AH-129 Mangusta','HELO',['CAS','RESCORT','LOWSLOW'],['AH129','A129','MANGUSTA']],
   ['AH-64 Apache','HELO',['CAS','RESCORT','LOWSLOW'],['AH64','APACHE']],
@@ -297,7 +303,9 @@ const AC = [
   ['A330 MRTT','TANKER',['AAR','AIRLIFT'],['A330MRTT','MRTT','KC30','A332MRTT','A332']],
   ['KC-46','TANKER',['AAR'],['KC46','PEGASUS']],
   ['KC-135','TANKER',['AAR'],['KC135','STRATOTANKER']],
-  ['KC-130J','TANKER',['AAR','AIRLIFT','AIRDROP'],['KC130','KC130J']],
+  ['KC-130J','TANKER',['AAR','HAAR','AIRLIFT','AIRDROP'],['KC130','KC130J']],
+  ['HC-130J Combat King II','TANKER',['HAAR','AAR','AIRDROP'],['HC130','HC130J','COMBATKING']],
+  ['MC-130J Commando II','TANKER',['HAAR','AAR','AIRDROP','AIRLIFT'],['MC130','MC130J','COMMANDO']],
   ['E-3 Sentry','AEW',['AEW'],['E3','E3A','AWACS','SENTRY']],
   ['E-2 Hawkeye','AEW',['AEW'],['E2','E2C','E2D','HAWKEYE']],
   ['G550 CAEW','AEW',['AEW','RECCE'],['G550','CAEW','E550']],
@@ -309,7 +317,7 @@ const AC = [
   ['AS350 / H125 (light single helo)','HELO',['HEMS','AIB','SAR','HOSPITAL'],['AS350','H125','EC130','AS355','B407']],
   ['AW189 / S-92 / H175 (heavy SAR helo)','HELO',['SAR','MEDEVAC','HUMAN'],['AW189','S92','H175','H160','AW149']],
   ['Bell 412 / UH-1 (utility helo)','HELO',['AIB','HEMS','SAR','HUMAN'],['B412','B212','UH1N','AB412','UH1H','UH1']],
-  ['S-64 Skycrane / heavy firefighting helo','HELO',['AIB','HUMAN'],['S64','SKYCRANE','CH53','KA32']],
+  ['S-64 Skycrane / heavy firefighting helo','HELO',['AIB','HUMAN'],['S64','SKYCRANE','KA32']],
   ['CL-415 Canadair','WATERBOMBER',['AIB'],['CL415','CL41','CL215','CANADAIR','CL4']],
   ['AT-802 Fire Boss','WATERBOMBER',['AIB'],['AT802','AT8T','FIREBOSS','AT802F','AT8']],
   ['PC-12 / King Air (light utility)','LIGHT',['SAR','MEDEVAC','HUMAN','AIRLIFT'],['PC12','B350','BE20','BE9L','C208','DHC6','DA42','DA62','C172','SR22','P180']],
@@ -317,6 +325,13 @@ const AC = [
   ['ATR 72 / Dash 8 (regional transport)','TRANSPORT',['HUMAN','AIRLIFT','MEDEVAC'],['AT72','AT76','AT75','DH8D','DH8C','DH8A','ATR72','ATR42','AT45']],
 ].map(([type,cat,roles,aliases])=>({type,cat,roles,aliases}));
 
+// air refuelling systems: tankers BOOM / DROGUE / BOTH; receivers BOOM (receptacle) or PROBE
+const AAR_SYS = { 'KC-767': 'BOTH', 'A330 MRTT': 'BOTH', 'KC-46': 'BOTH', 'KC-135': 'BOOM', 'KC-130J': 'DROGUE', 'HC-130J Combat King II': 'DROGUE', 'MC-130J Commando II': 'DROGUE',
+  'F-35A': 'BOOM', 'F-16': 'BOOM', 'F-15E': 'BOOM', 'F-15C': 'BOOM', 'F-22': 'BOOM', 'A-10': 'BOOM', 'C-17': 'BOOM', 'E-3 Sentry': 'BOOM', 'P-8 Poseidon': 'BOOM', 'KC-46': 'BOTH',
+  'F-35B': 'PROBE', 'EF-2000 Typhoon': 'PROBE', 'Tornado ECR': 'PROBE', 'Tornado IDS': 'PROBE', 'AMX': 'PROBE', 'F/A-18': 'PROBE', 'EA-18G Growler': 'PROBE', 'Rafale': 'PROBE', 'Gripen': 'PROBE',
+  'AV-8B Harrier': 'PROBE', 'A400M': 'PROBE', 'E-2 Hawkeye': 'PROBE' };
+const aarSys = type => AAR_SYS[type] || (AC.find(a => a.type === type && a.cat === 'HELO' && a.roles.includes('HAARRCV')) ? 'PROBE' : '');
+const aarFits = (tk, rc) => { const t = aarSys(tk), r = aarSys(rc); if (!t || !r) return true; return t === 'BOTH' || (t === 'BOOM' && r === 'BOOM') || (t === 'DROGUE' && r === 'PROBE'); };
 // Phase-1 threat categories (what RED "can do"), with the BLUE tasks that answer them
 const CATS = {
   IADS:{it:'Difesa aerea integrata (SAM/radar)',label:'Integrated air defence (SAM / radar)',tasks:['SEAD'],
@@ -325,8 +340,8 @@ const CATS = {
         assess:'RED fighters fly combat air patrols and may launch strike raids against BLUE airfields.'},
   HELO:{it:'Infiltrazioni con elicotteri a bassa quota',label:'Low-level helicopter infiltration',tasks:['LOWSLOW'],
         assess:'RED uses helicopters at very low level to insert special forces behind the line.'},
-  RENEGADE:{it:'Velivoli renegade / sospetti',label:'Renegade / suspicious aircraft',tasks:['QRA'],
-        assess:'A civil aircraft may be hijacked and used as a weapon (RENEGADE scenario).'},
+  RENEGADE:{it:'Velivoli sospetti / non cooperanti (QRA)',label:'Suspicious / non-cooperative aircraft',tasks:['QRA'],
+        assess:'Aircraft without a clearance, off their authorised route or without radio contact may enter the area: the QRA scrambles to intercept and identify them.'},
   GROUND:{it:'Forze di terra (colonne corazzate)',label:'Ground forces (armour)',tasks:['CAS'],
         assess:'RED armoured columns are pushing towards the forward line of own troops.'},
   HVT:{it:'Obiettivi ad alto valore',label:'High-value targets',tasks:['STRIKE'],
@@ -346,6 +361,8 @@ const CATS = {
         assess:'Unidentified tracks must be intercepted, identified and handled according to the briefed procedure.'},
   NAV_I:{it:'Navigazione strumentale (IFR)',label:'Instrument navigation',tasks:['IFRNAV'],side:'BLUE',evt:1,
         assess:'Flights follow IFR routes through published fixes, with holdings and instrument approaches.'},
+  HAAR_T:{it:'Rifornimento in volo elicotteri (HAAR) – addestramento',label:'Helicopter air-to-air refuelling training',tasks:['HAAR','HAARRCV'],side:'BLUE',evt:1,
+        assess:'A drogue tanker refuels probe-equipped helicopters at low level in the dedicated HAAR areas.'},
   NAV_L:{it:'Navigazione a bassa quota',label:'Low-level navigation',tasks:['LOWNAV'],side:'BLUE',evt:1,
         assess:'Flights fly low-level routes between visual and IFR reference points with timing over the last point.'},
   SAR:{it:'Ricerca e soccorso (SAR)',label:'Search and rescue',tasks:['SAR'],side:'BLUE',evt:1,civil:1,
@@ -361,7 +378,7 @@ const CATS = {
   AIB:{it:'Antincendio boschivo (AIB)',label:'Aerial firefighting',tasks:['AIB'],side:'BLUE',evt:1,civil:1,
         assess:'Wildfires must be contained with water drops under the control of the fire operations director.'},
 };
-const TASK_CAT = {SEAD:'IADS',DCA:'AIR',OCA:'AIR',ESCORT:null,LOWSLOW:'HELO',QRA:'RENEGADE',CAS:'GROUND',STRIKE:'HVT',
+const TASK_CAT = {TARGET:'ID_T',HAAR:'HAAR_T',HAARRCV:'HAAR_T',SEAD:'IADS',DCA:'AIR',OCA:'AIR',ESCORT:null,LOWSLOW:'HELO',QRA:'RENEGADE',CAS:'GROUND',STRIKE:'HVT',
   ANTISHIP:'NAVAL',MPA:'NAVAL',CSAR:'PERSONNEL',RESCORT:'PERSONNEL',AIRDROP:'LOGISTICS',INSERT:'LOGISTICS',AIRLIFT:null,AAR:null,AEW:null,RECCE:null,
   RECEIVER:'AAR_T',IFRNAV:'NAV_I',LOWNAV:'NAV_L',SAR:'SAR',HEMS:'HEMS',MEDEVAC:'MEDEVAC',HOSPITAL:'HOSPITAL',HUMAN:'HUMAN',AIB:'AIB',STANDBY:null};
 
@@ -375,7 +392,7 @@ const TT = { // RED threat types
   RED_CAP:{label:'Hostile fighter CAP',short:'RED CAP',r:30,alt:'FL250-350',resp:'OCA'},
   RED_RAID:{label:'Hostile strike raid',short:'RAID',r:0,alt:'FL150-250',resp:'DCA'},
   RED_HELO:{label:'Low-level helicopter infiltration',short:'RED HELO',r:0,alt:'< 500 ft AGL',resp:'LOWSLOW'},
-  RENEGADE:{label:'Renegade aircraft',short:'RENEGADE',r:0,alt:'FL100-350',resp:'QRA'},
+  RENEGADE:{label:'Non-cooperative aircraft',short:'UNK TRACK',r:0,alt:'FL100-350',resp:'QRA'},
   ARMOR:{label:'Armoured column',short:'ARMOUR',r:3,alt:'-',resp:'CAS'},
   HVT:{label:'High-value target',short:'HVT',r:0,alt:'-',resp:'STRIKE'},
   NAVAL:{label:'Hostile naval group',short:'NAVAL',r:25,alt:'FL300',resp:'ANTISHIP'},
@@ -400,12 +417,13 @@ const PKG = {
 };
 const PKG_OF = {SEAD:'A',STRIKE:'A',OCA:'A',ESCORT:'A',CAS:'B',LOWSLOW:'C',DCA:'C',QRA:'C',ANTISHIP:'D',MPA:'D',
   CSAR:'E',RESCORT:'E',AIRDROP:'F',INSERT:'F',AIRLIFT:'F',AAR:'S',AEW:'S',RECCE:'S',
-  RECEIVER:'G',IFRNAV:'N',LOWNAV:'N',SAR:'R',HEMS:'M',MEDEVAC:'M',HOSPITAL:'M',HUMAN:'H',AIB:'I',STANDBY:'X'};
+  RECEIVER:'G',TARGET:'X',HAAR:'S',HAARRCV:'G',IFRNAV:'N',LOWNAV:'N',SAR:'R',HEMS:'M',MEDEVAC:'M',HOSPITAL:'M',HUMAN:'H',AIB:'I',STANDBY:'X'};
 const PRIORITY = ['SEAD','DCA','STRIKE','CAS','ANTISHIP','CSAR','QRA','LOWSLOW','AIRDROP','INSERT','AEW','AAR','MPA','OCA','ESCORT','RESCORT','AIRLIFT','RECCE',
-  'RECEIVER','SAR','HEMS','MEDEVAC','HOSPITAL','HUMAN','AIB','IFRNAV','LOWNAV'];
+  'TARGET','RECEIVER','HAAR','HAARRCV','SAR','HEMS','MEDEVAC','HOSPITAL','HUMAN','AIB','IFRNAV','LOWNAV'];
 
 const CAPS = { // tasks a flight can fly beyond the roles listed for its type (by category)
   RECEIVER: f => ['FIGHTER', 'ATTACK', 'TRANSPORT', 'MPA', 'AEW'].includes(f.cat),
+  TARGET: f => ['TRANSPORT', 'LIGHT', 'MPA', 'FIGHTER', 'ATTACK'].includes(f.cat),
   IFRNAV: () => true,
   LOWNAV: f => ['FIGHTER', 'ATTACK', 'HELO', 'TRANSPORT', 'LIGHT', 'MPA'].includes(f.cat),
   SAR: f => ['HELO', 'LIGHT', 'MPA'].includes(f.cat) && !/AH-|Apache|Mangusta/.test(f.type),
@@ -419,7 +437,7 @@ const canDo = (f, t) => (f.roles || []).includes(t) || !!(CAPS[t] && CAPS[t](f))
 const acCan = (a, t) => canDo({ cat: a.cat, type: a.type, roles: a.roles }, t);
 const ALLTASKS = Object.keys(ROLES).filter(k => k !== 'STANDBY');
 const CS_POOL = {
-  FIGHTER:['VIPER','COBRA','RAPTOR','HAWK','PYTHON','JAGUAR','LANCER','SABRE','DAGGER','TALON','GHOST','MAMBA'],
+  FIGHTER:['VIPER','COBRA','RAPTOR','HAWK','PYTHON','JAGUAR','LANCER','SABRE','DAGGER','TALON','GHOST','MAMBA','DARDO','FALCO'],
   ATTACK:['HOG','WARHAWK','BOAR','BISON','RHINO'], HELO:['PEDRO','KNIGHT','STALLION','HUNTER','JOLLY','BOXER'],
   TRANSPORT:['ATLAS','HERKY','MOOSE','SPARTAN'], TANKER:['TEXACO','SHELL','ARCO','EXXON'],
   AEW:['DARKSTAR','SENTRY','WIZARD'], MPA:['TRIDENT','NEPTUNE'], ISR:['OVERLORD','SHADOW'], OTHER:['ROGUE','NOMAD'],
@@ -611,7 +629,25 @@ function pickTrack(kind, used) {
   c.sort((a, b) => (b.r - a.r) || a.d - b.d); return c.length ? c[0].t : null;
 }
 // AAR tracks shown in phase 1 (only when the event refuels): the staff can choose them; choosing one reserves its areas
-const trkShape = t => [t.ap1, t.tp1, t.ap2, t.tp2];
+// AAR tracks as holdings (Manuale AAR v2): two parallel legs (TP2→AP1 and TP1→AP2 for the published tracks) joined by semicircular turns,
+// turns to the LEFT unless briefed otherwise; width = leg separation (7 NM, ZOE 12 NM)
+function holdArc(p, q, away) { const c = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], r = dist(c, p), b0 = bearing(c, p), mk = sg => Array.from({ length: 13 }, (_, k) => dest(c, b0 + sg * k * 15, r));
+  const a = mk(-1), b = mk(1); return dist(a[6], away) >= dist(b[6], away) ? { pts: a, left: true } : { pts: b, left: false }; }
+function holdRing(e1a, e1b, e2a, e2b) { // end 1 = e1a/e1b, end 2 = e2a/e2b; legs e1b→e2a and e2b→e1a
+  const m1 = [(e1a[0] + e1b[0]) / 2, (e1a[1] + e1b[1]) / 2], m2 = [(e2a[0] + e2b[0]) / 2, (e2a[1] + e2b[1]) / 2];
+  const a1 = holdArc(e1a, e1b, m2), a2 = holdArc(e2a, e2b, m1), ring = a1.pts.concat(a2.pts);
+  // direction of flight so that the turns are left: arc e1a→e1b is flown as drawn when it is a left turn
+  const fwd = a1.left, legs = fwd ? [[e2b, e1a], [e1b, e2a]] : [[e1a, e2b], [e2a, e1b]];
+  const arrows = legs.map(([x, y]) => ({ p: [(x[0] + y[0]) / 2, (x[1] + y[1]) / 2], brg: bearing(x, y) }));
+  return { ring, arrows, turn: 'LEFT' }; }
+function holdLoop(a) { // a: TRACK airspace element or a published track definition
+  const t = a.kind === 'AAR' ? a : a.trk ? TRK().find(x => x.id === a.trk) : null;
+  if (t && t.ap1) { const h = holdRing(t.ap1, t.tp1, t.ap2, t.tp2); h.marks = [[t.ap1, 'AP1'], [t.tp1, 'TP1'], [t.ap2, 'AP2'], [t.tp2, 'TP2']]; return h; }
+  const p = a.pts[0], q = a.pts[a.pts.length - 1], b = bearing(p, q), w = (a.w || 7) * 1.852 / 2; // inbound leg on the right of the axis, outbound on the left
+  const h = holdRing(dest(q, b + 90, w), dest(q, b - 90, w), dest(p, b - 90, w), dest(p, b + 90, w)); h.marks = []; return h; }
+const capLoop = a => holdLoop({ pts: [dest(a.pts[0], a.cap.inbound + 180, a.cap.leg * 1.852), a.pts[0]], w: 5 }); // CAP racetrack: inbound (HOT) leg ends at the anchor
+const arrowPts = (x, size = 3) => [dest(x.p, x.brg + 150, size), x.p, dest(x.p, x.brg - 150, size)];
+const trkShape = t => holdLoop(t).ring;
 const aarNear = () => thChosen() ? TRK().filter(t => t.kind === 'AAR' && dist(geom().front, trkCenter(t)) <= TRK_RANGE.AAR).sort((a, b) => dist(geom().front, trkCenter(a)) - dist(geom().front, trkCenter(b))) : [];
 const aarWanted = () => REL().aar;
 function trkToggle(id) { const t = TRK().find(x => x.id === id); if (!t) return; const sel = new Set(S.trkSel || []), res = new Set(S.reserved || []);
@@ -709,24 +745,28 @@ const zArea = poly => { const c = centroid(poly), k = Math.cos(c[0] * Math.PI / 
 function autoReserve() { if (!thChosen()) return []; if (cusLocked()) return cusLocked().map(c => c.id); return fixConfigs([...new Set(autoReserve0().concat((S.custom || []).map(c => c.id)))]); }
 // level bands (FL) each task needs from a reserved area; an area qualifies if it overlaps one band by ≥ 5000 ft
 const TASK_FL = { AAR: [150, 280], RECEIVER: [150, 280], DCA: [100, 350], OCA: [100, 350], ESCORT: [100, 350], QRA: [100, 350], SEAD: [100, 300], STRIKE: [50, 300], CAS: [50, 200], ANTISHIP: [50, 250], MPA: [50, 250], RECCE: [50, 250] };
+const haarArea = z => /HAAR/i.test(z.name || '') || /HAAR/i.test(z.activity || ''); // AIP ENR 5.1.3 D266A/B/C "Haar – Mar Adriatico"
 const zBandOk = (z, b) => !/TBC|TBD/i.test(String(z.upper)) && zLo(z.lower) <= b[1] - 50 && zLimit(z.upper) >= b[0] + 50; // unknown upper limit: not proposed for a level band
 function autoReserve0() { const g = geom(), real = S.asp && S.asp.source !== 'demo', P = PROF(), LIB = () => LIBF().filter(z => z.type !== 'COR');
   if (real && S.asp.source === 'aip' && P.civil) return []; // AIP layer = military areas only: civil events do not use them
   const T = new Set(reqTasks().filter(t => !offT(t))), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : []), ...(T.has('LOWNAV') ? ['LOWLEVEL'] : [])]);
   const bands = [...T].map(t => TASK_FL[t]).filter(Boolean), tagged = z => (z.use || []).some(u => want.has(u));
   // an area is useful when its vertical limits fit what the event flies (e.g. AAR FL150-FL280), or it is published for an activity of the event (firing, para, helicopters, low level)
-  const useful = z => tagged(z) || bands.some(b => zBandOk(z, b));
-  const thp = theatre().poly, cand = LIB().filter(z => (!thp || polyTouch(z.poly, thp)) && z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || ((zArea(z.poly) >= 40 || tagged(z)) && (!P.sober || useful(z))))); // combat: ground elements need the areas near the front at any level
+  const haar = T.has('HAAR') || T.has('HAARRCV'), useful = z => tagged(z) || bands.some(b => zBandOk(z, b)) || (haar && haarArea(z));
+  const thp = theatre().poly, cand = LIB().filter(z => (!thp || polyTouch(z.poly, thp)) && lvOk(z) && z.type !== 'P' && (z.type !== 'IND' || REL().aew) && (!real || z.type === 'IND' || ((zArea(z.poly) >= 40 || tagged(z)) && (!P.sober || useful(z))))); // combat: ground elements need the areas near the front at any level
   if (P.sober && real) { // training: no front line; the nearest useful areas around the theatre, AAR corridors first for refuelling
     const d = z => dist(g.front, centroid(z.poly)), out = [];
+    if (haar) out.push(...cand.filter(z => haarArea(z) && d(z) < 300).sort((a, b) => d(a) - d(b)).slice(0, 3)); // dedicated HAAR areas first
     if (T.has('AAR') || T.has('RECEIVER')) out.push(...cand.filter(z => z.type === 'AAR' && d(z) < 250).sort((a, b) => d(a) - d(b)).slice(0, 2));
-    const rest = cand.filter(z => z.type !== 'AAR' && z.type !== 'IND' && d(z) < (tagged(z) && (z.use || []).includes('LOWLEVEL') ? 220 : 160)).sort((a, b) => (tagged(b) - tagged(a)) || d(a) - d(b));
-    out.push(...rest.slice(0, out.length ? 2 : 4)); out.push(...cand.filter(z => z.type === 'IND' && d(z) < 250).sort((a, b) => d(a) - d(b)).slice(0, 1));
+    const rest = cand.filter(z => z.type !== 'AAR' && z.type !== 'IND' && !(haar && haarArea(z)) && d(z) < (tagged(z) && (z.use || []).includes('LOWLEVEL') ? 220 : 160)).sort((a, b) => (tagged(b) - tagged(a)) || d(a) - d(b));
+    const haarOnly = haar && [...T].every(t => ['HAAR', 'HAARRCV', 'AEW'].includes(t)) && out.length; // HAAR: other low areas only if the staff picks them
+    out.push(...rest.slice(0, haarOnly ? 0 : out.length ? 2 : 4)); out.push(...cand.filter(z => z.type === 'IND' && d(z) < 250).sort((a, b) => d(a) - d(b)).slice(0, 1));
     return [...new Set(out.map(z => z.id))]; }
   const sel = cand.filter(z => pip(g.front, z.poly) || pip(g.redC, z.poly) || dist(g.front, centroid(z.poly)) < (real ? 60 : 140) || (real && tagged(z) && dist(g.front, centroid(z.poly)) < ((z.use || []).includes('LOWLEVEL') ? 220 : 150)));
   // every level band the event flies must be covered by at least one area: otherwise add the nearest areas that fit it
   if (real) bands.forEach(b => { if (sel.some(z => z.type !== 'IND' && zBandOk(z, b))) return; const d = z => dist(g.front, centroid(z.poly));
     sel.push(...cand.filter(z => z.type !== 'IND' && z.type !== 'AAR' && zBandOk(z, b) && !sel.includes(z) && d(z) < 180).sort((a, c) => d(a) - d(c)).slice(0, 2)); });
+  if (REL().aew && !sel.some(z => z.type === 'IND')) { const d = z => dist(g.front, centroid(z.poly)); sel.push(...cand.filter(z => z.type === 'IND' && d(z) < 250).sort((a, b) => d(a) - d(b)).slice(0, 1)); } // AEW asset: the nearest INDIA area
   return [...new Set(sel.map(z => z.id))]; }
 const inRes = p => { const r = RES(); return !r.length || r.some(z => pip(p, z.poly)); };
 const zoneAt = p => RES().find(z => pip(p, z.poly));
@@ -777,7 +817,7 @@ function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area
       const z = lk.find(q => a.pts.some(p => pip(p, q.poly))) || lk[0], lo = zLo(z.lower), hi = Math.min(zLimit(z.upper), 600), r = flRange(a.alt) || [lo, hi];
       let a0 = Math.max(r[0], lo), a1 = Math.min(r[1], hi); if (a0 > a1) { a1 = hi; a0 = Math.max(lo, hi - 40); } a.alt = a0 === a1 ? `FL${String(a0).padStart(3, '0')}` : `FL${String(a0).padStart(3, '0')}-FL${String(a1).padStart(3, '0')}`; }); }
   t.airspace.forEach(a => { if (cusLocked() || manualRes() || !SNAP_AST.includes(a.type) || a.pub || !a.alt || RES().some(q => fitQ(q, a.alt))) return; // no reserved area for this level: add the nearest one that has it
-    const c = LIB().filter(q => q.type !== 'P' && q.type !== 'COR' && (q.type !== 'IND' || a.type === 'ORBIT') && fitQ(q, a.alt)).map(q => [q, dist(a.pts[0], centroid(q.poly))]).filter(x => x[1] < 250).sort((x, y) => x[1] - y[1])[0];
+    const c = LIB().filter(q => q.type !== 'P' && q.type !== 'COR' && lvOk(q) && (q.type !== 'IND' || a.type === 'ORBIT') && fitQ(q, a.alt)).map(q => [q, dist(a.pts[0], centroid(q.poly))]).filter(x => x[1] < 250).sort((x, y) => x[1] - y[1])[0];
     if (c) S.reserved = fixConfigs([...new Set([...(S.reserved || []), c[0].id])]); });
   t.airspace.forEach(a => { if (SNAP_AST.includes(a.type) && !a.pub) a.pts = a.pts.map(p => snapRes(p, a.alt)); }); }
 function snapAll() {
@@ -828,12 +868,12 @@ const EVT = {
     rules: ['Maximum 2 receivers on the tanker at the same time; the others hold in the pre-contact position.', 'Receivers join only on tanker clearance: no unannounced join-ups.', 'Stay inside the published track and levels.'],
     spins: ['AAR: contact the tanker on the AAR frequency; maximum 2 aircraft on the boom/basket.'],
     tl: [['H+05', 'Tankers on track'], ['H+15 – H+60', 'AAR cycles: join-up, contact, break-away']] },
-  ID: { kind: 'training', it: 'Identificazione / intercettazione', cats: ['ID_T'], tasks: ['QRA', 'AEW', 'AAR'],
+  ID: { kind: 'training', it: 'Identificazione / intercettazione', cats: ['ID_T'], tasks: ['QRA', 'TARGET', 'AEW', 'AAR'],
     desc: 'Identification and intercept training: fighters scramble on GCI tasking, intercept unidentified tracks, identify them visually and handle them as briefed.',
     obj: ['Scramble and intercept geometry: closure rate, stern conversion, separation.', 'Visual identification and reporting (type, markings, behaviour).', 'Apply the briefed procedure and keep the controller (GCI) informed.'],
     c2: ['GCI', 'APP', 'CTR'],
     rules: ['Weapons HOLD: no simulated engagement without an explicit order of the Mission Director.', 'Visual identification only after GCI clearance, keeping the briefed minimum distance.', 'Civil traffic is shepherded out of the area and handed back to ATC.'],
-    tl: [['H+00', 'QRA on alert'], ['H+10 – H+60', 'Scrambles and intercepts']], words: [['RENEGADE confirmed – await authority']] },
+    tl: [['H+00', 'QRA on alert'], ['H+10 – H+60', 'Scrambles and intercepts']], words: [['TRACK IDENTIFIED – await authority']] },
   CAS: { kind: 'combat', it: 'Close Air Support (CAS)', cats: ['GROUND', 'SHORAD'], tasks: ['CAS', 'RECCE'],
     desc: 'Close air support training: JTAC-controlled attacks on armoured targets inside a kill box, with check-in, situation update and 9-line brief.',
     obj: ['Check-in, situation update and 9-line brief with the JTAC.', 'Target talk-on and weapons release only under JTAC control.', 'Deconflict attackers inside the kill box and respect friendly positions.'],
@@ -850,6 +890,18 @@ const EVT = {
   MAR: { kind: 'combat', it: 'Operazioni marittime', cats: ['NAVAL'], tasks: ['ANTISHIP', 'MPA'],
     desc: 'Maritime operations: patrol aircraft locate and track surface contacts, strike aircraft engage hostile vessels.',
     obj: ['Locate and identify the surface contacts.', 'Pass the picture and engage under ROE.'], c2: ['GCI', 'APP', 'CTR'] },
+  AEW: { kind: 'combat', it: 'AEW / controllo aereo della difesa aerea', cats: ['AIR', 'ID_T'], tasks: ['AEW', 'DCA', 'QRA', 'TARGET'],
+    desc: 'Airborne early warning and control: the AEW aircraft builds the air picture from its orbit and controls the air-defence fighters (CAP and QRA) against the incoming tracks, with hand-over to and from the ground GCI.',
+    obj: ['Establish the AEW orbit and the radar picture; pass the picture in BULLSEYE and BRAA format.', 'Control the air-defence fighters: commit, intercept geometry, declaration and hand-over with the GCI.', 'Keep block deconfliction, playtime and fuel states under control.'],
+    c2: ['AEW', 'GCI', 'APP', 'CTR'],
+    rules: ['The AEW is the tactical controller of the air-defence fighters; hand-over to and from the GCI on the briefed frequency.', 'Weapons HOLD unless the controller declares HOSTILE under the briefed ROE.', 'Block deconfliction between BLUE and RED as briefed.'],
+    tl: [['H-10', 'AEW on station, picture established'], ['H+00 – H+60', 'CAP and QRA under AEW control']] },
+  HAAR: { kind: 'training', it: 'Rifornimento in volo elicotteri (HAAR)', cats: ['HAAR_T'], tasks: ['HAAR', 'HAARRCV'],
+    desc: 'Helicopter air-to-air refuelling: a drogue tanker meets the probe-equipped helicopters at low level in the dedicated HAAR areas, joins up and refuels them one at a time.',
+    obj: ['Fly the briefed HAAR rendezvous and the join-up (receiver low or high).', 'Contact and fuel transfer with correct drogue procedure and radio calls.', 'Post-AAR separation and departure from the area.'],
+    c2: ['APP', 'CTR'],
+    rules: ['Minimum visibility 3 NM for a visual rendezvous, 1 NM for an electronic one; no refuelling in cloud.', 'Receivers fly 115 KIAS from the ARIP to the ARCP; join-up altitude 300 ft below (low) or 200 ft above (high) the tanker.', 'Crossover only above the tanker\'s tail (at least 50 ft) and only if the other side is free.'],
+    tl: [['H+05', 'Tanker in the HAAR area'], ['H+15 – H+60', 'Rendezvous, join-up, contacts']] },
   NAVI: { kind: 'training', it: 'Navigazione strumentale (IFR)', cats: ['NAV_I'], tasks: ['IFRNAV'],
     desc: 'Instrument navigation training: IFR routes through published fixes with holdings and instrument approaches. ATC is the main protagonist.',
     obj: ['Fly the assigned IFR route and comply with ATC clearances.', 'Hold at the assigned fix and fly the instrument approach.', 'Missed approach and second approach as published.'],
@@ -910,9 +962,29 @@ function setEvents(ids) {
   ids = ids.filter(e => EVT[e]);
   S.meta.events = ids; S.cats = [...new Set(ids.flatMap(e => EVT[e].cats))];
   if (PROF().sober !== /^EXERCISE/.test(S.meta.op || '')) S.meta.op = opName();
-  S.off = []; S.mpSec = {}; S.c2sel = proposeC2();
+  S.off = ids.length && ids.every(e => ['CAS', 'CSAR'].includes(e)) ? ['AEW'] : []; // CAS-only / CSAR: AEW only if the staff ticks it
+  S.variants = Object.fromEntries(ids.filter(e => VARIANTS[e]).map(e => [e, (S.variants && S.variants[e]) || varDefault(e)]));
+  S.mpSec = {}; S.c2sel = proposeC2();
 }
-const EVT_EN = { MIX: 'Combined operations', AAR: 'Air-to-air refuelling (AAR)', ID: 'Identification and intercept', CAS: 'Close air support (CAS)', SEAD: 'SEAD / strike',
+// event variants (staff 19 Nov): groups of choices per event type; one choice per group unless multi
+const VARIANTS = {
+  ID: [{ g: 'launch', multi: 1, it: 'Avvio', opts: [['QRA', 'Scramble da base (QRA a terra)', 'Scramble of the QRA from the ground'], ['CAP', 'Da CAP in volo', 'Intercept from an airborne CAP']], def: ['QRA'] }],
+  AEW: [{ g: 'launch', multi: 1, it: 'Caccia', opts: [['CAP', 'CAP in volo', 'Air-defence CAP under AEW control'], ['QRA', 'QRA da base', 'QRA scrambled under AEW control']], def: ['CAP', 'QRA'] }],
+  AAR: [{ g: 'rv', it: 'Rendezvous', opts: [['AUTO', 'Automatico (Alpha con GCI, altrimenti Echo)', ''], ['A', 'RV Alpha (anchor, vettori GCI)', 'RV ALPHA (anchor)'], ['B', 'RV Bravo (frontale, ricevitori senza radar)', 'RV BRAVO'], ['C', 'RV Charlie (frontale, ricevitori con radar)', 'RV CHARLIE'], ['E', 'RV Echo (timing su anchor point)', 'RV ECHO (timing)'], ['F', 'RV Foxtrot (stessa base)', 'RV FOXTROT (buddy departure)'], ['G', 'RV Golf (in rotta)', 'RV GOLF (en route)']], def: ['AUTO'] }],
+  HAAR: [{ g: 'rv', it: 'Rendezvous', opts: [['D', 'RV Delta (head-on offset)', 'RV DELTA (head-on offset)'], ['B', 'RV Bravo (head-on)', 'RV BRAVO (head-on)'], ['E', 'RV Echo (tanker orbit)', 'RV ECHO (tanker orbit)'], ['G', 'RV Golf (in rotta)', 'RV GOLF (en route)'], ['H', 'RV Hotel (random, VMC)', 'RV HOTEL (random)']], def: ['D'] }],
+  CAS: [{ g: 'ctrl', it: 'Controllo', opts: [['JTAC', 'JTAC a terra', 'JTAC on the ground'], ['FACA', 'FAC(A) in volo', 'Airborne forward air controller FAC(A)']], def: ['JTAC'] }],
+  CSAR: [{ g: 'where', it: 'Recupero', opts: [['LAND', 'A terra', 'Recovery over land'], ['SEA', 'In mare', 'Recovery at sea']], def: ['LAND'] }, { g: 'time', it: 'Luce', opts: [['DAY', 'Giorno', 'Day'], ['NIGHT', 'Notte', 'Night (NVG)']], def: ['DAY'] }],
+  SEAD: [{ g: 'sam', it: 'SAM', opts: [['FIXED', 'Siti fissi', 'Fixed SAM sites'], ['MOBILE', 'Sistemi mobili', 'Mobile SAM systems (last known positions)']], def: ['FIXED'] }, { g: 'tgt', it: 'Obiettivi', opts: [['PLANNED', 'Pianificati', 'Planned targets'], ['DYNAMIC', 'Dinamici (in volo)', 'Dynamic / time-sensitive targets passed in flight']], def: ['PLANNED'] }],
+};
+const varDefault = e => Object.fromEntries((VARIANTS[e] || []).map(g => [g.g, g.def.slice()]));
+const varOn = (e, g, o) => { const v = (S.variants || {})[e] || varDefault(e); return !!(v && (v[g] || []).includes(o)); };
+const varEn = () => Object.entries(S.variants || {}).filter(([e]) => evIds().includes(e)).flatMap(([e, v]) => (VARIANTS[e] || []).flatMap(g => (v[g.g] || []).map(o => (g.opts.find(x => x[0] === o) || [])[2]).filter(Boolean).map(x => `${EVT_EN[e] || e}: ${x}`)));
+function varHtml() { const ids = evIds().filter(e => VARIANTS[e]); if (!ids.length) return '';
+  return `<div class="card" style="margin-top:10px"><b style="font-size:13px">Varianti</b>${ids.map(e => `<div style="margin-top:6px"><div class="muted" style="font-size:11px">${esc(EVT[e].it)}</div>${VARIANTS[e].map(g => `<div class="row" style="align-items:center;flex-wrap:wrap;gap:4px;margin:2px 0"><span class="muted" style="font-size:12px;min-width:80px">${esc(g.it)}${g.multi ? ' (anche insieme)' : ''}</span>${g.opts.map(([k, l]) => `<button class="b sm shrink ${varOn(e, g.g, k) ? 'primary' : ''}" data-var="${e}|${g.g}|${k}">${esc(l)}</button>`).join('')}</div>`).join('')}</div>`).join('')}</div>`; }
+function varToggle(spec) { const [e, gk, k] = spec.split('|'), g = (VARIANTS[e] || []).find(x => x.g === gk); if (!g) return; S.variants = S.variants || {}; const v = S.variants[e] = S.variants[e] || varDefault(e);
+  let cur = v[gk] || []; if (g.multi) { cur = cur.includes(k) ? cur.filter(x => x !== k) : cur.concat(k); if (!cur.length) cur = [k]; } else cur = [k]; v[gk] = cur;
+  if (GEN()) { S.background = genBackground(); S.t = null; } save(); renderPanel(); }
+const EVT_EN = { AEW: 'Airborne early warning and control (AEW)', HAAR: 'Helicopter air-to-air refuelling (HAAR)', MIX: 'Combined operations', AAR: 'Air-to-air refuelling (AAR)', ID: 'Identification and intercept', CAS: 'Close air support (CAS)', SEAD: 'SEAD / strike',
   CSAR: 'Combat search and rescue (CSAR)', AIRMOB: 'Air mobility (airdrop / insertion / airlift)', MAR: 'Maritime operations', NAVI: 'Instrument navigation (IFR)', NAVL: 'Low-level navigation',
   SAR: 'Search and rescue (SAR)', HEMS: 'Helicopter emergency medical service (HEMS)', MEDEVAC: 'Medical evacuation (MEDEVAC)', HOSPITAL: 'Hospital transfers', HUMAN: 'Humanitarian relief', AIB: 'Aerial firefighting (AIB)' };
 Object.entries(EVT_EN).forEach(([k, v]) => { if (EVT[k]) EVT[k].en = v; });
@@ -922,13 +994,16 @@ const opName = () => PROF().sober ? 'EXERCISE ' + pick(WORDS) : 'OPERATION ' + p
 const timeKey = s => { const m = String(s).match(/([+-]?\d+)/); return m ? +m[1] : 0; };
 
 /* ---- C2 positions ---- */
+const gciNorth = () => { const th = theatre(); return th.view[0] >= 42.4; }; // Poggio Renatico (north) / Licola (south)
+const gciCs = () => { const r = (S.c2sel || []).find(x => x.on && (x.key === 'GCI' || x.key === 'AEW')); return r && r.cs ? r.cs.replace(/ RADAR$/, '') : (gciNorth() ? 'PIOPPO' : 'BARCA'); };
 const C2DEF = {
-  GCI: () => ({ role: 'AWACS / GCI – tactical control', cs: 'MAGIC' }),
+  GCI: () => gciNorth() ? { role: 'GCI / CRC – Poggio Renatico (LIVK_CRC_CTR)', cs: 'PIOPPO RADAR', freq: '136.200' } : { role: 'GCI / CRC – Licola (LIRO_CRC_CTR)', cs: 'BARCA RADAR', freq: '136.250' },
+  AEW: () => ({ role: 'AEW / AWACS – airborne control (LIZZ_AEW_CTR)', cs: 'LEGION', freq: '136.400' }),
   APP: m => ({ role: `Military approach / tower – ${m.main}`, cs: `${m.main}_APP` }),
-  JTAC: () => ({ role: 'JTAC – close air support control', cs: 'HAMMER' }),
+  JTAC: () => varOn('CAS', 'ctrl', 'FACA') ? { role: 'FAC(A) – airborne forward air controller (flown by a CAS flight lead)', cs: 'HAMMER' } : { role: 'JTAC – close air support control', cs: 'HAMMER' },
   CTR: () => ({ role: `Area control – ${theatre().fir} FIR`, cs: `${theatre().fir}_CTR` }),
   RCC: () => ({ role: 'Rescue coordination (CSAR)', cs: 'KINGPIN' }),
-  GCI2: () => ({ role: 'GCI #2 – sector split', cs: 'CHALICE' }),
+  GCI2: () => gciNorth() ? { role: 'GCI #2 – Licola (LIRO_CRC_CTR)', cs: 'BARCA RADAR', freq: '136.250' } : { role: 'GCI #2 – Poggio Renatico (LIVK_CRC_CTR)', cs: 'PIOPPO RADAR', freq: '136.200' },
   TWR2: m => m.sec ? { role: `Tower – ${m.sec}`, cs: `${m.sec}_TWR` } : null,
   RCCS: () => ({ role: 'Rescue Coordination Centre (SAR)', cs: 'RESCUE CTR' }),
   EMS: () => ({ role: 'Medical dispatch centre (EMS)', cs: 'DISPATCH' }),
@@ -1020,21 +1095,43 @@ function genEventElements(c) {
   if (S.cats.includes('AAR_T')) {
     if (recvs.length && !tankers.length) warnings.push('Evento AAR: nessun tanker nel roster, i receiver non hanno chi li rifornisce.');
     if (tankers.length && !recvs.length) warnings.push('Evento AAR: nessun receiver nel roster, i tanker non hanno chi rifornire.');
-    recvs.forEach((fl, i) => { fl.tanker = tankers.length ? tankers[i % tankers.length].id : null; });
+    const load = {}; recvs.slice().sort((a, b) => tankers.filter(tk => aarFits(tk.type, a.type)).length - tankers.filter(tk => aarFits(tk.type, b.type)).length).forEach(fl => { const ok = tankers.filter(tk => aarFits(tk.type, fl.type)), pool = ok.length ? ok : tankers;
+      const tk = pool.slice().sort((a, b) => (load[a.id] || 0) - (load[b.id] || 0))[0]; fl.tanker = tk ? tk.id : null; if (tk) load[tk.id] = (load[tk.id] || 0) + 1;
+      if (tk && !ok.length) warnings.push(`AAR: ${fl.cs} (${fl.type}, ${aarSys(fl.type) === 'BOOM' ? 'ricettacolo boom' : 'sonda'}) non è compatibile con nessun tanker presente (${tankers.map(x => x.type + ' ' + aarSys(x.type)).join(', ')}).`); });
     const extra = ['Procedure briefed step by step, dry contacts first.', 'Standard cycle with one emergency break-away drill.', 'EMCON (radio silence) join-up and one receiver at low fuel.'][lvl];
     tankers.forEach(tk => { const rs = recvs.filter(r => r.tanker === tk.id), trk = airspace.find(a => a.type === 'TRACK' && a.flight === tk.id);
       SR('AAR', `${tk.cs} tanker${rs.length ? ' with ' + fls(rs) : ''}`, [tk, ...rs],
         `${tk.cs} (${tk.type}) flies ${trk ? trk.name + ', ' + trk.alt : 'the briefed track'}. Receivers: ${rs.map(r => `${r.cs} (${r.size} × ${r.type})`).join('; ') || 'none assigned'}. Rendezvous, join-up, dry contact, wet contact one aircraft at a time (maximum 2 on the boom/basket), offload as briefed, break-away and rejoin. ${extra}`,
         'Safe join-up and separation; contact made with every receiver; fuel states reported; radio discipline kept.'); });
   }
-  // --- ID / intercept training ---
+  // --- HAAR training (Manuale AAR: helicopter air-to-air refuelling in the dedicated HAAR areas) ---
+  const htk = by('HAAR'), hrc = by('HAARRCV');
+  if (S.cats.includes('HAAR_T')) {
+    if (hrc.length && !htk.length) warnings.push('Evento HAAR: nessun tanker HAAR (KC-130J / HC-130J / MC-130J) nel roster.');
+    if (htk.length && !hrc.length) warnings.push('Evento HAAR: nessun elicottero ricevitore con sonda nel roster.');
+    hrc.forEach((fl, i) => { fl.tanker = htk.length ? htk[i % htk.length].id : null; });
+    const hz = RES().filter(haarArea); if (!hz.length) warnings.push('Evento HAAR: nessuna area HAAR (D266 "Haar – Mar Adriatico") tra le aree riservate: la track HAAR è stata messa nell\'area dell\'evento.');
+    htk.forEach((tk, i) => { const z = hz.length ? hz[i % hz.length] : null, c = z ? centroid(z.poly) : zc('HAAR_T', 0.3), far = z ? z.poly.slice().sort((a, b) => dist(c, b) - dist(c, a))[0] : dest(c, 0, 10), b = bearing(c, far), half = z ? Math.min(12, dist(c, far) * 0.55) : 12;
+      A('TRACK', `HAAR track ${z ? z.name.replace(/\s*-.*$/, '') : pick(WORDS)}`, [dest(c, b + 180, half), dest(c, b, half)], { flight: tk.id, alt: '2000 FT', haar: true, w: 3 });
+      const rs = hrc.filter(r => r.tanker === tk.id);
+      SR('HAAR', `${tk.cs} HAAR tanker${rs.length ? ' with ' + fls(rs) : ''}`, [tk, ...rs], `${tk.cs} (${tk.type}) refuels ${rs.map(r => `${r.cs} (${r.size} × ${r.type})`).join('; ') || 'the helicopters'} in ${z ? z.name : 'the HAAR area'} at 2000 ft (area ${z ? z.lower + '–' + z.upper : 'limits TBC'}). Rendezvous as on the HAAR card, join-up ${['low (300 ft below the tanker)', 'low (300 ft below the tanker)', 'high (200 ft above the tanker)'][lvl]}, contacts one receiver at a time on the left / right hose, post-AAR separation before any turn.`,
+        'RV flown as briefed; join-up and contacts safe; receivers at 115 KIAS from ARIP to ARCP; separation kept after disconnect.'); });
+  }
+  // --- ID / intercept training (Manuale Guidacaccia: T-scramble from the alert base or commit from an airborne CAP) ---
   if (S.cats.includes('ID_T') && !P.all) {
-    const nUnk = [1, 2, 3][lvl]; let k = 0;
-    by('QRA').forEach(fl => { const ts = [];
-      for (let i = 0; i < nUnk; i++) { const sc = UNK_SCRIPTS[(k++) % UNK_SCRIPTS.length]; ts.push(T('UNKNOWN', zc('ID_T', 0.8), { flight: fl.id, status: 'TRACK', name: `Unidentified track "${sc[0]}"`, note: sc[1] })); }
-      SR('ID', `${fl.cs} – scramble and identify`, [fl], `Scramble on GCI tasking and intercept ${ts.map(x => x.id).join(', ')}. Identify each track visually, report to GCI and apply the briefed procedure (shadow, shepherd, report, or HOSTILE declaration only on GCI order).`,
-        'Correct intercept geometry; identification reported in the briefed format; no weapons action without authority.'); });
+    const nUnk = [1, 1, 2][lvl], tg = by('TARGET');
+    by('QRA').forEach((fl, i) => { const ts = [];
+      for (let k = 0; k < nUnk; k++) { const sc = scrPick(), pos = zc('ID_T', 0.8), who = tg.length ? tg[(i + k) % tg.length] : null;
+        ts.push(T('UNKNOWN', pos, { flight: fl.id, status: 'TRACK', scr: sc, role: who ? who.id : null, name: `Unidentified track – ${sc.reason}`, note: `${sc.tgt} Flown by ${who ? who.cs + ' (' + who.type + ')' : 'a participant (role player, to assign)'}.` })); }
+      const cap = fl.launch === 'CAP';
+      if (cap) A('CAP', `CAP ${pick(WORDS)}`, [dest(ts[0].pos, bearing(ts[0].pos, ap(fl.base) || g.front), 45)], { flight: fl.id, alt: 'FL200-260', capType: 'BarCAP' });
+      SR('ID', `${fl.cs} – ${cap ? 'commit from CAP' : 'T-scramble'} and identify`, [fl], cap
+        ? `${fl.cs} holds the CAP (BarCAP) under ${gciCs()} control and commits on ${ts.map(x => x.id).join(', ')} when tasked (new picture + new task). Phases: commit, vectoring, interception, resolution. Task: ${ts.map(x => SCR_TASK[x.scr.task]).join('; ')}. Then recap as fragged.`
+        : `${fl.cs} on QRA alert at ${fl.base} (${(qraOf(fl.base) || {}).wing || 'alert base'}). TANGO SCRAMBLE order passed by TWR or on the briefed channel; then ${gciCs()} vectors ${fl.cs} on ${ts.map(x => x.id).join(', ')}. Phases: launch, vectoring, interception, resolution. Task: ${ts.map(x => SCR_TASK[x.scr.task]).join('; ')}. Report the VID data in the standard order; no weapons action.`,
+        'Scramble time and exit gate as ordered; correct intercept geometry (beam to stern); VID data reported in the standard order; task completed and RTB as instructed.'); });
+    tg.forEach(fl => SR('ID', `${fl.cs} – target role player`, [fl], `${fl.cs} flies the unidentified track as briefed in the target brief (GCI pack): route, level, squawk and behaviour. Follow the interceptors' visual signals (VIS) and the instructions on guard 121.500 as briefed; never manoeuvre aggressively.`, 'Behaviour as briefed; safe separation kept; VIS signals answered correctly.'));
     if (!by('QRA').length) warnings.push('Evento di identificazione/intercettazione: nessun caccia QRA nel roster.');
+    if (!tg.length) warnings.push('Nessun partecipante per il ruolo "bersaglio": assegna a mano chi vola la traccia da intercettare (task TARGET).');
   }
   // --- CAS / QRA / CSAR serials for combat events other than the mix ---
   if (!P.all) {
@@ -1160,10 +1257,11 @@ const realPos = (kind, icao) => POS().filter(p => kind === 'CTR' ? (p.type === '
 function proposeC2() {
   const P = PROF(), main = S.blueBases[0], sec = S.blueBases[1];
   let keys = [];
-  if (P.all) keys = ['GCI', 'APP', 'CTR', 'GCI2', 'TWR2']; else P.list.forEach(e => (e.c2 || []).forEach(k => { if (!keys.includes(k)) keys.push(k); }));
+  if (P.all) keys = ['GCI', 'AEW', 'APP', 'CTR', 'GCI2', 'TWR2']; else P.list.forEach(e => (e.c2 || []).forEach(k => { if (!keys.includes(k)) keys.push(k); }));
   if (reqTasks().includes('CAS') && !offT('CAS') && !keys.includes('JTAC')) keys.splice(1, 0, 'JTAC');
   if (reqTasks().includes('CSAR') && !offT('CSAR') && !keys.includes('RCC')) keys.push('RCC');
   if (!REL().bull) keys = keys.filter(k => k !== 'GCI2');
+  if (keys.includes('AEW') && (!reqTasks().includes('AEW') || offT('AEW'))) keys = keys.filter(k => k !== 'AEW'); // the AEW position goes with an AEW asset
   const rows = [];
   for (const k of keys) {
     if (['APP', 'TWR2', 'CTR'].includes(k)) {
@@ -1171,7 +1269,7 @@ function proposeC2() {
       const kind = k === 'APP' ? 'APP' : k === 'TWR2' ? 'TWR' : 'CTR';
       const r = realPos(kind, icao)[0] || (kind === 'APP' ? realPos('TWR', icao)[0] : null);
       rows.push({ id: uid(), key: k, real: true, on: true, icao, kind, role: kind === 'CTR' ? `Area control – ${theatre().fir} FIR` : `${kind === 'APP' ? 'Approach' : 'Tower'} – ${icao}`, cs: r ? r.cs : '', freq: r ? r.freq : '' });
-    } else { const d = C2DEF[k]({ main, sec }); if (d) rows.push({ id: uid(), key: k, real: false, on: true, role: d.role, cs: d.cs, freq: '' }); }
+    } else { const d = C2DEF[k]({ main, sec }); if (d) rows.push({ id: uid(), key: k, real: false, on: true, role: d.role, cs: d.cs, freq: d.freq || '' }); }
   }
   return rows;
 }
@@ -1185,13 +1283,14 @@ const GEN = () => !!(S.gen || (S.zones && S.zones.length));
    ===================================================================== */
 function genBackground() {
   const th = theatre(), c = S.cats.map(k => CATS[k]);
-  if (PROF().sober) { const P = PROF(); return `Training event over ${th.region}: ${evLabel()}. ` + P.list.map(e => e.desc).join(' ') + (P.civil ? ' The scenario is fictional and cooperative: every flight is friendly and there is no opposing force.' : ' All traffic is friendly or neutral: no weapons are released and there is no opposing force.'); }
+  const vs = varEn(), vtxt = vs.length ? ` Variants: ${vs.join('; ')}.` : '';
+  if (PROF().sober) { const P = PROF(); return `Training event over ${th.region}: ${evLabel()}.${vtxt} ` + P.list.map(e => e.desc).join(' ') + (P.civil ? ' The scenario is fictional and cooperative: every flight is friendly and there is no opposing force.' : ' All traffic is friendly or neutral: no weapons are released and there is no opposing force.'); }
   const reds = RB().map(i => AIRPORTS[i] ? AIRPORTS[i][0] : i).join(', ');
   const blues = S.blueBases.slice(0, 3).map(i => AIRPORTS[i] ? AIRPORTS[i][0] : i).join(', ');
   const intel = c.map(x => x.assess).join(' ');
   return `After months of rising tension, forces of the ${S.factions.red} have crossed into ${th.region}, seizing ${reds || 'key airfields'} and declaring an air exclusion zone over the area. ` +
     `The ${S.factions.blue}, operating from ${blues}, has been mandated to restore control of the airspace, protect the civilian population and support friendly ground forces. ` +
-    `Intelligence assessment: ${intel}`;
+    `Intelligence assessment: ${intel}${vtxt}`;
 }
 function genZones() {
   const g = geom(), z = [];
@@ -1208,7 +1307,8 @@ function genZones() {
     if (cat === 'SHORAD') mk(cat, g.front, 30);
     if (cat === 'PERSONNEL') mk(cat, dest(g.redC, g.dir, g.r * 0.35), 20);
     if (cat === 'LOGISTICS') mk(cat, dest(g.front, g.dir, 30), 12);
-    if (CATS[cat].evt && !['AAR_T', 'NAV_I', 'NAV_L'].includes(cat)) mk(cat, cat === 'ID_T' ? g.outside : dest(g.front, Math.random() * 360, 5 + Math.random() * 25), cat === 'ID_T' ? 35 : 28);
+    if (cat === 'HAAR_T') { const hz = RES().find(haarArea); mk(cat, hz ? centroid(hz.poly) : dest(g.front, Math.random() * 360, 10), 15); continue; }
+    if (CATS[cat].evt && !['AAR_T', 'NAV_I', 'NAV_L', 'HAAR_T'].includes(cat)) mk(cat, cat === 'ID_T' ? g.outside : dest(g.front, Math.random() * 360, 5 + Math.random() * 25), cat === 'ID_T' ? 35 : 28);
   }
   return z;
 }
@@ -1217,7 +1317,7 @@ function defaultBases(th = theatre()) {
   const milEv = !PROF().civil, isMil = k => AIRPORTS[k] && AIRPORTS[k][3] !== 'CIV', pos = k => [AIRPORTS[k][1], AIRPORTS[k][2]], rc = th.red.center;
   let bp = milEv ? th.blue.filter(isMil) : th.blue.filter(k => AIRPORTS[k]);
   if (!bp.length) bp = th.blue.filter(k => AIRPORTS[k]);
-  const blue = bp.sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b))).slice(0, 1);
+  const blue = milEv && th.main && AIRPORTS[th.main] ? [th.main] : bp.sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b))).slice(0, 1); // main BLUE base of the theatre (staff choice) for military events
   S.blueBases = blue;
   let red = th.red.bases.filter(k => AIRPORTS[k] && !blue.includes(k));
   if (milEv) { const g = geom(), toB = dest(g.front, g.dir, 50), toR = dest(g.front, g.dir + 180, 50);
@@ -1268,6 +1368,7 @@ function allowedTask(task, assigned) {
   if (offT(task)) return false;
   if (task === 'ESCORT') return ['SEAD', 'STRIKE', 'AIRDROP', 'INSERT', 'CSAR'].some(t => assigned[t]) && S.cats.includes('AIR');
   if (task === 'RESCORT') return !!assigned.CSAR;
+  if (task === 'TARGET') return !!assigned.QRA && PROF().ids.some(e => ['ID', 'AEW'].includes(e)) && !assigned.TARGET;
   const P = PROF();
   if (!P.all) { if (task === 'AIRLIFT') return P.tasks.has('AIRLIFT'); if (P.tasks.has(task)) return true; const c0 = TASK_CAT[task]; return c0 ? S.cats.includes(c0) : false; }
   if (task === 'AIRLIFT') return true;
@@ -1323,7 +1424,7 @@ function generateElements(flights) {
   // SEAD -> SAM sites to neutralise
   by('SEAD').forEach((fl, i) => {
     const type = D === 'EASY' ? 'SAM_SR' : D === 'HARD' && i === 0 ? 'SAM_LR' : 'SAM_MR';
-    T(type, zc('IADS'), { flight: fl.id, name: `${TT[type].label} "${pick(WORDS)}"` });
+    const mob = varOn('SEAD', 'sam', 'MOBILE'); T(type, zc('IADS'), { flight: fl.id, name: `${mob ? 'Mobile ' : ''}${TT[type].label} "${pick(WORDS)}"${mob ? ' (last known position)' : ''}`, note: mob ? 'Mobile system: may relocate up to 10 NM between the briefing and the attack; updated position from AEW / GCI.' : '' });
     if (D === 'HARD') T('SAM_SR', zc('IADS'), { flight: fl.id, name: `${TT.SAM_SR.label} "${pick(WORDS)}" (point defence)` });
   });
   if (S.cats.includes('IADS')) {
@@ -1346,7 +1447,7 @@ function generateElements(flights) {
     warnings.push('Minaccia aerea prevista ma nessun caccia A/A: nessun RED air generato (riduci o aggiungi caccia).');
   // Strike
   by('STRIKE').forEach(fl => {
-    const p = zc('HVT'); T('HVT', p, { flight: fl.id, name: pick(HVT_NAMES) });
+    const p = zc('HVT'), dyn = varOn('SEAD', 'tgt', 'DYNAMIC'); T('HVT', p, { flight: fl.id, name: pick(HVT_NAMES) + (dyn ? ' (time-sensitive)' : ''), note: dyn ? 'Dynamic target: coordinates and TOT are passed in flight by the AEW / GCI; the briefed position is only the expected area.' : '' });
     if (D === 'HARD') T('SAM_SR', dest(p, Math.random() * 360, 3), { name: 'Point-defence SR-SAM', note: 'Protects the HVT.' });
   });
   // CAS
@@ -1359,12 +1460,13 @@ function generateElements(flights) {
   by('ANTISHIP').forEach(fl => T('NAVAL', zc('NAVAL', 0.5), { flight: fl.id, size: 1 + Math.round(f), name: `Hostile surface group (${1 + Math.round(f)} vessels)` }));
   by('MPA').forEach(fl => { const n = threats.find(t => t.type === 'NAVAL'); if (n) n.note = (n.note + ` Located/tracked by ${fl.cs}.`).trim(); else T('NAVAL', zc('NAVAL', 0.6), { flight: fl.id, status: 'TRACK', resp: 'MPA', name: 'Unidentified surface contact', note: 'Locate, identify and track.' }); });
   // QRA / Low & slow
-  if (!S.cats.includes('ID_T') || PROF().all) by('QRA').forEach(fl => T('RENEGADE', zc('RENEGADE', 0.5), { flight: fl.id, status: 'TRACK', name: `RENEGADE track (${pick(['A320', 'B737', 'CRJ900', 'ATR72', 'business jet'])})`, note: 'Weapons HOLD. Intercept, identify, shepherd.' }));
+  if (!S.cats.includes('ID_T') || PROF().all) by('QRA').forEach(fl => { const sc = scrPick(); T('RENEGADE', zc('RENEGADE', 0.5), { flight: fl.id, status: 'TRACK', scr: sc, name: `Unidentified track (${pick(['A320', 'B737', 'CRJ900', 'ATR72', 'business jet'])}) – ${sc.reason}`, note: `${sc.tgt} Weapons HOLD. Task: ${SCR_TASK[sc.task]}.` }); });
   by('LOWSLOW').forEach(fl => T('RED_HELO', zc('HELO', 0.6), { flight: fl.id, size: D === 'HARD' ? 4 : 2, name: `${D === 'HARD' ? 4 : 2} × hostile helicopters, low level` }));
   if (S.cats.includes('HELO') && !by('LOWSLOW').length) warnings.push('Infiltrazioni elicotteri previste ma nessun assetto "low & slow": minaccia omessa.');
   // CSAR
   by('CSAR').forEach(fl => {
-    const p = zc('PERSONNEL', 0.6); T('ISOLATED', p, { flight: fl.id, status: 'RECOVER', name: `Isolated aircrew "${pick(WORDS)} 21"` });
+    const sea = varOn('CSAR', 'where', 'SEA'), night = varOn('CSAR', 'time', 'NIGHT'), p = sea ? snapRes(dest(g.sea, Math.random() * 360, 8)) : zc('PERSONNEL', 0.6);
+    T('ISOLATED', p, { flight: fl.id, status: 'RECOVER', name: `Isolated aircrew "${pick(WORDS)} 21"${sea ? ' in a dinghy' : ''}`, note: [sea ? 'Recovery at sea: hoist, sea state as briefed, swimmer on board.' : '', night ? 'Night: NVG recovery, IR strobe on request, authentication mandatory before the pick-up.' : ''].filter(Boolean).join(' ') });
     A('HOLD', `CSAR hold ${pick(WORDS)}`, [toBlue(g.front, 25)], { flight: fl.id, alt: '< 3000 ft' });
     if (S.cats.includes('SHORAD') && D !== 'EASY') T('MANPADS', dest(p, Math.random() * 360, 5));
   });
@@ -1435,18 +1537,18 @@ function buildTexts(flights, assigned, el) {
   const hasCtrl = S.roster.controllers.length > 0;
   const roe = [
     'Weapons status: TIGHT – engage only targets positively identified as HOSTILE.',
-    hasCtrl ? 'BVR engagements require a HOSTILE declaration from MAGIC (AWACS/GCI).' : 'BVR engagements require two independent ID criteria (no GCI on station).',
+    hasCtrl ? `BVR engagements require a HOSTILE declaration from ${gciCs()} (GCI / AEW).` : 'BVR engagements require two independent ID criteria (no GCI on station).',
     'Self-defence is always authorised.',
   ];
-  if (assigned.QRA) roe.push('RENEGADE tracks: WEAPONS HOLD. Intercept, identify, shepherd; engagement only on explicit order of the Mission Director.');
-  if (assigned.CAS) roe.push('Inside the kill box: weapons release only under JTAC control (type 2/3 as briefed).');
+  if (assigned.QRA) roe.push('QRA intercepts: WEAPONS HOLD. Intercept, identify and apply the assigned task (escort, intervention to land, shadow); no weapons action.');
+  if (assigned.CAS) roe.push(varOn('CAS', 'ctrl', 'FACA') ? 'Inside the kill box: weapons release only under FAC(A) control (airborne controller, type 2/3 as briefed).' : 'Inside the kill box: weapons release only under JTAC control (type 2/3 as briefed).');
   if (el.threats.some(t => t.status === 'AVOID')) roe.push('Rings marked AVOID must not be entered below their max altitude.');
   if (S.cats.includes('SHORAD')) roe.push('Minimum altitude over RED territory outside the kill box: 5000 ft AGL (MANPADS).');
   roe.push('No weapons release on or within 5 NM of civil airports.');
   const g = geom();
   const spins = [
     `Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}${(bullOf(S.meta.bullseye) || {}).ref ? ' (' + bullOf(S.meta.bullseye).ref + ')' : ''}. Threat calls in BULLSEYE format.`,
-    `Check-in with MAGIC: callsign, mission, position, altitude, fuel/playtime.`,
+    `Check-in with ${gciCs()}: callsign, mission, position, altitude, fuel / playtime; authentication and ALPHA CHECK on the bullseye.`,
     'Squawk and IFF codes: assigned per package by ATC (TBD).',
     'Lost comms: return via the ingress route at the briefed altitude, squawk 7600.',
     'Joker / Bingo fuel: set by each flight lead.',
@@ -1456,11 +1558,11 @@ function buildTexts(flights, assigned, el) {
   const codewords = [[words[0], 'Package push – mission start'], [words[1], 'Target destroyed']];
   if (assigned.SEAD) codewords.push([words[2], 'SEAD complete – SAM threat neutralised']);
   if (assigned.CSAR) codewords.push([words[3], 'Isolated personnel recovered']);
-  if (assigned.QRA) codewords.push([words[4], 'RENEGADE confirmed – await authority']);
+  if (assigned.QRA) codewords.push([words[4], 'Track identified – await authority']);
   codewords.push([words[5], 'Mission abort – all players RTB'], ['KNOCK IT OFF', 'Exercise stop (real emergency)']);
   const tl = [['H-60', 'Mass briefing'], ['H-30', 'Start-up / taxi']];
   if (assigned.AEW || assigned.AAR) tl.push(['H-15', 'Support assets on station (AEW / tanker)']);
-  tl.push(['H-10', 'Check-in with MAGIC']);
+  tl.push(['H-10', `Check-in with ${gciCs()}`]);
   if (assigned.DCA || assigned.QRA) tl.push(['H+00', 'DCA vul time begins / QRA on alert']);
   tl.push(['H+00', 'PUSH']);
   if (assigned.SEAD) tl.push(['H+10', 'SEAD TOT']);
@@ -1477,7 +1579,7 @@ function buildTexts(flights, assigned, el) {
    (IVAO Manuale Close Air Support v2.0). 9-lines are for staff and JTACs only:
    they never reach the public page, the masterplan or the pilot decks.
    ===================================================================== */
-const CAS_JTAC_CS = ['LEGION', 'GLADIATOR', 'HAMMER', 'SPARTAN', 'ANVIL', 'TOMAHAWK', 'VIKING', 'WARLORD'];
+const CAS_JTAC_CS = ['WARHORSE', 'GLADIATOR', 'HAMMER', 'SPARTAN', 'ANVIL', 'TOMAHAWK', 'VIKING', 'WARLORD'];
 const CAS_CP = ['ALABAMA', 'TEXAS', 'OHIO', 'NEVADA', 'UTAH', 'MAINE', 'IDAHO', 'IOWA', 'KANSAS', 'OREGON', 'DAKOTA', 'VERMONT', 'MONTANA', 'FLORIDA', 'GEORGIA', 'ARIZONA'];
 const CAS_IP = ['AUDI', 'JEEP', 'FIAT', 'LANCIA', 'FERRARI', 'PORSCHE', 'VOLVO', 'TESLA', 'MASERATI', 'SKODA', 'DODGE', 'BUICK', 'HONDA', 'MAZDA', 'SUBARU', 'OPEL'];
 const CAS_BP = ['GRANITE', 'SLATE', 'FLINT', 'COBALT', 'IRON', 'BASALT', 'QUARTZ', 'MARBLE'];
@@ -1797,7 +1899,7 @@ function assignPR(t) {
   free('CSAR').forEach(f => { const c = P.csar.slice().sort((a, b) => a.rescue.length - b.rescue.length)[0]; if (c) { c.rescue.push(f.id); taken.add(f.id); } });
   free('RESCORT').forEach(f => { const c = P.csar.slice().sort((a, b) => a.rescort.length - b.rescort.length)[0]; if (c) { c.rescort.push(f.id); taken.add(f.id); } });
   const gci = t.c2.find(r => r.key === 'GCI'), aew = t.flights.find(f => f.task === 'AEW');
-  P.csar.forEach(c => { c.amc = (gci && gci.cs) || (aew && aew.cs) || 'MAGIC'; c.osc = c.rescort.length ? (prFlight(c.rescort[0]) || {}).cs : c.wing; });
+  P.csar.forEach(c => { c.amc = (gci && gci.cs) || (aew && aew.cs) || gciCs(); c.osc = c.rescort.length ? (prFlight(c.rescort[0]) || {}).cs : c.wing; });
   P.med.forEach(m => { if (m.sec === 'X' && !m.escort.length) { const e = t.flights.find(f => f.task === 'RESCORT' && !P.med.some(x => x.escort.includes(f.id))); if (e) m.escort.push(e.id); } });
 }
 function applyPR(t) {
@@ -2308,10 +2410,161 @@ function notamHtml() { const cfg = notamCfg(), L = notamList(), B = notamTime(+c
   ${L.length ? `${prPre(`NOTAM (${L.length})`, [L.map(n => n.text).join('\n\n')])}<div class="row" style="margin-top:6px"><button class="b sm shrink" data-copy="${esc(L.map(n => n.text).join('\n\n'))}">Copia</button><button class="b sm shrink" id="notamtxt">Scarica .txt</button></div>` : '<p class="muted">Nessuna area riservata.</p>'}</div>`;
 }
 
+/* =====================================================================
+   5x. QRA SCRAMBLES AND GCI MATERIAL (IVAO Italia Manuale Guidacaccia v5)
+   Real air-defence alert bases and QRA callsigns; TANGO scramble order with blank fields for the
+   dynamic items; scramble reasons (never unlawful acts); GCI pack: injects, target briefs,
+   authentication tables, control types, CAP types, block deconfliction, briefing card, checklists, phraseology.
+   ===================================================================== */
+const QRA_BASES = [
+  { icao: 'LIPS', pfx: ['HL'], wing: '51° Stormo', ac: 'EF-2000 Typhoon' }, { icao: 'LIRS', pfx: ['GA'], wing: '4° Stormo', ac: 'EF-2000 Typhoon' },
+  { icao: 'LIBV', pfx: ['HA', 'GE'], wing: '36° Stormo', ac: 'EF-2000 Typhoon' }, { icao: 'LICT', pfx: ['GI'], wing: '37° Stormo', ac: 'EF-2000 Typhoon' },
+  { icao: 'LIBA', pfx: ['BA'], wing: '32° Stormo', ac: 'F-35A' } ];
+const qraOf = icao => QRA_BASES.find(b => b.icao === icao);
+const SCR_REASONS = [
+  { k: 'DIPCL', reason: 'no diplomatic clearance', tgt: 'State aircraft on its filed route without a diplomatic clearance; answers on guard 121.500 when called and follows the interceptors.', sq: BLANK_SQ(), tasks: ['LAND', 'ESCORT'] },
+  { k: 'NOAUTH', reason: 'no authorisation to enter national airspace', tgt: 'Enters national airspace without authorisation at constant level and heading; answers only after the interceptors have joined.', sq: BLANK_SQ(), tasks: ['ESCORT', 'INTERROGATION'] },
+  { k: 'DEV', reason: 'deviation from the authorised route', tgt: 'Leaves the cleared route by more than 20 NM and does not answer ATC; resumes contact when interrogated on guard 121.500.', sq: BLANK_SQ(), tasks: ['INTERROGATION', 'ESCORT'] },
+  { k: 'COMLOSS', reason: 'loss of radio contact', tgt: 'No radio contact with ATC (squawk 7600); silent on frequency, follows the visual signals (VIS) of the interceptors.', sq: '7600', tasks: ['INTERROGATION', 'LAND'] },
+  { k: 'DISTRESS', reason: 'aircraft in distress', tgt: 'Declares an emergency (squawk 7700) and needs assistance; follows the interceptors to the designated airport.', sq: '7700', tasks: ['ESCORT', 'LAND'] } ];
+function BLANK_SQ() { return '[........] (code given at the briefing)'; }
+const BLANK = '[................]';
+const SCR_TASK = { VID: 'VISUAL IDENTIFICATION', INTERROGATION: 'VISUAL IDENTIFICATION AND INTERROGATION', ESCORT: 'VISUAL IDENTIFICATION AND ESCORT UNTIL FIR LIMIT', LAND: 'VISUAL IDENTIFICATION AND INTERVENTION TO LAND' };
+const SEC_TASKS = ['SHADOW', 'COCKPIT CHECK', 'KODAK'];
+function scrPick() { const r = pick(SCR_REASONS), task = pick(r.tasks), land = task === 'LAND' ? (S.blueBases.concat(Object.keys(AIRPORTS)).find(k => AIRPORTS[k] && AIRPORTS[k][3] !== 'CIV' && dist(ap(k), geom().front) < 200) || S.blueBases[0]) : null;
+  return { k: r.k, reason: r.reason, tgt: r.tgt, sq: r.sq, task, land, sec: Math.random() < 0.5 ? pick(SEC_TASKS) : '' }; }
+const EXIT_GATE = b => ['NOVEMBER', 'ECHO', 'SIERRA', 'WHISKEY'][Math.round((((b % 360) + 360) % 360) / 90) % 4];
+// QRA flights: real alert base (nearest to the area, same aircraft family when possible) and real QRA callsigns (two-ship xx01/xx02)
+function qraSetup(flights) {
+  const g = geom(), ref = (zoneOf('ID_T') || zoneOf('RENEGADE') || { center: g.front }).center, used = {};
+  const launch = PROF().ids.some(e => e === 'ID' || e === 'AEW') ? (evIds().includes('ID') ? (S.variants && S.variants.ID && S.variants.ID.launch) || ['QRA'] : (S.variants && S.variants.AEW && S.variants.AEW.launch) || ['CAP', 'QRA']) : ['QRA'];
+  flights.filter(f => f.task === 'QRA').forEach((f, i) => {
+    f.launch = launch.length > 1 ? launch[i % launch.length] : launch[0]; if (f.launch !== 'QRA') return;
+    const fam = QRA_BASES.filter(b => ap(b.icao) && (/F-35/.test(f.type) ? b.ac === 'F-35A' : b.ac !== 'F-35A')), pool = fam.length ? fam : QRA_BASES.filter(b => ap(b.icao));
+    const b = pool.slice().sort((x, y) => dist(ap(x.icao), ref) - dist(ap(y.icao), ref))[0]; if (!b) return;
+    const n = used[b.icao] = (used[b.icao] || 0) + 1, lead = 2 * n - 1, pad = x => String(x).padStart(2, '0');
+    f.base = b.icao; f.cs = `${b.pfx[0]}${pad(lead)}`; f.csAll = f.size > 1 ? Array.from({ length: f.size }, (_, k) => `${b.pfx[0]}${pad(lead + k)}`).join(' / ') : f.cs; f.qra = b.icao;
+    if (!S.blueBases.includes(b.icao)) S.blueBases.push(b.icao); });
+}
+// authentication tables (methods GCI1 and GCI2): generated per event
+function authTables() { const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), rows = Array.from({ length: 6 }, () => shuffle(L).slice(0, 13));
+  return { gci1: rows, gci2: Array.from({ length: 3 }, () => shuffle(L).join('')) }; }
+const GCI_CHECK = {
+  intercept: ['Check-in and radio check (training: the controller gives the clearance and the area limits)', 'Authentication', 'Radar contact and type of service (new squawk if needed)', 'Task (supersonic only for A-scramble or inside approved areas)', 'ALPHA CHECK on the active bullseye + WEAPONS SAFE', 'Playtime report', 'Start of the intercept (READY TO COMMIT?)', 'PICTURE if needed', 'Vectors to the target with intercept geometry', 'JUDY call', 'TALLY call', 'Identification data and further tasks, if any', 'End of the intercept and coordination for the return to base'],
+  cap: ['Check-in and radio check (training: clearance and area limits)', 'Authentication', 'Radar contact and type of service (new squawk if needed)', 'Task: CAP info and clearance, if not briefed (deconfliction blocks, role to play, kill criteria, regeneration)', 'ALPHA CHECK on the active bullseye + WEAPONS SAFE', 'Playtime report', 'PICTURE / threat awareness and ROE in use', 'Further tasks', 'Execution of the activity', 'Termination and recap'],
+  aar: ['Check-in and radio check (training: clearance and area limits)', 'Authentication', 'Radar contact and type of service (new squawk if needed)', 'Task, type of RV, tanker position and level, tanker (boom) frequency', 'RV ALPHA: vectors to 1 NM behind the tanker (other RVs: traffic in / approaching the area and tanker position updates)', 'JUDY call', 'VISUAL call', 'Transfer of communications to the tanker / boom operator', 'When AAR is complete, instruct the receivers to leave the area as intended'] };
+const CTRL_TYPE = { QRA: 'Close positive control (intercept) until TALLY / JUDY', DCA: 'Loose control – BULLSEYE / BRAA format, advisory', OCA: 'Broadcast control – BULLSEYE format', ESCORT: 'Broadcast control – BULLSEYE format', SEAD: 'Broadcast control – BULLSEYE format', STRIKE: 'Broadcast control – BULLSEYE format', RECEIVER: 'RV ALPHA: close positive control to 1 NM behind the tanker; other RVs: loose / advisory', AAR: 'Advisory (traffic information, tanker position)', LOWSLOW: 'Close positive control (intercept)' };
+function capTypeFor(t) { const has = k => t.flights.some(f => f.task === k); return has('AEW') || has('AAR') ? 'HAVCAP' : has('CSAR') ? 'ResCAP' : has('STRIKE') || has('SEAD') ? 'TarCAP' : 'BarCAP'; }
+const CAP_DESC = { BarCAP: 'Barrier CAP on the threat axis, protects an airspace for a set time', HAVCAP: 'High asset value CAP: protects the AEW and the tankers', ResCAP: 'Rescue CAP: protects the CSAR task force and the isolated personnel', TarCAP: 'Target CAP near the target, protects the attack aircraft from enemy fighters', ForCAP: 'Force CAP: escort of the strike package' };
+function applyGCI(t) {
+  if (!t) return; const g = geom(), gci = t.c2.find(c => ['GCI', 'AEW'].includes(c.key)), ctl = gci ? gci.cs.replace(/ RADAR$/, '') : gciCs(), ctlFreq = gci && gci.freq && gci.freq !== 'TBD' ? gci.freq : BLANK;
+  const fl = id => t.flights.find(f => f.id === id), aa = t.flights.filter(f => ['QRA', 'DCA', 'OCA', 'ESCORT', 'LOWSLOW', 'AEW', 'TARGET'].includes(f.task));
+  const scr = t.threats.filter(x => x.scr && x.flight).map((x, i) => { const f = fl(x.flight); if (!f) return null; const base = ap(f.base) || g.front, brg = bearing(base, x.pos), cap = f.launch === 'CAP';
+    const msgGround = cap ? null : `SCRAMBLE… SCRAMBLE… SCRAMBLE, TANGO SCRAMBLE ORDER, ${f.csAll || f.cs}, EXIT ${BLANK}, VECTOR ${BLANK}, CLIMB IN GATE ${BLANK} FOR ${SCR_TASK[x.scr.task]}, WHEN AIRBORNE CONTACT ${ctl} ON ${BLANK}, TRANSMIT ${BLANK}`;
+    const msg = cap ? `${f.cs}, ${ctl}, NEW PICTURE SINGLE GROUP BULLSEYE ${BLANK}, ${BLANK}, TRACKING ${BLANK}, BOGEY, NEW TASK ${x.scr.task === 'VID' ? 'VID' : SCR_TASK[x.scr.task]}` : `${f.cs}, T-SCRAMBLE ORDER, EXIT ${BLANK}, [VECTOR ${BLANK}], CLIMB IN GATE ${BLANK} FOR ${SCR_TASK[x.scr.task]}, WHEN AIRBORNE CONTACT ${ctl} ON ${BLANK}, TRANSMIT ${BLANK}`;
+    const tmin = 10 + i * 15; return { id: 'Q' + (i + 1), flight: f.id, cs: f.cs, csAll: f.csAll || f.cs, base: f.base, wing: (qraOf(f.base) || {}).wing || '', cap, threat: x.id, reason: x.scr.reason, task: x.scr.task, land: x.scr.land, sec: x.scr.sec, sq: x.scr.sq, tgt: x.scr.tgt, role: x.role ? (fl(x.role) || {}).cs : '',
+      gate: EXIT_GATE(brg), distNm: Math.round(dist(base, x.pos) / 1.852), brg: Math.round(brg), msg, msgGround, times: { order: tmin, airborne: tmin + (cap ? 0 : 10), intercept: tmin + (cap ? 8 : 18), end: tmin + 35 } }; }).filter(Boolean);
+  const injects = [];
+  scr.forEach(q => { injects.push([`H+${String(q.times.order - 5).padStart(2, '0')}`, `${q.role || 'Target role player'}`, `Target airborne / enters the area as briefed (${q.reason}); squawk ${q.sq}.`]);
+    injects.push([`H+${String(q.times.order).padStart(2, '0')}`, q.cap ? `${ctl} → ${q.cs}` : `TWR ${q.base} (or the briefed channel) → ${q.csAll}`, q.cap ? 'New picture and new task (commit) – read the message of the GCI pack, filling the blank fields live.' : 'Read the ground alert message (TANGO SCRAMBLE ORDER), filling the blank fields live.']);
+    injects.push([`H+${String(q.times.intercept).padStart(2, '0')}`, `${ctl}`, `Expected intercept (planning: ${q.distNm} NM ${q.brg}° from ${q.base}, exit gate ${q.gate}). Clear the VID run after TALLY.`]);
+    injects.push([`H+${String(q.times.end).padStart(2, '0')}`, `${ctl} → ${q.cs}`, `Resolution: ${SCR_TASK[q.task]}${q.land ? ' at ' + q.land : ''}${q.sec ? '; secondary task ' + q.sec : ''}. Then "TANGO SCRAMBLE TERMINATED, RTB".`]); });
+  injects.sort((a, b) => timeKey(a[0]) - timeKey(b[0]));
+  // CAP types and geometry: anchor, inbound track towards the threat (HOT leg), 15 NM leg, LEFT turns
+  const capT = capTypeFor(t); t.airspace.filter(a => a.type === 'CAP').forEach(a => { a.capType = a.capType || capT; const inb = Math.round(bearing(a.pts[0], g.redC)); a.cap = { inbound: inb, leg: 15, turn: 'LEFT', hot: inb }; });
+  const caps = t.airspace.filter(a => a.type === 'CAP').map(a => ({ name: a.name, cs: (fl(a.flight) || {}).cs || '', type: a.capType, desc: CAP_DESC[a.capType] || '', anchor: fmtLL(a.pts[0]), alt: a.alt, inbound: a.cap.inbound, leg: a.cap.leg, turn: a.cap.turn }));
+  const blocks = aa.length ? { blue: '0–4', red: '5–9', note: 'BLUE flies the levels ending in 0–4 of each ten-level band (e.g. FL200–FL240), RED / target the levels ending in 5–9 (FL250–FL290).' } : null;
+  const kill = aa.some(f => ['DCA', 'OCA', 'ESCORT'].includes(f.task)) ? ['Kill: FOX 3 called on frequency with radar lock inside 20 NM; FOX 2 inside 5 NM with TALLY; guns inside 1 NM in the rear quarter.', `Kill removal: the killed aircraft calls "${'callsign'} DEAD", leaves the fight 1000 ft below its block and flies to the regeneration point.`, 'Regeneration: 30 NM behind its own CAP / anchor point, 3 minutes, then re-enter with a new playtime call.', 'Timeout: 3 minutes without a valid shot = TERMINATE that engagement.'] : [];
+  const control = [...new Set(t.flights.map(f => f.task))].filter(k => CTRL_TYPE[k]).map(k => [ROLES[k], CTRL_TYPE[k]]);
+  const blank = BLANK, cardRow = (label, b, r) => [label, b || blank, r || blank];
+  const blue = aa.filter(f => f.task !== 'TARGET'), red = t.flights.filter(f => f.task === 'TARGET');
+  const card = aa.length ? [cardRow('Date', S.meta.date, S.meta.date), cardRow('Call sign', blue.map(f => f.csAll || f.cs).join(', '), red.map(f => f.cs).join(', ') || 'AI / staff track'), cardRow('Aircraft type', blue.map(f => f.type).join(', '), red.map(f => f.type).join(', ')),
+    cardRow('Simulated adversary', '-', red.length ? 'Unidentified / non-cooperative traffic' : 'Hostile air'), cardRow('Mission / role', blue.map(f => ROLES[f.task]).join(', '), red.length ? 'Target (role player)' : 'RED air'),
+    cardRow('Step / start / taxi / T/O', 'H-30 / H-20 / H-15 / as ordered', 'H-30 / H-20 / H-15 / H-05'), cardRow('Block altitudes', blocks ? `Block ${blocks.blue}` : '', blocks ? `Block ${blocks.red}` : ''), cardRow('HRD floor / top', '', ''), cardRow('CBT floor / top', '', ''),
+    cardRow('Bullseye', `${S.meta.bullseye} ${fmtLL(bullPos())}`, `${S.meta.bullseye}`), cardRow('ADep', [...new Set(blue.map(f => f.base).filter(Boolean))].join(', '), [...new Set(red.map(f => f.base).filter(Boolean))].join(', ')),
+    cardRow('Area / FAOR', RES().map(z => z.name).slice(0, 4).join(', '), ''), cardRow('ID criteria / ROE', 'VID before any action; WEAPONS HOLD on unidentified tracks', 'Cooperative, as briefed'), cardRow('Primary freq', `${ctl} ${ctlFreq}`, ''),
+    cardRow('IFF Mode 3 (1–4)', '', ''), cardRow('Playtime', '', ''), cardRow('Config', '', ''), cardRow('Reloads', '', ''), cardRow('Shot type', kill.length ? 'FOX 3 / FOX 2 / guns' : 'NIL (no engagements)', ''), cardRow('Kill type', kill.length ? 'As per kill criteria' : 'NIL', ''),
+    cardRow('Timeout', kill.length ? '3 min' : 'NIL', ''), cardRow('Kill removal', kill.length ? '1000 ft below block, to regeneration' : 'NIL', ''), cardRow('Regeneration', kill.length ? '30 NM behind own CAP, 3 min' : 'NIL', ''), cardRow('NORDO', 'Rock wings, follow the lead / RTB as briefed', 'Squawk 7600, follow the VIS signals'), cardRow('Remarks', '', '')] : null;
+  const ph = []; // phraseology examples with the event's callsigns
+  scr.forEach(q => { const c = q.cs, cs2 = (q.csAll.split(' / ')[1]) || c.replace(/\d+$/, x => String(+x + 1).padStart(2, '0'));
+    if (!q.cap) ph.push(['Launch (ground alert)', [[`TWR`, q.msgGround], [`TWR, ${c}`, `TWO SHIPS TANGO SCRAMBLE`], [`${c}, TWR`, `TAXI ${blank}, RUNWAY ${blank}, REPORT READY FOR DEPARTURE`], [`${c}, TWR`, `RUNWAY ${blank} CLEARED FOR TAKE-OFF, WIND ${blank}`], [`TWR, ${c}`, `AIRBORNE ${blank}, CONTACT ${ctl} ON ${blank}`]]]);
+    ph.push(['Vectoring', [[`${ctl}, ${c}`, 'TWO SHIP CHECKING IN'], [`${c}, ${ctl}`, `RADAR CONTACT, CLOSE POSITIVE CONTROL, READ YOU FIVE BY FIVE, REPORT READY FOR AUTHENTICATION`], [`${c}, ${ctl}`, `AUTHENTICATE ${blank}`], [`${ctl}, ${c}`, `COME BACK ${blank}, AUTHENTICATE ${blank}`], [`${c}, ${ctl}`, `COME BACK ${blank}, GOOD AUTHENTICATION, REPORT WEAPONS SAFE AND READY FOR ALPHA CHECK`], [`${ctl}, ${c}`, `WEAPONS SAFE, ALPHA CHECK ${blank}`], [`${ctl}, ${cs2}`, 'TWO WEAPONS SAFE, SAME'], [`${c}, ${ctl}`, 'ROGER, REPORT YOUR PLAYTIME']]]);
+    ph.push(['Interception', [[`${c}, ${ctl}`, `THIS IS A TANGO SCRAMBLE ORDER FOR ${SCR_TASK[q.task]} AGAINST TRACK ${blank}, ${blank} NM, ${blank} FT, TRACKING ${blank}`], [`${ctl}, ${c}`, `ROGER TANGO SCRAMBLE FOR ${SCR_TASK[q.task]}, READY TO COMMIT`], [`${c}, ${ctl}`, `COMMIT ${blank}, THIS WILL BE BEAM TO STERN INTERCEPTION`], [`${ctl}, ${c}`, 'JUDY'], [`${c}, ${ctl}`, 'STRANGLE PARROT, WE WILL CONTINUE TO PROVIDE INFORMATION, REPORT TALLY'], [`${ctl}, ${c}`, 'TALLY ONE'], [`${c}, ${ctl}`, 'CLEARED VID RUN'], [`${ctl}, ${c}`, `READY TO COPY DATA? ${blank} (type, colours / markings, heading, level, speed, weapons / configuration, registration)`]]]);
+    ph.push(['Resolution', q.task === 'LAND' ? [[`${c}, ${ctl}`, `YOUR TASK IS INTERVENTION TO LAND IN ${q.land || blank}`], [`${ctl}, ${c}`, `ROGER, TASK IS INTERVENTION TO LAND IN ${q.land || blank}`], [`${blank}, ${c}`, 'FOLLOW, FOLLOW … YOU LAND, YOU LAND'], [`${ctl}, ${c}`, `TARGET HAS LANDED, REQUEST RECOVERY TO ${q.base || blank}`]]
+      : q.task === 'ESCORT' ? [[`${c}, ${ctl}`, 'YOUR TASK IS ESCORT UNTIL FIR LIMIT'], [`${ctl}, ${c}`, 'REACHING LIMIT'], [`${c}, ${ctl}`, `TANGO SCRAMBLE TERMINATED, RTB VIA ${q.base || blank} DIRECT`]]
+      : [[`${c}, ${ctl}`, 'APPLY VIS 1 AND REPORT IF THE TARGET IS COMPLIANT'], [`121.500`, `AIRCRAFT WITH REGISTRATION ${blank} ${blank}, YOU HAVE BEEN INTERCEPTED BY ITALIAN AIR FORCE, IF YOU READ ME CONTACT ME ON GUARD FREQUENCY 121.500`], [`${ctl}, ${c}`, 'TARGET IS COMPLIANT'], [`${c}, ${ctl}`, `TANGO SCRAMBLE TERMINATED, RTB VIA ${q.base || blank} DIRECT`]]]); });
+  t.caps = caps; caps.forEach(c => { if (!c.cs) return; ph.push([`CAP assignment – ${c.cs}`, [[`${c.cs}, ${ctl}`, `${c.type.toUpperCase()} OVER ${c.anchor}, LEFT TURN, INBOUND TRACK ${String(c.inbound).padStart(3, '0')}, LEG ${c.leg} MILES, ${c.alt}`], [`${ctl}, ${c.cs}`, 'REQUEST PICTURE'], [`${c.cs}, ${ctl}`, `PICTURE CLEAN`], [`${c.cs}, ${ctl}`, `NEW PICTURE SINGLE GROUP BULLSEYE ${blank}, ${blank}, ${blank}, TRACKING ${blank}, BOGEY, NEW TASK VID`], [`${c.cs}, ${ctl}`, 'RECAP AS FRAGGED']]]); });
+  const need = scr.length || caps.length || aa.length;
+  t.gci = need ? { ctl, ctlFreq, scr, injects, auth: authTables(), control, blocks, kill, card, ph, checklists: GCI_CHECK } : null;
+  // SPINS / ROE lines (masterplan)
+  if (need) { const sp = t.spins || (t.spins = []);
+    sp.push(`Control: ${control.map(([r, c]) => `${r} – ${c}`).join('; ') || 'as briefed'}.`);
+    sp.push(`Authentication with ${ctl}: method GCI1 or GCI2, tables in the GCI pack (given at the briefing).`);
+    if (blocks) sp.push(`Block deconfliction: BLUE block ${blocks.blue}, RED / target block ${blocks.red}. ${blocks.note}`);
+    kill.forEach(k => sp.push(k));
+    if (scr.length) sp.push(`QRA: TANGO SCRAMBLE ORDER from TWR or the briefed channel (format in the GCI pack, dynamic items given live). Exit gates 15 NM from the base: NOVEMBER, ECHO, SIERRA, WHISKEY. Interceptors fly IOAT until the task is complete, then RTB IFR or VOAT.`);
+    if (scr.length) sp.push('VID data in this order: aircraft type, colours / markings, heading, level, speed, weapons / configuration (military), registration.');
+    caps.forEach(c => sp.push(`${c.cs || c.name}: ${c.type} (${c.desc}) – anchor ${c.anchor}, inbound ${String(c.inbound).padStart(3, '0')}, leg ${c.leg} NM, LEFT turns, ${c.alt}; HOT leg towards the threat.`)); }
+}
+/* =====================================================================
+   5y. AAR / HAAR CARDS (IVAO Italia Manuale AAR v2.0): RV type (default ALPHA with a GCI, otherwise ECHO;
+   HAAR default DELTA head-on offset), boom / drogue matching, base AAR altitude, EMCON, MARSA, phraseology.
+   ===================================================================== */
+const RV_EN = { A: 'RV ALPHA (anchor, GCI vectors)', B: 'RV BRAVO (head-on, tanker directed)', C: 'RV CHARLIE (head-on, receiver radar)', E: 'RV ECHO (timing on the anchor point)', F: 'RV FOXTROT (buddy departure)', G: 'RV GOLF (en route)', D: 'RV DELTA (head-on offset)', H: 'RV HOTEL (random, VMC)' };
+const RV_HOW = {
+  A: ['The GCI gives positive control of heading, speed and level and brings the receiver to 1 NM behind the tanker, 1000 ft below it.', 'Tanker: anchor pattern on the anchor point at the base AAR altitude, turns at 15° or 25° bank.', 'Receiver: 1000 ft below the base AAR altitude; JUDY when radar contact, VISUAL when in sight; weapons safe and radar off when visual; ECHELON LEFT when cleared.'],
+  B: ['Head-on approach, at least 100 NM between the aircraft at the start; ARIP, receiver inbound track and ARCT designated.', 'After the RV initial call the tanker calls TRANSMIT FOR DF and steers the receiver onto the reciprocal heading.', 'At the turn range the tanker turns 225° LEFT onto the receiver\'s heading; receiver at tanker KIAS + 20.'],
+  C: ['As RV BRAVO, for receivers with air-intercept radar: the receiver takes over once it has radar contact.', 'At the turn range the tanker turns 180° LEFT and the receiver turns 45° RIGHT.'],
+  E: ['The tanker flies over the anchor point at the RV level on the hour and then every RV interval (normally 15 min: 10, 15 or 20 as briefed).', 'Receivers join on their own, 1000 ft below the RV level; receivers without AI radar fly the inbound track to the anchor point and arrive 30 s after the tanker.', 'Normally used to support CAPs; suitable with EMCON.'],
+  F: ['Tanker and receivers from the same base. Accompanied departure / buddy climb: receivers take off first and join the climbing tanker. Tailchase (degraded weather): tanker first, ARIP 1 min after the tanker\'s top of climb.', 'Receivers 1000 ft below until visual; the tanker reports the levels passed every 5000 ft.'],
+  G: ['Tanker and receivers fly independently to the ARIP at the ARCT; receivers 30 s after the ARCT at tanker KIAS + 20 (about 3 NM behind).', 'A common route of about 15 min of flight is planned to descend to the RV level, get visual and correct.'],
+  D: ['The tanker meets the helicopters on the reciprocal of the HAAR track at the AAR altitude with 2–5 NM lateral offset (3 NM best).', 'Abeam the receivers, about 3 min before the ARCT, it turns 180° (normally LEFT); trail distance after the turn less than 2 NM.', 'If the receivers are not in sight before passing abeam the ARIP, the tanker reverses and flies the NO-SHOW procedure.'],
+  H: ['No set pattern, VMC only: the tanker stabilises at the AAR altitude at least 5 NM from the receivers, then manoeuvres to ½ NM in trail to start the join-up.'] };
+const HAAR_RULES = ['Visibility: 3 NM minimum for a visual RV, 1 NM for an electronic RV; no flying into cloud after a contact.', 'Receivers stabilised at or below the receiver height at AAR speed not later than the ARIP; at the join-up altitude not later than the ARCP: LOW join 300 ft below the tanker, HIGH join 200 ft above.', 'Receivers fly 115 KIAS from the ARIP to the ARCP until the tanker has passed abeam all receivers.', 'Arrival at the ARCP: receivers not more than 1 min early, tanker not more than 1 min late.', 'Join-up: at ½ NM the tanker calls "ONE-HALF NM IN TRAIL"; when its nose passes the receiver\'s 3 o\'clock the receiver calls VISUAL and passes the lead.', 'Crossover at least 50 ft above the tanker\'s tail and only if the other side is free.', 'NO-SHOW: tanker slows to 180 KIAS between ARIP and ARCP and continues on the track; receiver continues at the join-up altitude to the abort / turn point.'];
+const AAR_RULES = ['Altimeter 1013.2 hPa at or above the transition altitude (state the setting in the initial call if different).', 'Receivers approach from below and keep at least 1000 ft vertical separation until visual and at 1 NM.', 'Formations sharing a pattern: at least 3000 ft between them.', 'MARSA: the formation leader is responsible for the separation inside the AAR formation; ATC separates the formation from non-participating traffic.', 'Avoidance turns at 10° bank, announced: "(callsign) TURNING RIGHT, ROLLOUT HEADING 250".', 'Breakaway: on the call the receiver moves back and down immediately; the tanker climbs and accelerates.'];
+const EMCON_EN = { 1: 'EMCON 1 – all emitters authorised, full R/T (training)', 2: 'EMCON 2 – restricted R/T: silent formation, essential calls only', 3: 'EMCON 3 – silent R/T: formation, RV and AAR without radio', 4: 'EMCON 4 – emission out' };
+const TURN_RANGE = { B: { 25: [[230, 8.4], [250, 9.6], [270, 11.0], [290, 12.4], [310, 14.0], [330, 15.6], [350, 17.3]], 15: [[180, 9.2], [200, 10.9], [220, 12.8], [240, 14.9], [260, 17.2], [280, 19.6], [300, 22.2]] },
+  C: { 25: [[230, 5.4], [250, 6.2], [270, 7.0], [290, 7.9], [310, 8.8], [330, 9.8], [350, 10.9]], 15: [[180, 6.0], [200, 7.0], [220, 8.2], [240, 9.5], [260, 10.9], [280, 12.4], [300, 14.0]] } };
+const AOB_TABLE = { tas: [250, 300, 350, 400, 450], rows: [[15, 3, 5, 7, 9, 11], [13, 4, 6, 8, 10, 12], [11, 5, 7, 9, 11, 13], [9, 6, 9, 11, 14, 18], [7, 7, 11, 15, 19, 23], [5, 10, 15, 20, 25, 30], [3, 17, 24, 31, 38, 45]] };
+const stationOf = (tk, rc) => { const t = aarSys(tk.type), r = aarSys(rc.type); return t === 'BOOM' || (t === 'BOTH' && r === 'BOOM') ? 'BOOM' : t === 'BOTH' ? 'WING PODS (left / right)' : 'HOSE (left / right pod)'; };
+const offloadKg = rc => rc.cat === 'HELO' ? 600 : ['TRANSPORT', 'AEW', 'MPA'].includes(rc.cat) ? 8000 : 2000;
+function applyAAR(t) {
+  if (!t) return; const tks = t.flights.filter(f => f.task === 'AAR' || f.task === 'HAAR'); if (!tks.length) { t.aar = null; return; }
+  const gciOn = t.c2.find(c => ['GCI', 'AEW'].includes(c.key) && c.controller && !/not staffed/.test(c.controller)), ctl = gciOn ? `${gciOn.cs} PRI ${gciOn.freq}` : '';
+  const perTrack = {}, cards = tks.map((tk, i) => { const haar = tk.task === 'HAAR', rs = t.flights.filter(f => f.tanker === tk.id && ['RECEIVER', 'HAARRCV'].includes(f.task));
+    const trk = t.airspace.find(a => a.type === 'TRACK' && a.flight === tk.id), def = trk && trk.trk ? TRK().find(x => x.id === trk.trk) : null;
+    const v = haar ? ((S.variants && S.variants.HAAR && S.variants.HAAR.rv) || ['D'])[0] : ((S.variants && S.variants.AAR && S.variants.AAR.rv) || ['AUTO'])[0];
+    const rv = haar ? v : v === 'AUTO' ? (gciOn ? 'A' : 'E') : v;
+    const key = trk ? trk.name : 'X', k = perTrack[key] = (perTrack[key] || 0) + 1;
+    let alt; if (haar) alt = '2000 FT'; else if (def) { const lv = Math.min(def.hi, Math.max(def.lo, 180)) + (k - 1) * 30; alt = `FL${Math.min(lv, def.hi)}`; } else { const r = flRange(trk && trk.alt) || [220, 260]; alt = `FL${Math.min(r[1], r[0] + (k - 1) * 30)}`; }
+    const h = trk ? holdLoop(trk) : null, inb = h ? Math.round(h.arrows[0].brg) : null, course = def ? def.course : inb != null ? `${String(inb).padStart(3, '0')}/${String((inb + 180) % 360).padStart(3, '0')}` : '';
+    const leg = def ? def.leg : trk ? Math.round(dist(trk.pts[0], trk.pts[trk.pts.length - 1]) / 1.852) : '', width = def ? def.width : trk && trk.w ? trk.w : 7;
+    const alts = TRK().filter(x => x.kind === 'AAR' && def && x.id !== def.id).sort((a, b) => dist(trkCenter(a), trkCenter(def)) - dist(trkCenter(b), trkCenter(def)))[0];
+    const anchor = def ? fmtLL(def.ap1) : trk ? fmtLL(trk.pts[trk.pts.length - 1]) : BLANK;
+    const arip = ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(dest(trk.pts[0], bearing(trk.pts[trk.pts.length - 1], trk.pts[0]), (rv === 'D' ? 10 : 30) * 1.852)) : rv === 'F' ? `${BLANK} (1 min after the tanker's TOC)` : 'NA';
+    const arcp = rv === 'E' ? anchor : ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(trk.pts[0]) : 'NA';
+    const start = 15 + i * 5, card = [['RV TYPE', RV_EN[rv], 'EMCON', '1'], ['AAR TIME', totClock(start), 'END AAR', totClock(start + 45)], ['AR ENTRY POINT', 'NA', 'AR EXIT POINT', 'NA'], ['ANCHOR POINT', anchor, 'ARIP', arip],
+      ['AAR PATTERN', `LENGTH ${leg} NM · WIDTH ${width} NM · TURN LEFT · INB/OUTB ${course}`, '', ''], ['AAR TRK', trk ? trk.name.replace(/^Track /, '') : BLANK, 'ALTN AAR TRK', alts ? alts.id : 'NA'],
+      ['ARCP', arcp, 'ARCT', rv === 'E' ? `${totClock(start)}, then every 15 min` : ['B', 'C', 'G', 'D'].includes(rv) ? totClock(start) : 'NA'], ['AAR ALT', haar ? `${alt} (tanker) – receivers join ${'low 300 ft below'}` : `${alt} (base AAR altitude) – receivers ${alt.startsWith('FL') ? 'FL' + (+alt.slice(2) - 10) : '1000 ft below'} until visual`, 'AAR SPD', haar ? 'Receivers 115 KIAS (ARIP → ARCP)' : '270 KIAS'],
+      ['AAR FREQ', BLANK, 'AA TAC CHAN', BLANK], ['TANKER C/S', `${tk.cs} (${tk.type}, ${aarSys(tk.type) || 'drogue'})`, '', ''], ...rs.map(r => ['RECEIVERS C/S', `${r.cs} (${r.size} × ${r.type}) – ${stationOf(tk, r)}`, 'OFFLOAD', `≈ ${offloadKg(r) * r.size} kg`]),
+      ['AAR ABORT', 'NA', 'SPARE', 'NA'], ['RECEIVERS ALTN', [...new Set(rs.map(r => r.base).filter(Boolean))].join(' / ') || BLANK, 'TANK ALTN', tk.base || BLANK], ['AGENCIES', ctl || 'NIL (no GCI on station)', '', ''], ['NOTE', haar ? HAAR_RULES[1] : 'Receivers report fuel state and intentions after AAR in echelon left.', '', '']];
+    if (haar) card.splice(5, 0, ['TRAIL DST', '< 2 NM after the turn', 'JOIN-UP', 'LOW (300 ft below) / HIGH (200 ft above)']);
+    // phraseology filled with the event callsigns
+    const r0 = rs[0] || { cs: 'RECEIVER 1', type: '' }, st = rs[0] ? stationOf(tk, r0) : 'HOSE', boom = st === 'BOOM', gc = gciOn ? gciOn.cs.replace(/ RADAR$/, '') : null, ph = [];
+    if (rv === 'A' && gc) ph.push(['RV ALPHA – with the GCI', [[`${gc}, ${r0.cs}`, `SINGLE SHIP ${r0.type ? r0.type.toUpperCase() : ''} CHECKING IN`], [`${r0.cs}, ${gc}`, `RADAR CONTACT, PROVIDING CLOSE POSITIVE CONTROL, TANKER BRAA ${BLANK}, LEVEL ${alt.replace('FL', '')}, THIS WILL BE RENDEZVOUS ALPHA, TANKER FREQUENCY ${BLANK}, MAINTAIN ${alt.startsWith('FL') ? 'FL' + (+alt.slice(2) - 10) : BLANK}`], [`${gc}, ${r0.cs}`, 'ROGER, THIS WILL BE RENDEZVOUS ALPHA, MAINTAINING'], [`${r0.cs}, ${gc}`, `FLY HEADING ${BLANK}, REPORT VISUAL`], [`${gc}, ${r0.cs}`, 'VISUAL WITH TANKER'], [`${r0.cs}, ${gc}`, `CONTACT ${tk.cs} ON ${BLANK}`]]]);
+    if (['B', 'C'].includes(rv)) ph.push([`${RV_EN[rv]} – initial call and DF`, [[`${r0.cs}, ${tk.cs}`, `FOR RV ${rv === 'B' ? 'BRAVO' : 'CHARLIE'}, MY LEVEL ${alt}, WHEN CLEARED YOUR LEVEL ${BLANK}, SET AA TACAN ${BLANK}, MODE 3 ${BLANK}, TIMING ${BLANK}`], [`${tk.cs}, ${r0.cs}`, 'READBACK, NOSE COLD, SWITCHES SAFE'], [`${r0.cs}, ${tk.cs}`, 'TRANSMIT FOR DF'], [`${tk.cs}, ${r0.cs}`, 'TRANSMITTING FOR DF'], [`${r0.cs}, ${tk.cs}`, `TURN LEFT HEADING ${BLANK}`]]]);
+    ph.push([`Tanker phase – ${boom ? 'BOOM' : 'PROBE AND DROGUE'}`, boom ? [[`${tk.cs}, ${r0.cs}`, 'CLEAR TO JOIN ECHELON LEFT, CONFIRM NOSE COLD, SWITCHES SAFE'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ASTERN'], [`${r0.cs}, ${tk.cs}`, 'ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED CONTACT WET (or DRY)'], [`${tk.cs}, ${r0.cs}`, '30 FT … 20 FT … 10 FT … 5 FT'], [`${r0.cs}, ${tk.cs}`, 'CONTACT'], [`${r0.cs}, ${tk.cs}`, 'REFUELLING COMPLETED, REQUEST DISCONNECT'], [`${tk.cs}, ${r0.cs}`, 'CLEARED TO DISCONNECT, REPORT ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ECHELON RIGHT'], [`${r0.cs}, ${tk.cs}`, 'ECHELON RIGHT, READY TO LEAVE'], [`${tk.cs}, ${r0.cs}`, `OFFLOAD ${BLANK} KG, CLEAR TO LEAVE, 1000 FT HIGHER${gc ? `, CONTACT ${gc} ON ${BLANK}` : ''}`]]
+      : [[`${tk.cs}, ${r0.cs}`, `CLEAR TO JOIN ECHELON LEFT, ${st.split(' (')[0]} IN USE, CONFIRM NOSE COLD, SWITCHES SAFE`], [`${r0.cs}, ${tk.cs}`, 'ECHELON LEFT, REQUEST CONTACT WET'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ASTERN'], [`${r0.cs}, ${tk.cs}`, 'ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED CONTACT WET'], [`${r0.cs}, ${tk.cs}`, 'REFUELLING COMPLETED'], [`${tk.cs}, ${r0.cs}`, 'CLEARED TO DISCONNECT, REPORT ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ECHELON RIGHT'], [`${r0.cs}, ${tk.cs}`, 'ECHELON RIGHT, READY TO LEAVE'], [`${tk.cs}, ${r0.cs}`, `OFFLOAD ${BLANK} KG, CLEAR TO LEAVE${gc ? `, CONTACT ${gc} ON ${BLANK}` : ''}`]]]);
+    return { tanker: tk.cs, haar, rv, alt, card, how: RV_HOW[rv] || [], ph, receivers: rs.map(r => r.cs), track: trk ? trk.name : '' }; });
+  t.aar = { cards, emcon: 1, rules: AAR_RULES, haarRules: cards.some(c => c.haar) ? HAAR_RULES : [] };
+  const sp = t.spins || (t.spins = []);
+  cards.forEach(c => sp.push(`${c.tanker}: ${RV_EN[c.rv]}, ${c.alt}${c.receivers.length ? ', receivers ' + c.receivers.join(', ') : ''} – AAR card in the AAR pack.`));
+  sp.push(`${EMCON_EN[1]}. MARSA inside each AAR formation; altimeter 1013.2 hPa above the transition altitude; receivers 1000 ft below the tanker until visual; at least 3000 ft between formations sharing a pattern.`);
+}
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
-  assignBases(flights, geom());
+  assignBases(flights, geom()); qraSetup(flights);
   flights.forEach(f => f.pkg = PKG_OF[f.task] || 'S');
   // escorts join the package they protect
   const has = p => flights.some(f => f.pkg === p && f.task !== 'ESCORT');
@@ -2320,7 +2573,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); fitAirspace(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); fitAirspace(S.t);
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -2329,7 +2582,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); fitAirspace(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); fitAirspace(S.t);
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -2502,6 +2755,7 @@ function drawMap(fit) {
     if (on) add(L.polyline(z.axis, { color: '#7e22ce', weight: 1.5 })); });
   if ((S.thDraft || []).length) { add(L.polyline(S.thDraft.concat(S.thDraft.length > 2 ? [S.thDraft[0]] : []), { color: '#0f172a', weight: 2, dashArray: '6 4' })); S.thDraft.forEach(p => add(L.circleMarker(p, { radius: 4, color: '#0f172a' }))); }
   if (TAB === 'scenario' && aarWanted()) aarNear().forEach(t => { const on = (S.trkSel || []).includes(t.id);
+    holdLoop(t).arrows.forEach(x => add(L.polyline(arrowPts(x), { color: '#EA580C', weight: on ? 3 : 1.5, interactive: false })));
     const pl = add(L.polygon(trkShape(t), { color: '#EA580C', weight: on ? 3 : 1.5, dashArray: on ? null : '8 5', fillOpacity: on ? .12 : .03 })).bindTooltip(`Track AAR ${t.id} · FL${t.lo}–FL${t.hi} · aree ${t.areas.join(', ')}${on ? ' · SCELTA' : ' · clic per sceglierla'}`, { sticky: true });
     pl.on('click', () => { if (!ADDMODE) trkToggle(t.id); }); });
   if (theatre().poly && ADDMODE !== 'th:draw') add(L.polygon(theatre().poly, { color: '#0f172a', weight: 1.5, dashArray: '10 6', fill: false, interactive: false }));
@@ -2519,9 +2773,10 @@ function drawMap(fit) {
     for (const a of S.t.airspace) {
       const c = '#0284C7';
       if (a.type === 'ORBIT' && a.pub) orbitShapes(a).forEach(l => add(L.polyline(l, { color: c, weight: 2, opacity: .8 })));
+      if (a.type === 'CAP' && a.cap) { const h = capLoop(a); add(L.polygon(h.ring, { color: c, weight: 1.5, dashArray: '6 4', fillOpacity: .03 })).bindTooltip(`${a.name} · ${a.capType || 'CAP'} · ${a.alt}`); h.arrows.forEach(x => add(L.polyline(arrowPts(x, 2), { color: c, weight: 2 }))); }
       if (a.type === 'FLOT') { }
       else if (a.type === 'ROUTE') { add(L.polyline(a.pts, { color: a.kind === 'LOW' ? '#16a34a' : '#7c3aed', weight: 3, opacity: .85, dashArray: a.kind === 'LOW' ? '8 5' : null })).bindTooltip(a.name); a.pts.forEach((q, i) => add(L.circleMarker(q, { radius: 5, color: '#111', weight: 1, fillColor: '#fff', fillOpacity: 1 })).bindTooltip((a.names || [])[i] || '')); }
-      else if (a.type === 'TRACK') add(L.polyline(a.loop ? a.loop.concat([a.loop[0]]) : a.pts, { color: c, weight: a.loop ? 3 : 4, opacity: .8 })).bindTooltip(a.name);
+      else if (a.type === 'TRACK') { const h = holdLoop(a); add(L.polygon(h.ring, { color: c, weight: 3, opacity: .85, fillOpacity: .05 })).bindTooltip(`${a.name} · ${a.alt || ''} · left turns`); h.arrows.forEach(x => add(L.polyline(arrowPts(x), { color: c, weight: 3 }))); h.marks.forEach(([q, l]) => add(L.circleMarker(q, { radius: 3, color: c, weight: 2 })).bindTooltip(l)); }
       else if (a.type === 'KILLBOX') { const p = a.pts[0], h = a.size / 2; add(L.polygon([dest(dest(p, 0, h), 90, h), dest(dest(p, 0, h), 270, h), dest(dest(p, 180, h), 270, h), dest(dest(p, 180, h), 90, h)], { color: '#CA8A04', weight: 1.5, fillOpacity: .05 })).bindTooltip(a.name); }
       else if (a.type === 'BULLSEYE') { add(L.circle(a.pts[0], { radius: 18520, color: '#D97706', weight: 1, fill: false })); add(L.marker(a.pts[0], { icon: icon('#f59e0b', '◎', a.name, 'circle', 16) })); }
       else add(L.marker(a.pts[0], { icon: icon(c, a.type[0], a.name, 'circle', 14) })).bindTooltip(AST[a.type]);
@@ -2651,9 +2906,13 @@ function zonePickHtml(zs) { const res = new Set(S.reserved || []);
 function zonePick(p, zs) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs)).openOn(MAP); }
 // zone list: filter by name/id, type, selection, range; sort by distance, name, type or lower limit
 const ZF = { q: '', type: '', sel: '', all: false, sort: 'dist' };
+// mission level band (S.meta.levels = [bottom, upper] in FL, 600 = UNL): areas that overlap it, even partly (touching only = hidden); unknown (TBC) upper limit = shown
+const LVMAX = 600, lvBand = () => { const l = S.meta && S.meta.levels; return l && (l[0] > 0 || l[1] < LVMAX) ? l : null; };
+const lvTxt = v => v <= 0 ? 'SFC' : v >= LVMAX ? 'UNL' : 'FL' + String(v).padStart(3, '0');
+const lvOk = z => { const b = lvBand(); if (!b) return true; const up = /TBC|TBD/i.test(String(z.upper)) ? 999 : zLimit(z.upper); return zLo(z.lower) < b[1] && up > b[0]; };
 const zfNorm = x => String(x || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
 const zfMatch = (z, res) => { const q = zfNorm(ZF.q);
-  return (!q || zfNorm(z.name + z.id).includes(q) || String(z.activity || '').toLowerCase().includes(ZF.q.trim().toLowerCase())) && (!ZF.type || (ZF.type === 'custom' ? z.custom : z.type === ZF.type && !z.custom)) && (!ZF.sel || (ZF.sel === 'on') === res.has(z.id)); };
+  return lvOk(z) && (!q || zfNorm(z.name + z.id).includes(q) || String(z.activity || '').toLowerCase().includes(ZF.q.trim().toLowerCase())) && (!ZF.type || (ZF.type === 'custom' ? z.custom : z.type === ZF.type && !z.custom)) && (!ZF.sel || (ZF.sel === 'on') === res.has(z.id)); };
 function zfList(near) { const L0 = ZF.all ? LIB().filter(z => z.type !== 'COR') : near.concat(CUS().filter(c => !near.includes(c))), c = theatre().red.center;
   const k = { dist: z => dist(c, centroid(z.poly)), name: z => z.name.toLowerCase(), type: z => (z.custom ? 'ZZ' : z.type) + ' ' + z.name.toLowerCase(), lo: z => zLo(z.lower) };
   const f = k[ZF.sort] || k.dist; return L0.slice().sort((a, b) => { const x = f(a), y = f(b); return x < y ? -1 : x > y ? 1 : 0; }); }
@@ -2663,6 +2922,16 @@ function zfFit() { if (!MAP || !ZF.all) return; const pts = mapZones().flatMap(z
 function zfApply() { const res = new Set(S.reserved || []); let n = 0, m = 0;
   document.querySelectorAll('tr[data-zrow]').forEach(tr => { const z = LIB().find(x => x.id === tr.dataset.zrow); const ok = z && zfMatch(z, res); tr.hidden = !ok; m++; if (ok) n++; });
   const c = $('#zfcount'); if (c) c.textContent = `${n} di ${m} mostrate`; }
+function lvHtml() { const l = (S.meta && S.meta.levels) || [0, LVMAX], out = RES().filter(z => !z.custom && !lvOk(z));
+  return `<div class="card" style="margin-top:8px;padding:8px 10px"><div class="row" style="align-items:center;flex-wrap:wrap"><b style="font-size:13px">Quote della missione</b><span id="zlvtxt" style="font-size:13px">${lvTxt(l[0])} – ${lvTxt(l[1])}</span><span class="muted" style="font-size:12px;flex:1">nasconde le aree che non hanno quote in comune (quelle che le toccano solo al bordo comprese)</span><button class="b sm shrink" id="zlvall">Tutte le quote</button></div>
+    <div class="row" style="align-items:center;gap:8px"><label style="margin:0;min-width:60px">Bottom</label><input type="range" id="zlvlo" min="0" max="${LVMAX}" step="5" value="${l[0]}" style="flex:1"></div>
+    <div class="row" style="align-items:center;gap:8px"><label style="margin:0;min-width:60px">Upper</label><input type="range" id="zlvhi" min="0" max="${LVMAX}" step="5" value="${l[1]}" style="flex:1"></div>
+    ${out.length ? `<div class="warn" style="margin-top:4px">Aree riservate fuori dalle quote della missione: ${out.map(z => esc(z.name)).join(', ')}</div>` : ''}
+    <p class="muted" style="font-size:12px;margin:4px 0 0">Imposta prima le quote: "Proponile tu" sceglie solo tra le aree che le contengono.</p></div>`; }
+let lvSaveT = null;
+function lvInput(t) { const l = (S.meta.levels || [0, LVMAX]).slice(); if (t.id === 'zlvlo') l[0] = +t.value; else l[1] = +t.value;
+  if (l[0] >= l[1]) { if (t.id === 'zlvlo') l[0] = Math.max(0, l[1] - 5); else l[1] = Math.min(LVMAX, l[0] + 5); t.value = t.id === 'zlvlo' ? l[0] : l[1]; }
+  S.meta.levels = l; const tx = $('#zlvtxt'); if (tx) tx.textContent = `${lvTxt(l[0])} – ${lvTxt(l[1])}`; zfApply(); zfMapLater(); clearTimeout(lvSaveT); lvSaveT = setTimeout(save, 400); }
 function zoneTableHtml(near, res) {
   const list = zfList(near), types = [...new Set(list.filter(z => !z.custom).map(z => z.type))].sort(), shown = list.filter(z => zfMatch(z, res)).length;
   const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`;
@@ -2674,7 +2943,7 @@ function zoneTableHtml(near, res) {
     <div style="flex:1 1 120px"><label>Elenco</label><select id="zfall">${opt('', 'Vicino al teatro', ZF.all ? 'x' : '')}${opt('1', 'Tutta Italia', ZF.all ? '1' : '')}</select></div></div>
   <div class="row" style="flex-wrap:wrap;align-items:center;margin-top:4px"><span class="muted" style="font-size:12px" id="zfcount">${shown} di ${list.length} mostrate</span>
     <button class="b sm shrink" id="zfon">Seleziona le mostrate</button><button class="b sm shrink" id="zfoff">Deseleziona le mostrate</button>${ZF.q || ZF.type || ZF.sel ? '<button class="b sm shrink" id="zfreset">Togli filtri</button>' : ''}</div>
-  ${list.length ? `<div data-keep="zlist" id="zlist" style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
+  ${list.length ? `<div data-keep="zlist" id="zlist" style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}${/TBC|TBD/i.test(String(z.upper)) ? '<div style="font-size:11px">quota da confermare</div>' : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
 }
 function aspCard() {
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
@@ -2684,6 +2953,7 @@ function aspCard() {
   <div class="card"><details${a && a.source === 'aip' ? '' : ' open'}><summary class="muted" style="font-size:12px;cursor:pointer">Fonte dei dati: <b>${src}</b> · ${LIB().length} zone <span style="color:var(--accent,#2563eb)">(cambia)</span></summary><div class="muted" style="font-size:12px;margin-top:4px">${LIB().length} zone · ${((a && a.freqs) || []).length} frequenze · ${BUL().length} bullseye · ${TRK().filter(t => t.kind === 'AAR').length} track AAR · ${TRK().filter(t => t.kind === 'AEW').length} track AEW${a ? ' · ' + new Date(a.loaded).toLocaleString() : ''}</div>
   <div class="row" style="margin-top:6px;flex-wrap:wrap">${AIPDATA && S.asp && S.asp.source !== 'aip' ? '<button class="b sm shrink" id="aspaip">Torna alle zone AIP</button>' : ''}<label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label></div>
   <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div></details>
+  ${lvHtml()}
   <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center"><span style="font-size:13px"><b>Aree riservate</b> (${RES().length} selezionate):</span>
     <button class="b sm shrink ${S.resMode === 'auto' ? 'primary' : ''}" id="resauto" title="Il generatore propone le aree in base a teatro ed evento">Proponile tu</button>
     <button class="b sm shrink ${S.resMode === 'manual' ? 'primary' : ''}" id="resman" title="Selezioni tu le aree: il generatore non le cambia">Le scelgo io</button>
@@ -2756,7 +3026,8 @@ function wBody(id) {
   switch (id) {
     case 'ev': return `<p class="muted" style="margin-top:0">Scegli uno o più tipi (si possono combinare). "Misto" è uno scenario operativo completo con tutte le minacce.</p>
       ${Object.entries(EVT_GROUPS).map(([gk, gl]) => `<div class="muted" style="font-size:11px;margin-top:6px">${gl}</div><div class="chips">${Object.entries(EVT).filter(([k, v]) => v.kind === gk).map(([k, v]) => `<label class="chip"><input type="checkbox" data-evt="${k}" ${evChosen() && evIds().includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>`).join('')}
-      ${evChosen() && P.sober ? `<p class="muted" style="font-size:12px">${P.civil ? 'Evento civile: niente fazioni, minacce né spazio aereo riservato.' : 'Evento senza opposizione: niente fazioni, minacce o uso di armi.'}</p>` : ''}`;
+      ${evChosen() && P.sober ? `<p class="muted" style="font-size:12px">${P.civil ? 'Evento civile: niente fazioni, minacce né spazio aereo riservato.' : 'Evento senza opposizione: niente fazioni, minacce o uso di armi.'}</p>` : ''}
+      ${varHtml()}`;
     case 'req': return `<p class="muted" style="margin-top:0">Ruoli richiesti ai partecipanti. Un ruolo tolto non viene assegnato e sparisce dai documenti.</p>${reqCard()}`;
     case 'th': return `<label>Nome evento</label><div class="row"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop" title="Nome casuale">🎲</button></div>
       <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', { ...(thChosen() || ADDMODE === 'th:draw' ? {} : { '': '— scegli il teatro —' }), ...thl, CUSTOM: S.thCustom ? `✏️ ${S.thCustom.name}${S.thCustom.name === 'Teatro disegnato' ? '' : ' (disegnato a mano)'}` : '✏️ Disegnalo tu sulla mappa…' }, ADDMODE === 'th:draw' ? 'CUSTOM' : S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth" title="Teatro casuale">🎲</button></div>
@@ -2988,6 +3259,8 @@ function renderExport() {
   <div class="row" style="margin-top:6px"><button class="b" id="pubhtml">Scarica pagina pubblica (.html)</button></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>
   ${notamHtml()}
+  ${S.t && S.t.gci ? `<div class="card"><b>GCI / QRA pack – solo staff e controllori</b><p class="muted" style="margin:4px 0">Messaggi di scramble (TANGO) con i campi dinamici vuoti, inject con gli orari, brief dei bersagli, segnali di intercettazione ICAO, scheda di briefing GCI, blocchi, criteri di kill, tabelle di autenticazione, CAP, checklist e fraseologia con i nominativi dell'evento.</p><button class="b primary shrink" id="gcipack">Scarica GCI pack</button></div>` : ''}
+  ${S.t && S.t.aar ? `<div class="card"><b>AAR pack – tanker, ricevitori e controllori</b><p class="muted" style="margin:4px 0">Una AAR card per tanker (${S.t.aar.cards.map(c => esc(c.tanker) + ' ' + c.rv).join(', ')}) con lo schema della track, la procedura di rendezvous, la fraseologia (boom o sonda e cestello), le regole generali, EMCON e le tabelle di riferimento.</p><button class="b primary shrink" id="aarpack">Scarica AAR pack</button></div>` : ''}
   ${REL().aib ? `<div class="card"><b>AIB pack (antincendio) – solo staff e DOS</b><p class="muted" style="margin:4px 0">Per ogni incendio: mappa, richiesta di concorso aereo COAU, aeromobili assegnati, briefing DOS ed equipaggi, evoluzione dell'incendio con gli inject (solo staff), registro dello stato; in fondo la scheda vuota stampabile.</p>
     <div class="row" style="flex-wrap:wrap">${S.aib.list.map(sc => `<button class="b shrink" data-aibpack="${sc.id}">${sc.id}</button>`).join('')}<button class="b primary shrink" data-aibpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().sar ? `<div class="card"><b>SAR pack (SAR civile) – solo staff e RCC</b><p class="muted" style="margin:4px 0">Per ogni scenario: mappa delle aree e degli schemi, chiamata di soccorso, search action plan, briefing SAR, SITREP, debriefing, scheda per chi interpreta i dispersi e, in fondo, le soluzioni.</p>
@@ -3030,7 +3303,7 @@ function facEdit(t, end) {
   S.factions[k] = nv; if (end) FAC_ED = null; save(); clearTimeout(facEdit._t); facEdit._t = setTimeout(() => drawMap(), 120);
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); zfMapLater(); } });
+document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); zfMapLater(); } if (e.target.id === 'zlvlo' || e.target.id === 'zlvhi') lvInput(e.target); });
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.edit) {
@@ -3049,6 +3322,7 @@ document.addEventListener('change', e => {
     S.t[t.dataset.list] = ['codewords', 'timeline'].includes(t.dataset.list) ? lines.map(l => { const i = l.indexOf('='); return i < 0 ? [l, ''] : [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }) : lines;
     save(); return;
   }
+  if (t.id === 'zlvlo' || t.id === 'zlvhi') { save(); renderPanel(); drawMap(); return; }
   if (['zftype', 'zfsel', 'zfsort', 'zfall'].includes(t.id)) { const k = t.id.slice(2); ZF[k] = k === 'all' ? !!t.value : t.value; renderPanel(); drawMap(k === 'all' && !ZF.all); if (k === 'all') zfFit(); return; }
   if (t.dataset.res !== undefined) { if (!S.resMode) S.resMode = 'manual'; const set = new Set(S.reserved || []); t.checked ? set.add(t.dataset.res) : set.delete(t.dataset.res); S.reserved = [...set]; save(); renderPanel(); drawMap(); return; }
   if (t.id === 'ptsurl') { lsSet('ivao-so-pts-url', t.value.trim()); return; }
@@ -3123,11 +3397,14 @@ document.addEventListener('click', e => {
   if (t.id === 'cusscen') { const c = cusFromScenario(); toast(c ? `${c.name} creata attorno a tutto lo scenario` : 'Scenario vuoto'); renderPanel(); drawMap(); return; }
   if (t.id === 'notamtxt') { download(`${fileBase()}_NOTAM.txt`, new Blob([notamList().map(n => n.text).join('\n\n') + '\n'], { type: 'text/plain' })); return; }
   if (t.dataset.trk) { trkToggle(t.dataset.trk); return; }
+  if (t.dataset.var) { varToggle(t.dataset.var); return; }
   if (t.dataset.cor) { const z = CORS().find(x => x.id === t.dataset.cor), st = new Set(S.cor || []); if (z) { st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
   if (t.dataset.prpack) { exportPrPack(t.dataset.prpack, t); return; }
   if (t.dataset.sarpack) { exportSarPack(t.dataset.sarpack, t); return; }
   if (t.dataset.aibpack) { exportAibPack(t.dataset.aibpack, t); return; }
+  if (t.id === 'gcipack') { exportGciPack(t); return; }
+  if (t.id === 'aarpack') { exportAarPack(t); return; }
   if (t.dataset.c2del) { S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
   if (t.dataset.del) {
     const k = t.dataset.del, id = t.dataset.id;
@@ -3158,6 +3435,7 @@ document.addEventListener('click', e => {
     case 'resman': toManual(); save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
     case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
       S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); toManual(); save(); renderAll(); return; }
+    case 'zlvall': S.meta.levels = null; save(); renderPanel(); drawMap(); return;
     case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); drawMap(); return;
     case 'resnone': S.resMode = 'manual'; S.cor = []; S.trkSel = []; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
     case 'genauto': S.resMode = 'auto'; WOPEN = 'gen'; generateGeneric(); return;
@@ -3280,9 +3558,10 @@ async function renderMap(mode, opt = {}) {
   } else if (S.t) {
     for (const a of S.t.airspace) {
       if (a.type === 'ORBIT' && a.pub) orbitShapes(a).forEach(l => line(l, K2('#38bdf8'), 2.5));
+      if (a.type === 'CAP' && a.cap) { const h = capLoop(a); line(h.ring.concat([h.ring[0]]), K2('#38bdf8'), 2, [8, 6]); h.arrows.forEach(x => line(arrowPts(x, 2), K2('#38bdf8'), 2.5)); }
       if (a.type === 'FLOT') { }
       else if (a.type === 'ROUTE') { line(a.pts, K2(a.kind === 'LOW' ? '#4ade80' : '#a78bfa'), 3.5, a.kind === 'LOW' ? [10, 6] : null); a.pts.forEach((q, i) => { dot(q, '#ffffff', 5); const [x, y] = P(q); label((a.names || [])[i] || '', x + 8, y - 6, K2('#e5e7eb'), 15); }); }
-      else if (a.type === 'TRACK') { line(a.loop ? a.loop.concat([a.loop[0]]) : a.pts, K2('#38bdf8'), a.loop ? 3.5 : 5); const [x, y] = P(a.pts[0]); label(a.name, x + 6, y - 6, K2('#bae6fd'), 16); }
+      else if (a.type === 'TRACK') { const h = holdLoop(a); line(h.ring.concat([h.ring[0]]), K2('#38bdf8'), 3.5); h.arrows.forEach(x => line(arrowPts(x), K2('#38bdf8'), 3.5)); const [x, y] = P(h.ring[0]); label(a.name, x + 6, y - 6, K2('#bae6fd'), 16); }
       else if (a.type === 'KILLBOX') { const [x, y] = P(a.pts[0]); const s = a.size * kmPx(a.pts[0][0]); c.strokeStyle = K2('#facc15'); c.lineWidth = 2; c.strokeRect(x - s / 2, y - s / 2, s, s); label(a.name, x - s / 2, y - s / 2 - 5, K2('#fde68a'), 16); }
       else if (a.type === 'BULLSEYE') { circle(a.pts[0], 18.52, K2('#fbbf24'), null); circle(a.pts[0], 37.04, K2('rgba(251,191,36,.5)'), null); const [x, y] = P(a.pts[0]); label('◎ ' + a.name, x + 6, y + 16, K2('#fde68a'), 16); }
       else { dot(a.pts[0], '#0ea5e9', 6); const [x, y] = P(a.pts[0]); label(a.name, x + 9, y + 4, K2('#bae6fd'), 16, false); }
@@ -3591,12 +3870,13 @@ const GLOSSARY = {
   ROE: 'Rules of Engagement', SPINS: 'Special Instructions for the mission', TOT: 'Time on Target', CAP: 'Combat Air Patrol',
   IP: 'Initial Point – start of the attack run', SEAD: 'Suppression of Enemy Air Defences', DEAD: 'Destruction of Enemy Air Defences',
   SAM: 'Surface-to-Air Missile', EWR: 'Early-Warning Radar', MANPADS: 'Man-Portable Air-Defence System', AAA: 'Anti-Aircraft Artillery',
-  DCA: 'Defensive Counter Air', OCA: 'Offensive Counter Air', QRA: 'Quick Reaction Alert', RENEGADE: 'Civil aircraft suspected of being used as a weapon',
+  DCA: 'Defensive Counter Air', OCA: 'Offensive Counter Air', QRA: 'Quick Reaction Alert', 
   CAS: 'Close Air Support', JTAC: 'Joint Terminal Attack Controller', 'KILL BOX': 'Area where weapons release is controlled for CAS',
   HVT: 'High-Value Target', CSAR: 'Combat Search and Rescue', RESCORT: 'Rescue escort', ISOP: 'Isolated personnel',
   AAR: 'Air-to-Air Refuelling', AEW: 'Airborne Early Warning', GCI: 'Ground-Controlled Interception', 'DZ / LZ': 'Drop zone / Landing zone',
   'LOW & SLOW': 'Interception of slow, low-flying targets such as helicopters', ASuW: 'Anti-Surface Warfare', MPA: 'Maritime Patrol Aircraft'
 };
+Object.assign(GLOSSARY, { 'ALPHA CHECK': 'Check of the bearing and range of the bullseye from the aircraft', ANGELS: 'Altitude of friendly aircraft in thousands of feet (ANGELS 18 = 18000 ft)', PLAYTIME: 'Time the aircraft can stay in the area of operations (hours + minutes)', PICTURE: 'Tactical situation of the area, normally in BULLSEYE format', BRAA: 'Bearing, range, altitude and aspect of a contact from the fighter', BOGEY: 'Unidentified aircraft', BANDIT: 'Aircraft identified as enemy; does not imply clearance to engage', HOSTILE: 'Enemy aircraft; clearance to engage implied', JUDY: 'Radar contact on the target: the fighter (or receiver) completes the intercept on its own', TALLY: 'Visual contact on the target', COMMIT: 'Start an intercept against a target', 'BUSTER / GATE': 'BUSTER: military power; GATE: maximum power', STRANGLE: 'Switch off the equipment named (STRANGLE PARROT = transponder off)', PARROT: 'Military IFF transponder', 'KNOCK IT OFF': 'Stop all activity for safety reasons', TERMINATE: 'Stop the engagement when the training objective is achieved', 'T-SCRAMBLE': 'TANGO scramble: simulated QRA scramble ordered for training', VID: 'Visual identification of the intercepted aircraft', 'EXIT GATE': 'Departure gate 15 NM from the alert base (NOVEMBER, ECHO, SIERRA, WHISKEY) giving the first heading after take-off', 'IOAT / VOAT': 'Operational air traffic flying under instrument (IOAT) or visual (VOAT) rules', BarCAP: 'Barrier combat air patrol protecting an airspace for a set time', HAVCAP: 'High asset value CAP protecting AEW, tankers and ISR aircraft', ResCAP: 'Rescue CAP protecting the CSAR forces and the isolated personnel', TarCAP: 'Target CAP near a ground target, protecting the attack aircraft', ForCAP: 'Force CAP: escort of the strike forces', ARIP: 'Air refuelling initial point: where tanker and receivers start the rendezvous', ARCP: 'Air refuelling control point: where the receivers arrive astern / in observation of the tanker', ARCT: 'Air refuelling control time at the ARCP', 'ANCHOR POINT': 'Reference point on which the tanker pattern is built', 'BASE AAR ALTITUDE': 'Altitude of the (lowest) tanker during the refuelling', ASTERN: 'Stabilised position behind the drogue or the boom before contact', 'ECHELON LEFT / RIGHT': 'Positions on the tanker\'s left wing before AAR and on the right wing after AAR', BREAKAWAY: 'Emergency separation call during AAR', TOBOGGAN: 'Request to the tanker for a slow descent at refuelling speed (300–500 ft/min)', 'DRY / WET CONTACT': 'Contact without / with fuel transfer', 'NOSE COLD': 'Radar on standby', 'SWITCHES SAFE': 'Armament selected safe / off', MARSA: 'Military assumes responsibility for separation of aircraft inside the formation', EMCON: 'Emission control: restrictions on radio and electronic emissions (options 1–4)', HAAR: 'Helicopter air-to-air refuelling' });
 Object.assign(GLOSSARY, { COAU: 'Unified air operations centre – coordinates the state firefighting fleet and issues the air support requests', TBT: 'Ground-air-ground radio link between the DOS and the aircraft', BAT: 'Buster Air Traffic – state aircraft with civil registration on urgent public safety, customs or civil protection missions', OPAREA: 'Flight plan item 18 indicator giving the place of operations', DATUM: 'Reference point, line or area used to plan a search', CSP: 'Commence search point', SITREP: 'Situation report from the on-scene coordinator to the RCC', AMC: 'Air mission commander – coordinates the CSAR task force (usually AWACS)', OSC: 'On-scene commander – controls the recovery in the objective area', SARDOT: 'Reference point known only to friendly forces, used to pass positions', CSARTF: 'Combat search and rescue task force', LZ: 'Landing zone', MTF: 'Medical treatment facility', JTAC: 'Joint Terminal Attack Controller – directs close air support from the ground', CP: 'Control point – named holding point for CAS aircraft', BOC: 'Bombs on coordinates', BOT: 'Bombs on target', FAH: 'Final attack heading', TOT: 'Time on target', '9-LINE': 'Standard CAS attack briefing passed by the JTAC',  SAR: 'Search and Rescue', HEMS: 'Helicopter Emergency Medical Service', MEDEVAC: 'Medical evacuation', RCC: 'Rescue Coordination Centre', DOS: 'Fire operations director – the on-scene commander who authorises every water drop', AIB: 'Aerial firefighting (wildfire suppression from the air)', IFR: 'Instrument Flight Rules', VFR: 'Visual Flight Rules', 'RECEIVER': 'Aircraft taking fuel from a tanker', 'HOLD': 'Holding pattern', EMS: 'Emergency Medical Services dispatch' });
 const ROLE_DESC = {
   SEAD: 'Locate and neutralise SAM sites and radars to open the corridor for the strike package.',
@@ -3604,7 +3884,7 @@ const ROLE_DESC = {
   CAS: 'Support friendly troops against armoured columns under JTAC control inside the kill box.',
   DCA: 'Hold the assigned CAP and defend BLUE airfields and high-value assets from hostile raids.',
   OCA: 'Sweep ahead of the package and clear hostile fighters.', ESCORT: 'Protect the package against hostile fighters.',
-  QRA: 'Scramble on alert, intercept, identify and shepherd unknown or RENEGADE traffic.',
+  QRA: 'Scramble on alert, intercept, identify and handle unknown or non-cooperative traffic as tasked.',
   LOWSLOW: 'Detect and intercept low-flying helicopters infiltrating friendly territory.',
   ANTISHIP: 'Locate and engage hostile surface vessels.', MPA: 'Locate, identify and track surface contacts.',
   CSAR: 'Locate and recover isolated personnel inside hostile territory.', RESCORT: 'Escort and protect the rescue helicopters.',
@@ -3639,7 +3919,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const { PDFDocument, rgb, StandardFonts, PDFName, PDFString } = PDFLib;
   const mp = mpGet(), t = S.t, th = theatre(), g = geom();
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
+  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'gci' ? 'GCI pack' : jsel.kind === 'aar' ? 'AAR pack' : jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
   let F = {};
   if (assets.fonts && window.fontkit) { pdf.registerFontkit(window.fontkit); for (const k of Object.keys(assets.fonts)) F[k] = await pdf.embedFont(assets.fonts[k], { subset: false }); }
   else { F.reg = await pdf.embedFont(StandardFonts.Helvetica); F.bold = await pdf.embedFont(StandardFonts.HelveticaBold); F.ital = await pdf.embedFont(StandardFonts.HelveticaOblique); F.head = F.bold; F.xb = F.bold; }
@@ -3668,7 +3948,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   draw(cover, event, 76, 530, F.head, 15, WHITE);
   draw(cover, division, 76, 553, F.reg, 11, WHITE);
   draw(cover, date + (S.meta.hHour ? ` · H-hour ${S.meta.hHour}` : '') + ` · ${revLabel()}${curRev() ? ' (' + curRev().date + ')' : ''}`, 76, 572, F.reg, 9, WHITE);
-  draw(cover, jsel ? (jsel.kind === 'aib' ? 'AIB PACK – staff and DOS only, contains the fire evolution' : jsel.kind === 'sar' ? 'SAR PACK – staff and RCC only, contains the solutions' : jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
+  draw(cover, jsel ? (jsel.kind === 'gci' ? 'GCI / QRA PACK – staff and controllers only, contains the injects and the target briefs' : jsel.kind === 'aar' ? 'AAR PACK – AAR cards, RV procedures and phraseology for tankers, receivers and controllers' : jsel.kind === 'aib' ? 'AIB PACK – staff and DOS only, contains the fire evolution' : jsel.kind === 'sar' ? 'SAR PACK – staff and RCC only, contains the solutions' : jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
   const cx = (txt, f, s, y) => draw(cover, txt, (PW - W(txt, f, s)) / 2, y, f, s, WHITE);
   cx('Special Operations Department', F.ital, 12, 765); cx('International Virtual Aviation Organisation', F.reg, 12, 783);
   // ---------- inner page machinery ----------
@@ -3737,6 +4017,56 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     }
     y += o.after ?? 10;
   };
+  if (jsel && jsel.kind === 'gci') { // ---------- GCI / QRA pack (Manuale Guidacaccia v5) ----------
+    const G = t.gci, kv = rows => table([{ h: 'Item', w: .3 }, { h: 'Content', w: .7 }], rows.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
+    const dlg = rows => table([{ h: 'Station', w: .26 }, { h: 'Transmission', w: .74 }], rows.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 7.5 });
+    newPage(); h1('Controllers and type of control');
+    para(`Controlling agency: ${G.ctl} – primary frequency ${G.ctlFreq}. Positions IVAO Italia: LIVK_CRC_CTR PIOPPO RADAR 136.200 (north), LIRO_CRC_CTR BARCA RADAR 136.250 (south), LIZZ_AEW_CTR LEGION 136.400 (AEW). GCI positions provide no ATC service: monitor civil traffic entering the areas and separate it from the exercise traffic (level restrictions, area limits or stopping the activity).`);
+    if (G.control.length) table([{ h: 'Mission', w: .35 }, { h: 'Type of control', w: .65 }], G.control, { size: 8 });
+    para('Fields shown as [................] are dynamic: the controller fills them live (exit gate, vectors, levels, channels / frequencies, codes).', { font: F.ital, size: 8 });
+    if (G.scr.length) { h1('QRA scrambles');
+      for (const q of G.scr) { h5(`${q.id} – ${q.csAll}${q.cap ? ' (from the CAP)' : ` – ${q.base} ${q.wing}`}`);
+        kv([['Reason', q.reason], ['Task', `${SCR_TASK[q.task]}${q.land ? ' at ' + q.land : ''}${q.sec ? '; secondary task: ' + q.sec : ''}`], ['Target', `${q.threat}${q.role ? ' – flown by ' + q.role : ''}; squawk ${q.sq}`],
+          ['Planning (staff only)', `${q.distNm} NM / ${q.brg}° from ${q.base || 'the CAP'}; expected exit gate ${q.gate}. Order H+${q.times.order}, airborne H+${q.times.airborne}, intercept ≈ H+${q.times.intercept}, end ≈ H+${q.times.end}.`],
+          ...(q.msgGround ? [['Ground alert message', q.msgGround]] : []), ['Scramble order', q.msg]]); } }
+    if (G.injects.length) { h1('Staff injects (timeline)'); table([{ h: 'Time', w: .12 }, { h: 'From / to', w: .3 }, { h: 'Inject', w: .58 }], G.injects.map(r => [{ t: r[0], bold: true }, r[1], r[2]]), { size: 8 }); }
+    if (G.scr.length) { h1('Target briefs (role players)');
+      for (const q of G.scr) { h5(`${q.threat} – ${q.role || 'role player'}`); bullets([`Scenario: ${q.reason}. ${q.tgt}`, `Squawk ${q.sq}. Route and level: ${BLANK} (given at the briefing).`, 'Answer the interceptors\' visual signals (VIS) and, if briefed, the calls on guard 121.500. Never manoeuvre aggressively; keep at least 1000 ft from the interceptors until they are visual.', `Expected outcome: ${SCR_TASK[q.task]}${q.land ? ' at ' + q.land : ''}.`]); }
+      h6('ICAO interception signals (Doc 7300) – intercepting aircraft');
+      table([{ h: 'VIS', w: .1 }, { h: 'Meaning', w: .9 }], [['1', 'You have been intercepted. Follow me.'], ['2', 'You may proceed.'], ['3', 'Land at this aerodrome.']], { size: 8 });
+      h6('Signals of the intercepted aircraft');
+      table([{ h: 'VIS', w: .1 }, { h: 'Meaning', w: .9 }], [['4', 'The aerodrome you have designated is inadequate.'], ['5', 'Cannot comply.'], ['6', 'In distress.']], { size: 8 });
+      h6('Radio phrases (each said twice)');
+      table([{ h: 'Interceptor', w: .25 }, { h: 'Meaning', w: .25 }, { h: 'Intercepted', w: .25 }, { h: 'Meaning', w: .25 }], [['CALL SIGN', 'What is your call sign?', 'CALL SIGN (call sign)', 'My call sign is …'], ['FOLLOW', 'Follow me', 'WILCO', 'Understood, will comply'], ['DESCEND', 'Descend for landing', 'CAN NOT', 'Unable to comply'], ['YOU LAND', 'Land at this aerodrome', 'REPEAT', 'Repeat your instruction'], ['PROCEED', 'You may proceed', 'AM LOST', 'Position unknown'], ['', '', 'MAYDAY', 'I am in distress'], ['', '', 'LAND (place)', 'I request to land at (place)'], ['', '', 'DESCEND', 'I request descent']], { size: 7.5 });
+      h6('VID report – order of the data'); bullets(['1. Aircraft type', '2. Colours and / or markings', '3. Heading', '4. Flight level', '5. Speed', '6. Weapons on board and configuration (military aircraft)', '7. Registration']); }
+    if (G.card) { h1('GCI briefing card'); table([{ h: '', w: .26 }, { h: 'BLUE', w: .37 }, { h: 'RED / TARGET', w: .37 }], G.card.map(r => [{ t: r[0], bold: true }, r[1], r[2]]), { size: 7.5 }); }
+    if (G.blocks || G.kill.length) { h1('Block deconfliction, kill criteria and regeneration'); if (G.blocks) para(`BLUE block ${G.blocks.blue}, RED block ${G.blocks.red}. ${G.blocks.note} Example: "${G.ctl}, BLUE BLOCK ${G.blocks.blue.replace('–', '-')}, RED BLOCK ${G.blocks.red.replace('–', '-')}, REPORT READY FOR ALPHA CHECK".`); if (G.kill.length) bullets(G.kill); }
+    h1('Authentication tables'); para('Given at the briefing. GCI1: the station that authenticates picks a letter in the first column and a letter in the same row; the other station answers with the letter just below it. GCI2: the station gives the first and the third of three consecutive letters of a line; the other answers with the letter between them.', { size: 8 });
+    h6('Method GCI1'); table([{ h: '', w: .07 }, ...Array.from({ length: 12 }, (_, k) => ({ h: String(k + 1), w: .93 / 12 }))], G.auth.gci1.map(r => [{ t: r[0], bold: true }, ...r.slice(1)]), { size: 8 });
+    h6('Method GCI2'); table([{ h: 'Line', w: .1 }, { h: 'Letters', w: .9 }], G.auth.gci2.map((l, k) => [{ t: String(k + 1), bold: true }, l.split('').join(' ')]), { size: 8 });
+    if (t.caps && t.caps.length) { h1('CAPs'); table([{ h: 'CAP', w: .16 }, { h: 'Flight', w: .12 }, { h: 'Type', w: .14 }, { h: 'Anchor', w: .24 }, { h: 'Inbound / leg / turn', w: .2 }, { h: 'Levels', w: .14 }], t.caps.map(c => [c.name, c.cs, c.type, c.anchor, `${String(c.inbound).padStart(3, '0')} / ${c.leg} NM / ${c.turn}`, c.alt]), { size: 7.5 }); }
+    h1('Control checklists');
+    h5('Air interception'); bullets(G.checklists.intercept.map((x, k) => `${k + 1}. ${x}`)); h5('CAP control'); bullets(G.checklists.cap.map((x, k) => `${k + 1}. ${x}`)); h5('AAR control'); bullets(G.checklists.aar.map((x, k) => `${k + 1}. ${x}`));
+    if (G.ph.length) { h1('Phraseology with the event callsigns'); for (const [title, rows] of G.ph) { h6(title); dlg(rows); } }
+    return { pdf, tocMap: {}, custom: !!assets.fonts };
+  }
+  if (jsel && jsel.kind === 'aar') { // ---------- AAR pack (Manuale AAR v2.0) ----------
+    const A = t.aar, card = c => table([{ h: 'Item', w: .2 }, { h: 'Value', w: .38 }, { h: 'Item', w: .16 }, { h: 'Value', w: .26 }], c.card.map(r => [{ t: r[0], bold: true }, r[1], { t: r[2], bold: true }, r[3]]), { size: 7.5 });
+    const dlg = rows => table([{ h: 'Station', w: .26 }, { h: 'Transmission', w: .74 }], rows.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 7.5 });
+    for (const c of A.cards) { newPage(); h1(`AAR card – ${c.tanker}${c.haar ? ' (rotary wing)' : ''}`);
+      const png = jsel.maps && jsel.maps[c.tanker]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, hh = w * img.height / img.width; ensure(hh + 8); page.drawImage(img, { x: ML, y: PH - y - hh, width: w, height: hh }); y += hh + 4; para('AAR pattern: legs, LEFT turns and direction of flight (arrows); AP / TP points of the published track.', { size: 7.5 }); } catch (e) { } }
+      card(c); h6(`${RV_EN[c.rv]} – how it is flown`); bullets(c.how);
+      for (const [title, rows] of c.ph) { h6(title); dlg(rows); } }
+    newPage(); h1('General rules'); bullets(A.rules); if (A.haarRules.length) { h5('Helicopter AAR (HAAR)'); bullets(A.haarRules); }
+    h5('EMCON options'); table([{ h: 'Option', w: .12 }, { h: 'Criteria', w: .88 }], [1, 2, 3, 4].map(k => [{ t: String(k), bold: true }, EMCON_EN[k].replace(/^EMCON \d – /, '')]), { size: 8 });
+    h1('Reference tables'); h6('RV BRAVO – turn range (NM) vs tanker TAS');
+    table([{ h: 'TAS 25° AOB', w: .25 }, { h: 'Turn range', w: .25 }, { h: 'TAS 15° AOB', w: .25 }, { h: 'Turn range', w: .25 }], TURN_RANGE.B[25].map((r, k) => [r[0], r[1], TURN_RANGE.B[15][k][0], TURN_RANGE.B[15][k][1]]), { size: 8 });
+    h6('RV CHARLIE – turn range (NM) vs tanker TAS');
+    table([{ h: 'TAS 25° AOB', w: .25 }, { h: 'Turn range', w: .25 }, { h: 'TAS 15° AOB', w: .25 }, { h: 'Turn range', w: .25 }], TURN_RANGE.C[25].map((r, k) => [r[0], r[1], TURN_RANGE.C[15][k][0], TURN_RANGE.C[15][k][1]]), { size: 8 });
+    h6('Bank angle (°) vs leg separation (NM) and TAS (kt)');
+    table([{ h: 'Leg sep.', w: .2 }, ...AOB_TABLE.tas.map(v => ({ h: String(v), w: .16 }))], AOB_TABLE.rows.map(r => r.map((x, k) => k ? String(x) : { t: x + ' NM', bold: true })), { size: 8 });
+    return { pdf, tocMap: {}, custom: !!assets.fonts };
+  }
   if (jsel && jsel.kind === 'aib') { // ---------- AIB pack ----------
     const kv = rows => table([{ h: 'Item', w: .3 }, { h: 'Content', w: .7 }], rows.map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
     for (const sc of jsel.list) { const T = aibTexts(sc), ac = aibAircraft(sc);
@@ -3861,11 +4191,14 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const has = re => re.test(txtAll);
   if (has(/BULLSEYE/)) used.add('BULLSEYE'); if (has(/FLOT/)) used.add('FLOT'); if (has(/"CAP"|DCA/)) used.add('CAP'); if (has(/"IP"/)) used.add('IP'); if (REL().cas) ['JTAC', 'CP', '9-LINE', 'TOT'].forEach(k => used.add(k)); if (REL().pr) ['AMC', 'OSC', 'SARDOT', 'CSARTF', 'LZ'].forEach(k => used.add(k)); if (REL().sar) ['RCC', 'OSC', 'DATUM', 'CSP', 'SITREP'].forEach(k => used.add(k)); if (REL().aib) ['COAU', 'DOS', 'TBT', 'BAT', 'OPAREA'].forEach(k => used.add(k));
   if (has(/SEAD|IADS/)) { used.add('SEAD'); used.add('DEAD'); used.add('SAM'); used.add('EWR'); } if (has(/MANPADS|SHORAD/)) { used.add('MANPADS'); used.add('AAA'); }
-  if (has(/DCA|AIR/)) used.add('DCA'); if (has(/OCA|ESCORT/)) used.add('OCA'); if (has(/QRA|RENEGADE/)) { used.add('QRA'); used.add('RENEGADE'); }
+  if (has(/DCA|AIR/)) used.add('DCA'); if (has(/OCA|ESCORT/)) used.add('OCA'); if (has(/QRA|SCRAMBLE/)) { used.add('QRA'); used.add('T-SCRAMBLE'); used.add('VID'); }
   if (has(/CAS|GROUND/)) { used.add('CAS'); used.add('JTAC'); used.add('KILL BOX'); } if (has(/STRIKE|HVT/)) { used.add('HVT'); used.add('TOT'); }
   if (has(/CSAR|PERSONNEL/)) { used.add('CSAR'); used.add('ISOP'); } if (has(/RESCORT/)) used.add('RESCORT'); if (has(/AAR/)) used.add('AAR');
   if (has(/AEW/)) used.add('AEW'); if (!PROF().sober || has(/QRA|AEW/)) used.add('GCI'); if (has(/AIRDROP|INSERT|LOGISTICS/)) used.add('DZ / LZ'); if (has(/LOWSLOW|HELO/)) used.add('LOW & SLOW');
   if (has(/ANTISHIP|NAVAL/)) used.add('ASuW'); if (has(/MPA/)) used.add('MPA');
+  if (t && t.gci) ['ALPHA CHECK', 'ANGELS', 'PLAYTIME', 'PICTURE', 'BRAA', 'BOGEY', 'BANDIT', 'HOSTILE', 'JUDY', 'TALLY', 'COMMIT', 'BUSTER / GATE', 'STRANGLE', 'PARROT', 'KNOCK IT OFF', 'TERMINATE'].forEach(k => used.add(k));
+  if (t && t.gci && t.gci.scr.length) ['T-SCRAMBLE', 'VID', 'EXIT GATE', 'IOAT / VOAT'].forEach(k => used.add(k)); if (t && t.caps && t.caps.length) t.caps.forEach(c => used.add(c.type));
+  if (t && t.aar) ['ARIP', 'ARCP', 'ARCT', 'ANCHOR POINT', 'BASE AAR ALTITUDE', 'ASTERN', 'ECHELON LEFT / RIGHT', 'BREAKAWAY', 'TOBOGGAN', 'DRY / WET CONTACT', 'NOSE COLD', 'SWITCHES SAFE', 'MARSA', 'EMCON'].forEach(k => used.add(k)); if (t && t.aar && t.aar.cards.some(c => c.haar)) used.add('HAAR');
   { const ev = PROF().ids.join(' '); if (/SAR/.test(ev)) { used.add('SAR'); used.add('RCC'); } if (/HEMS|MEDEVAC|HOSPITAL/.test(ev)) { used.add('HEMS'); used.add('MEDEVAC'); used.add('EMS'); } if (/AIB/.test(ev)) { used.add('AIB'); used.add('DOS'); } if (/NAVI/.test(ev)) { used.add('IFR'); } if (/NAVL/.test(ev)) { used.add('VFR'); } if (/AAR/.test(ev)) used.add('RECEIVER'); }
   table([{ h: 'TERM', w: .22 }, { h: 'EXPLANATION', w: .78 }], [...used].filter(k => GLOSSARY[k]).map(k => [{ t: k, bold: true }, GLOSSARY[k]]), { x: ML + 25, w: CW - 50 }); }
   // ---------- Airports ----------
@@ -3994,6 +4327,25 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec(null);
   const tocMap = Object.fromEntries(toc.filter(([n]) => n !== 'Content'));
   return { pdf, tocMap, custom: !!assets.fonts };
+}
+async function exportGciPack(btn) {
+  if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
+  if (!S.t || !S.t.gci) return toast('Nessun materiale GCI / QRA: serve uno scenario adattato con QRA, CAP o AEW');
+  if (btn) btn.disabled = true; toast('Generazione GCI pack…');
+  try { const assets = await mpAssets(), r = await buildMasterplanPdf(null, assets, null, { kind: 'gci' });
+    await download(`${fileBase()}_GCI_pack.pdf`, new Blob([await r.pdf.save()], { type: 'application/pdf' })); toast('GCI pack generato'); } catch (err) { console.error(err); toast('Errore: ' + err.message); }
+  if (btn) btn.disabled = false;
+}
+async function exportAarPack(btn) {
+  if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
+  if (!S.t || !S.t.aar) return toast('Nessun tanker nello scenario adattato');
+  if (btn) btn.disabled = true; toast('Generazione AAR pack…');
+  try { const assets = await mpAssets(), maps = {};
+    for (const c of S.t.aar.cards) { const tk = S.t.flights.find(f => f.cs === c.tanker), trk = tk && S.t.airspace.find(a => a.type === 'TRACK' && a.flight === tk.id);
+      if (trk) { const m = await renderMap('brief', { light: true, w: 1300, h: 760, focus: holdLoop(trk).ring, minPad: 0.08 }); if (m) maps[c.tanker] = dataUrlBytes(m); } }
+    const r = await buildMasterplanPdf(null, assets, null, { kind: 'aar', maps });
+    await download(`${fileBase()}_AAR_pack.pdf`, new Blob([await r.pdf.save()], { type: 'application/pdf' })); toast('AAR pack generato'); } catch (err) { console.error(err); toast('Errore: ' + err.message); }
+  if (btn) btn.disabled = false;
 }
 async function exportAibPack(which, btn) {
   if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
@@ -4281,9 +4633,10 @@ function initPublicMap() {
     for (const a of S.t.airspace) {
       a.pts.forEach(p => pts.push(p));
       if (a.type === 'ORBIT' && a.pub) orbitShapes(a).forEach(l => add(L.polyline(l, { color: '#0284C7', weight: 2, opacity: .8 })));
+      if (a.type === 'CAP' && a.cap) { const h = capLoop(a); add(L.polygon(h.ring, { color: '#0284C7', weight: 1.5, dashArray: '6 4', fillOpacity: .03 })); h.arrows.forEach(x => add(L.polyline(arrowPts(x, 2), { color: '#0284C7', weight: 2 }))); }
       if (a.type === 'FLOT') { }
       else if (a.type === 'ROUTE') { add(L.polyline(a.pts, { color: a.kind === 'LOW' ? '#16a34a' : '#7c3aed', weight: 3, dashArray: a.kind === 'LOW' ? '8 5' : null })).bindTooltip(a.name); a.pts.forEach((q, i) => add(L.circleMarker(q, { radius: 5, color: '#111', weight: 1, fillColor: '#fff', fillOpacity: 1 })).bindTooltip((a.names || [])[i] || '')); }
-      else if (a.type === 'TRACK') add(L.polyline(a.loop ? a.loop.concat([a.loop[0]]) : a.pts, { color: '#0284C7', weight: a.loop ? 3 : 4 })).bindTooltip(a.name);
+      else if (a.type === 'TRACK') { const h = holdLoop(a); h.ring.forEach(q => pts.push(q)); add(L.polygon(h.ring, { color: '#0284C7', weight: 3, fillOpacity: .05 })).bindTooltip(`${a.name} · ${a.alt || ''}`); h.arrows.forEach(x => add(L.polyline(arrowPts(x), { color: '#0284C7', weight: 3 }))); }
       else if (a.type === 'KILLBOX') { const p = a.pts[0], h = a.size / 2; add(L.polygon([dest(dest(p, 0, h), 90, h), dest(dest(p, 0, h), 270, h), dest(dest(p, 180, h), 270, h), dest(dest(p, 180, h), 90, h)], { color: '#CA8A04', weight: 1.5, fillOpacity: .05 })).bindTooltip(a.name); }
       else if (a.type === 'BULLSEYE') { add(L.circle(a.pts[0], { radius: 18520, color: '#D97706', weight: 1, fill: false })); add(L.marker(a.pts[0], { icon: icon('#f59e0b', '◎', a.name, 'circle', 16) })); }
       else add(L.marker(a.pts[0], { icon: icon('#0284C7', a.type[0], a.name, 'circle', 14) })).bindTooltip(AST[a.type]);
@@ -4425,7 +4778,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
