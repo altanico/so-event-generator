@@ -157,3 +157,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * Each task has a level band (`TASK_FL`): AAR/receiver FL150-FL280, DCA/OCA/escort/QRA FL100-FL350, SEAD FL100-FL300, strike FL50-FL300, CAS FL50-FL200, maritime/recce FL50-FL250. An area fits a band if it overlaps it by at least 5000 ft; an unknown (TBC) upper limit never fits.
 * Areas published for an activity of the event (`use`: FIRING/A2G, PARA, HELO, LOWLEVEL) are proposed whatever their levels.
 * Training events: nearest fitting areas around the theatre (AAR corridors first for refuelling, max 2 + 2-4 areas, 1 INDIA area if AEW). Combat events: areas around the front as before, plus the nearest areas for any band not yet covered.
+
+## Hand-drawn theatre (v1.15)
+
+* `S.meta.theatre = 'CUSTOM'` with `S.thCustom` = { id, custom, poly, name, fir, region, view, red: {center, r, bases}, blue, sea, outside }, the same fields as a preset theatre. FIR and sea point come from the nearest preset theatre; on the site the FIR can come from the database instead.
