@@ -2451,7 +2451,7 @@ function drawMap(fit) {
     add(L.polygon(z.poly, { color: '#9333EA', weight: on ? 2 : 1, dashArray: '6 4', fillOpacity: on ? .08 : .01, opacity: on ? .9 : .45 })).bindTooltip(`${z.name} · ${corLevels(z)}${on ? ' · IN USO' : ''}`, { sticky: true }).on('click', () => { if (TAB !== 'scenario' || ADDMODE) return; const st = new Set(S.cor || []); st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); });
     if (on) add(L.polyline(z.axis, { color: '#7e22ce', weight: 1.5 })); });
   if ((S.cusDraft || []).length) { add(L.polyline(S.cusDraft.concat(S.cusDraft.length > 2 ? [S.cusDraft[0]] : []), { color: '#db2777', weight: 2, dashArray: '5 4' })); S.cusDraft.forEach(p => add(L.circleMarker(p, { radius: 4, color: '#db2777' }))); }
-  nearZones().filter(z => z.type !== 'COR').forEach(z => { const r = (S.reserved || []).includes(z.id), col = ZCOL[z.type] || '#475569';
+  mapZones().forEach(z => { const r = (S.reserved || []).includes(z.id), col = ZCOL[z.type] || '#475569';
     const pl = add(L.polygon(z.poly, { color: col, weight: r ? 2 : 1, dashArray: r ? null : '4 4', fillOpacity: r ? .10 : .02, opacity: r ? .9 : .5 }));
     pl.bindTooltip(`${z.name} · ${z.type} · ${z.lower}–${z.upper}${r ? ' · RISERVATA' : ' · clic per riservarla'}`, { sticky: true });
     if (TAB === 'scenario') pl.on('click', e => { if (ADDMODE) return; const p = e && e.latlng ? [e.latlng.lat, e.latlng.lng] : centroid(z.poly), zs = zonesAt(p); if (zs.length > 1) return zonePick(p, zs); resToggle(z.id); }); });
@@ -2536,7 +2536,7 @@ function aspIssuesHtml() {
 }
 // map click on overlapping areas: list every area under the point instead of toggling the top one
 const polyArea = poly => Math.abs(poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[1] * q[0] - q[1] * p[0]; }, 0)) / 2;
-const zonesAt = p => nearZones().concat(CUS()).filter((z, i, a) => a.indexOf(z) === i && z.type !== 'COR' && pip(p, z.poly)).sort((a, b) => polyArea(a.poly) - polyArea(b.poly));
+const zonesAt = p => mapZones().concat(CUS()).filter((z, i, a) => a.indexOf(z) === i && z.type !== 'COR' && pip(p, z.poly)).sort((a, b) => polyArea(a.poly) - polyArea(b.poly));
 function resToggle(id) { const set = new Set(S.reserved || []); set.has(id) ? set.delete(id) : set.add(id); S.reserved = [...set]; save(); renderPanel(); drawMap(); }
 function zonePickHtml(zs) { const res = new Set(S.reserved || []);
   return `<div style="min-width:220px"><b style="font-size:12px">${zs.length} aree sovrapposte qui</b><div class="muted" style="font-size:11px;margin-bottom:4px">Spunta quelle da riservare (dalla più piccola):</div>${zs.map(z => `<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0;cursor:pointer"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span><span>${esc(z.name)} <span class="muted">${esc(z.lower)}–${esc(z.upper)}</span></span></label>`).join('')}</div>`; }
@@ -2549,6 +2549,9 @@ const zfMatch = (z, res) => { const q = zfNorm(ZF.q);
 function zfList(near) { const L0 = ZF.all ? LIB().filter(z => z.type !== 'COR') : near.concat(CUS().filter(c => !near.includes(c))), c = theatre().red.center;
   const k = { dist: z => dist(c, centroid(z.poly)), name: z => z.name.toLowerCase(), type: z => (z.custom ? 'ZZ' : z.type) + ' ' + z.name.toLowerCase(), lo: z => zLo(z.lower) };
   const f = k[ZF.sort] || k.dist; return L0.slice().sort((a, b) => { const x = f(a), y = f(b); return x < y ? -1 : x > y ? 1 : 0; }); }
+function mapZones() { const res = new Set(S.reserved || []), near = nearZones(); return zfList(near).filter(z => !z.custom && z.type !== 'COR' && (res.has(z.id) || zfMatch(z, res))); }
+let zfTimer = null; const zfMapLater = () => { clearTimeout(zfTimer); zfTimer = setTimeout(() => drawMap(), 250); };
+function zfFit() { if (!MAP || !ZF.all) return; const pts = mapZones().flatMap(z => z.poly); if (pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.05)); }
 function zfApply() { const res = new Set(S.reserved || []); let n = 0, m = 0;
   document.querySelectorAll('tr[data-zrow]').forEach(tr => { const z = LIB().find(x => x.id === tr.dataset.zrow); const ok = z && zfMatch(z, res); tr.hidden = !ok; m++; if (ok) n++; });
   const c = $('#zfcount'); if (c) c.textContent = `${n} di ${m} mostrate`; }
@@ -2866,7 +2869,7 @@ function facEdit(t, end) {
   S.factions[k] = nv; if (end) FAC_ED = null; save(); clearTimeout(facEdit._t); facEdit._t = setTimeout(() => drawMap(), 120);
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); } });
+document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); zfMapLater(); } });
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.edit) {
@@ -2885,7 +2888,7 @@ document.addEventListener('change', e => {
     S.t[t.dataset.list] = ['codewords', 'timeline'].includes(t.dataset.list) ? lines.map(l => { const i = l.indexOf('='); return i < 0 ? [l, ''] : [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }) : lines;
     save(); return;
   }
-  if (['zftype', 'zfsel', 'zfsort', 'zfall'].includes(t.id)) { const k = t.id.slice(2); ZF[k] = k === 'all' ? !!t.value : t.value; renderPanel(); return; }
+  if (['zftype', 'zfsel', 'zfsort', 'zfall'].includes(t.id)) { const k = t.id.slice(2); ZF[k] = k === 'all' ? !!t.value : t.value; renderPanel(); drawMap(k === 'all' && !ZF.all); if (k === 'all') zfFit(); return; }
   if (t.dataset.res !== undefined) { const set = new Set(S.reserved || []); t.checked ? set.add(t.dataset.res) : set.delete(t.dataset.res); S.reserved = [...set]; save(); renderPanel(); drawMap(); return; }
   if (t.id === 'ptsurl') { lsSet('ivao-so-pts-url', t.value.trim()); return; }
   if (t.id === 'ptsfile' && t.files[0]) { t.files[0].text().then(txt => { try { const it = /^\s*[\[{]/.test(txt) && /"(points|fixes|lat|name)"/.test(txt.slice(0, 400)) ? parsePointsJson(JSON.parse(txt)) : parseSector(txt); if (!it.length) throw 0; setPoints(it, t.files[0].name); renderAll(); toast(`Importati ${it.length} punti`); } catch (err) { toast('File non riconosciuto: serve un sectorfile .sct o un JSON di punti'); } }); return; }
@@ -2984,7 +2987,7 @@ document.addEventListener('click', e => {
     case 'resman': S.resMode = 'manual'; save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
     case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
       S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); S.resMode = 'manual'; save(); renderAll(); return; }
-    case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); return;
+    case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); drawMap(); return;
     case 'resnone': S.resMode = 'manual'; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
     case 'genauto': S.resMode = 'auto'; generateGeneric(); return;
     case 'genman': S.resMode = 'manual'; generateGeneric(); return;
@@ -4249,7 +4252,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, cusLocked, manualRes, zonesAt, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

@@ -54,4 +54,11 @@ await page.waitForTimeout(150); const after=await page.evaluate(()=>document.que
 if(!(before>0)||Math.abs(after-before)>2) fail.push(`list scroll ${before} -> ${after}`);
 await page.fill('#zfq','tsa 73'); await page.waitForTimeout(100);
 r=await page.evaluate(()=>[...document.querySelectorAll('tr[data-zrow]:not([hidden])')].map(t=>t.dataset.zrow)); if(!r.length||r.some(id=>!/TSA.?73/i.test(id))) fail.push('normalised search: '+r.slice(0,5));
+
+// the map follows the list: all Italy draws every area, the search narrows the map too
+await page.fill('#zfq',''); await page.selectOption('#zfall',''); await page.waitForTimeout(100); const nNear=await page.evaluate(()=>APP.mapZones().length);
+await page.selectOption('#zfall','1'); await page.waitForTimeout(100); const nAll=await page.evaluate(()=>APP.mapZones().length);
+if(!(nAll>nNear)) fail.push(`map all-Italy ${nNear} -> ${nAll}`);
+await page.fill('#zfq','R49'); await page.waitForTimeout(100); r=await page.evaluate(()=>APP.mapZones().filter(z=>!APP.S.reserved.includes(z.id)).map(z=>z.id)); if(r.some(id=>!/R49/i.test(id))) fail.push('map search filter '+r.slice(0,4));
+await page.fill('#zfq',''); await page.selectOption('#zfall','');
 console.log(fail.length?'"err": '+fail.join('; '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();

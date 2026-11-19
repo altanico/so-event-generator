@@ -27,6 +27,7 @@
 
 ## Reserved areas UI (v1.11)
 - Demo airspace removed. Before the first generation the staff chooses: areas proposed by the generator, or only the ticked ones (manual: the generator never changes them). "Deseleziona tutte" in the zone table; custom union uses the ticked areas.
+- v1.12.2: the map draws the same areas as the list (all Italy, search, type, state); reserved areas always shown.
 - v1.12.1: the zone list keeps its scroll position when an area is ticked; search ignores spaces and dashes.
 - v1.12: overlapping areas on the map open a pick list; zone table filters (name/id, type, state, all Italy) and sorting.
 
