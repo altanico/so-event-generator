@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Authentication required: yes / no, stated in the briefing; if yes, generate a RAMROD** (staff 19 Nov): a staff switch per event (default: yes for events with RED and for QRA / GCI / CAS / CSAR, no for civil events – to confirm). Briefing (masterplan SPINS, mission deck, GCI / JTAC / PR packs) states "Authentication: REQUIRED / NOT REQUIRED" and the method (GCI1 / GCI2 tables already generated). If required: generate a RAMROD = 10-letter word without repeated letters, each letter = one digit (0–9 order to confirm with the staff), new for every event and different from the SARNEG; used to encode numbers on the radio (abort codes, authentication numbers). Show the word, the letter ↔ digit table and 2–3 worked examples; CAS: abort codes encoded with the RAMROD instead of "abort in the clear" (removes the old CAS TODO item). Test.
 - [ ] **Bullseye markers not clickable + bullseye list** (staff 19 Nov, screenshot): on the staff map the grey bullseye markers are drawn BEFORE the reserved / AIP areas, so the area polygons are on top and take the click (the click toggles the area instead). Fix: bullseye layer in its own map pane above the areas (and above corridors / tracks), slightly bigger marker with the name visible on hover. Step 3 "Bullseye (dalla lista)" is an input with a datalist (the list only shows while typing): make it a select with every bullseye, nearest to the theatre first, with the distance (e.g. "SPIDER – 35 NM"). Also in the pick list that opens when clicking overlapping areas: if a bullseye is within ~5 NM of the click, list it at the top ("◎ SPIDER – use as mission bullseye", highlighted if already in use). Test: the bullseye pane exists and is above the overlay pane; the select lists all BUL() names. The pick list shows the nearby bullseye.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
@@ -35,7 +36,7 @@
 - **Terrain data (DEM)** once hosted on the division site (e.g. Open Topo Data SRTM 30 m): fill line 4 automatically and choose final attack headings along valleys / away from high ground.
 - Talk-on text generator (needs photoreal references, so probably staff-written).
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
-- RAMROD abort codes instead of "abort in the clear".
+- RAMROD abort codes instead of "abort in the clear" (now part of the authentication item in "Next build").
 
 ## Confirmed by the staff (2026-11-19)
 - CSAR A / CSAR B frequencies come from the database (not invented); LZ elevation read in the sim.
