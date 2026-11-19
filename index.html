@@ -1152,7 +1152,7 @@ function genBackground() {
 }
 function genZones() {
   const g = geom(), z = [];
-  const mk = (cat, center, r) => z.push({ id: uid(), cat, name: `${cat} area ${pick(WORDS)}`, center: snapRes(center), r: Math.round(r), side: CATS[cat].side || (cat === 'LOGISTICS' ? 'BLUE' : 'RED') });
+  const mk = (cat, center, r) => z.push({ id: uid(), cat, name: `${cat} area ${pick(WORDS)}`, center: toSide(snapRes(center), SIDE_Z[cat]), r: Math.round(r), side: CATS[cat].side || (cat === 'LOGISTICS' ? 'BLUE' : 'RED') });
   const toSea = Math.min(dist(g.front, g.sea), 25);
   for (const cat of S.cats) {
     if (cat === 'IADS') mk(cat, g.redC, g.r * 0.75);
@@ -1268,7 +1268,7 @@ function generateElements(flights) {
   const threats = [], objectives = [], airspace = [], warnings = [], serials = [];
   let tn = 0, on = 0;
   const SR = (kind, title, fls, text, success) => serials.push({ id: 'S' + (serials.length + 1), kind, title, flights: fls.map(x => x.id), text, success });
-  const T = (type, pos, extra = {}) => { const d = TT[type]; const t = { id: 'T' + (++tn), type, name: d.label, pos, r: d.r, alt: d.alt, resp: d.resp, status: d.resp === 'AVOID' ? 'AVOID' : 'TARGET', flight: null, size: 1, note: '', ...extra }; threats.push(t); return t; };
+  const T = (type, pos, extra = {}) => { const d = TT[type]; const t = { id: 'T' + (++tn), type, name: d.label, pos: SIDE_T.has(type) ? toSide(pos, 'RED') : pos, r: d.r, alt: d.alt, resp: d.resp, status: d.resp === 'AVOID' ? 'AVOID' : 'TARGET', flight: null, size: 1, note: '', ...extra }; threats.push(t); return t; };
   const O = (type, pos, extra = {}) => { const o = { id: 'O' + (++on), type, name: OBJT[type].label, pos, flight: null, note: '', ...extra }; objectives.push(o); return o; };
   const A = (type, name, pts, extra = {}) => airspace.push({ id: uid(), type, name, pts, ...extra });
   const zc = (cat, k = 0.7) => { const z = zoneOf(cat); return z ? sampleRes(z.center, z.r * k) : sampleRes(g.redC, g.r * 0.5); };
@@ -2445,6 +2445,7 @@ function drawMap(fit) {
   }
   { const bd = borderGeom(); if (bd) { add(L.polygon(bd.red, { stroke: false, fillColor: '#ef4444', fillOpacity: .07, interactive: false })); add(L.polygon(bd.blue, { stroke: false, fillColor: '#3b82f6', fillOpacity: .05, interactive: false }));
     add(L.polyline(bd.line, { color: '#7f1d1d', weight: 3, dashArray: '12 6' })).bindTooltip(`BLUE / RED boundary – ${S.factions.blue} | ${S.factions.red}`);
+    if (bd.own) add(L.polyline(bd.ext, { color: '#7f1d1d', weight: 1.5, dashArray: '4 8', opacity: .6, interactive: false })); drawBorderEdit(add);
     add(L.marker(bd.blueLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#1d4ed8;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">BLUE · ${esc(S.factions.blue)}</div>` }) }));
     add(L.marker(bd.redLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#b91c1c;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">RED · ${esc(S.factions.red)}</div>` }) })); } }
   // bases
@@ -2484,11 +2485,51 @@ function drawMap(fit) {
   if (fit) fitMission();
 }
 // BLUE / RED boundary: a line through the front, perpendicular to the RED→BLUE axis, with the two sides tinted
+// BLUE / RED boundary: automatic (straight, across the front) or edited by the staff (S.border = polyline, ≥ 2 points)
+function borderAuto() { const g = geom(); return [dest(g.front, g.dir + 90, 150), g.front, dest(g.front, g.dir - 90, 150)]; }
 function borderGeom() {
-  if (!REL().factions) return null; const g = geom(), L1 = 320, D = 450;
-  const a = dest(g.front, g.dir + 90, L1), b = dest(g.front, g.dir - 90, L1);
-  return { line: [a, b], red: [a, b, dest(b, g.dir + 180, D), dest(a, g.dir + 180, D)], blue: [a, b, dest(b, g.dir, D), dest(a, g.dir, D)],
-    redLbl: dest(g.front, g.dir + 180, 28), blueLbl: dest(g.front, g.dir, 28) };
+  if (!REL().factions) return null; const g = geom(), D = 450, X = 400;
+  const own = (S.border || []).length >= 2, line = own ? S.border : [dest(g.front, g.dir + 90, 320), dest(g.front, g.dir - 90, 320)], n = line.length;
+  // the edited line continues straight beyond its ends, so the two sides always split the whole map
+  const ext = own ? [dest(line[0], bearing(line[1], line[0]), X)].concat(line, [dest(line[n - 1], bearing(line[n - 2], line[n - 1]), X)]) : line;
+  const side = br => ext.concat(ext.slice().reverse().map(p => dest(p, br, D)));
+  let mid = line[Math.floor((n - 1) / 2)]; if (n % 2 === 0) { const a = line[n / 2 - 1], b = line[n / 2]; mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
+  return { line, ext, own, red: side(g.dir + 180), blue: side(g.dir), redLbl: dest(mid, g.dir + 180, 28), blueLbl: dest(mid, g.dir, 28) };
+}
+// which side of the boundary a point is on ('BLUE' / 'RED' / null outside both shaded areas)
+function borderSide(p) { const bd = borderGeom(); if (!bd || !p) return null; return pip(p, bd.blue) ? 'BLUE' : pip(p, bd.red) ? 'RED' : null; }
+// ground elements that belong to one side; airborne, naval and renegade tracks may cross the line
+const SIDE_T = new Set(['SAM_LR', 'SAM_MR', 'SAM_SR', 'EWR', 'MANPADS', 'AAA', 'ARMOR', 'HVT', 'ISOLATED']);
+const SIDE_Z = { IADS: 'RED', GROUND: 'RED', HVT: 'RED', SHORAD: 'RED', PERSONNEL: 'RED', LOGISTICS: 'BLUE' };
+// move a point across the boundary to its own side (2 km margin), only if it stays inside the reserved areas
+function toSide(p, want) { const sd = borderSide(p); if (!want || !sd || sd === want) return p; const g = geom(), br = want === 'RED' ? g.dir + 180 : g.dir;
+  for (let d = 2; d <= 150; d += 2) { const q = dest(p, br, d); if (borderSide(q) !== want) continue; for (const m of [3, 1, 6, 10]) { const q2 = dest(q, br, m); if (borderSide(q2) === want && inRes(q2)) return [+q2[0].toFixed(5), +q2[1].toFixed(5)]; } }
+  return p; }
+function borderIssues() {
+  if (!borderGeom()) return []; const out = [], chk = (p, want, what) => { const sd = borderSide(p); if (sd && sd !== want) out.push(`${what} sul lato ${sd}`); };
+  S.blueBases.forEach(i => chk(ap(i), 'BLUE', `Base BLUE ${i}`)); RB().forEach(i => chk(ap(i), 'RED', `Base RED ${i}`));
+  (S.zones || []).forEach(z => SIDE_Z[z.cat] && chk(z.center, SIDE_Z[z.cat], `Zona ${z.name}`));
+  if (S.t) S.t.threats.forEach(t => SIDE_T.has(t.type) && chk(t.pos, 'RED', `Minaccia ${t.id} (${TT[t.type].short})`));
+  return out;
+}
+let BEDIT = false;
+function borderHtml() {
+  const bd = borderGeom(); if (!bd) return ''; const iss = borderIssues();
+  return `<div class="row" style="flex-wrap:wrap;align-items:center;margin-top:6px"><span style="font-size:13px"><b>Confine BLUE / RED</b> <span class="muted">(${bd.own ? `modificato, ${bd.line.length} punti` : 'automatico'})</span></span>
+    <button class="b sm shrink ${BEDIT ? 'primary' : ''}" id="bedit">${BEDIT ? 'Fine modifica' : 'Modifica sulla mappa'}</button>${bd.own ? '<button class="b sm shrink" id="breset">Ripristina automatico</button>' : ''}</div>
+  ${BEDIT ? '<p class="muted" style="font-size:12px;margin:4px 0">Trascina i punti ■ per spostarli; trascina o clicca i ＋ a metà dei tratti per aggiungere un punto; doppio clic (o tasto destro) su un punto per toglierlo. Oltre gli estremi la linea prosegue dritta.</p>' : ''}
+  ${iss.length ? `<div class="warn" style="margin-top:4px">Dal lato sbagliato del confine: ${iss.map(esc).join(' · ')}. Spostali sulla mappa o correggi il confine.</div>` : ''}`;
+}
+function drawBorderEdit(add) {
+  if (!BEDIT || !borderGeom()) return; if (!((S.border || []).length >= 2)) S.border = borderAuto();
+  const B = S.border, done = () => { save(); renderPanel(); drawMap(); }, sq = (txt, col) => L.divIcon({ className: '', iconSize: [14, 14], iconAnchor: [7, 7], html: `<div style="width:12px;height:12px;background:${col};border:2px solid #fff;box-shadow:0 0 2px #000;font:700 11px/11px sans-serif;color:#fff;text-align:center">${txt}</div>` });
+  B.forEach((p, i) => { const m = add(L.marker(p, { draggable: true, icon: sq('', '#7f1d1d'), zIndexOffset: 1000 })).bindTooltip(`Punto ${i + 1} – trascina; doppio clic per togliere`);
+    m.on('dragend', e => { const ll = e.target.getLatLng(); B[i] = [+ll.lat.toFixed(5), +ll.lng.toFixed(5)]; done(); });
+    const rm = () => { if (B.length > 2) { B.splice(i, 1); done(); } else toast('Il confine ha almeno due punti'); }; m.on('dblclick', rm); m.on('contextmenu', rm); });
+  for (let i = 0; i < B.length - 1; i++) { const mid = [(B[i][0] + B[i + 1][0]) / 2, (B[i][1] + B[i + 1][1]) / 2];
+    const m = add(L.marker(mid, { draggable: true, icon: sq('+', 'rgba(127,29,29,.55)'), opacity: .85 })).bindTooltip('Aggiungi un punto');
+    m.on('click', () => { B.splice(i + 1, 0, mid); done(); });
+    m.on('dragend', e => { const ll = e.target.getLatLng(); B.splice(i + 1, 0, [+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); done(); }); }
 }
 function missionPts() {
   const pts = [];
@@ -2634,6 +2675,7 @@ function renderScenario() {
   ${R.threats ? `${step(4, 'Minacce', 'Proposte in base al tipo di evento: togli quelle che non vuoi. Quantità e posizioni si sistemano in fase 3.')}
   <div class="row"><div><label><span class="dot" style="background:var(--blue)"></span>Fazione BLUE</label><input id="fblue" value="${esc(S.factions.blue)}"></div>
   <div><label><span class="dot" style="background:var(--red)"></span>Fazione RED</label><input id="fred" value="${esc(S.factions.red)}"></div><button class="b shrink" id="rfac">🎲</button></div>
+  ${borderHtml()}
   <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>` : ''}
   ${step(R.threats ? 5 : 4, 'Postazioni ATC / C2', '')}
   ${c2Card()}
@@ -2768,6 +2810,7 @@ function renderTailor() {
   let h = `<h2>Fase 3 · Adattamento</h2>
   <p class="muted">Il motore raggruppa i piloti in flight, assegna i task in base alle capacità dei velivoli e genera solo le minacce a cui qualcuno può rispondere, dimensionate sulla difficoltà.</p>
   <div class="row"><div><label>H-hour (UTC)</label><input id="hh" placeholder="es. 19:00Z" value="${esc(S.meta.hHour)}"></div><div><label>Data evento</label><input id="edate" placeholder="es. 12 DEC 2026" value="${esc(S.meta.date)}"></div></div>
+  ${borderGeom() ? `<div class="card" style="margin:8px 0">${borderHtml()}</div>` : ''}
   <div class="row" style="margin-top:10px"><button class="b primary" id="dotail">${t ? 'Ri-adatta da zero' : 'Adatta scenario ai partecipanti'}</button>${t ? '<button class="b" id="regen">Rigenera minacce dai task</button>' : ''}</div>`;
   if (!t) return h;
   { const wantCas = reqTasks().includes('CAS') && !offT('CAS'), hasCas = t.flights.some(f => f.task === 'CAS');
@@ -2932,7 +2975,7 @@ document.addEventListener('change', e => {
   if (t.dataset.map !== undefined && CSV_PENDING) { CSV_PENDING.map[+t.dataset.map] = t.value; return; }
   const id = t.id;
   if (id === 'op') S.meta.op = t.value;
-  if (id === 'theatre') { S.meta.theatre = t.value; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name; if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (id === 'theatre') { S.meta.theatre = t.value; S.border = null; BEDIT = false; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); S.meta.bullseye = nearestBull().name; if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (id === 'bull') { S.meta.bullseye = t.value.toUpperCase();
     if (S.t) { const el = S.t.airspace.find(a => a.type === 'BULLSEYE'); if (el) { el.name = `BULLSEYE ${S.meta.bullseye}`; el.pts = [bullPos()]; }
       if (S.t.spins && S.t.spins[0]) S.t.spins[0] = `Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}${(bullOf(S.meta.bullseye) || {}).ref ? ' (' + bullOf(S.meta.bullseye).ref + ')' : ''}. Threat calls in BULLSEYE format.`; } }
@@ -2981,12 +3024,14 @@ document.addEventListener('click', e => {
   const v = id => ($('#' + id) || {}).value || '';
   switch (t.id) {
     case 'rop': S.meta.op = 'OPERATION ' + pick(OP_A) + ' ' + pick(OP_B); break;
-    case 'rth': { S.meta.theatre = pick(THEATRES).id; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+    case 'rth': { S.meta.theatre = pick(THEATRES).id; S.border = null; BEDIT = false; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
     case 'rfac': { const o = { ...S.factions }; S.factions = { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) }; FAC_ED = null; if (S.background) S.background = S.background.split(o.blue).join(S.factions.blue).split(o.red).join(S.factions.red); break; }
     case 'gen': generateGeneric(); return;
     case 'aspaip': defaultAirspace(); renderAll(); toast('Zone AIP caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'resauto': S.resMode = 'auto'; S.reserved = autoReserve(); S.cor = autoCor(); save(); renderAll(); toast('Aree proposte dal generatore'); return;
+    case 'bedit': BEDIT = !BEDIT; if (BEDIT && !((S.border || []).length >= 2)) { S.border = borderAuto(); save(); } renderPanel(); drawMap(); if (BEDIT) toast('Modifica il confine sulla mappa'); return;
+    case 'breset': S.border = null; BEDIT = false; save(); renderPanel(); drawMap(); toast('Confine automatico ripristinato'); return;
     case 'resman': toManual(); save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
     case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
       S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); toManual(); save(); renderAll(); return; }
@@ -4255,7 +4300,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

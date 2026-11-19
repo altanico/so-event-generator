@@ -1,7 +1,7 @@
 # TODO
 
 ## Next build
-- [ ] **Editable BLUE/RED boundary** – polyline with points to add/move/remove on the staff map, "reset to automatic"; used in all maps, masterplan, decks, public page, ACM (FLOT); saved with the event.
+- (none – waiting for the staff)
 
 ## On hold (wait for the go-ahead)
 - [ ] **Inflight guide (A5 kneeboard)** – one guide for all participants: frequencies, ATC/C2 positions, airports, reserved areas, map, bullseye/tracks/routes only if pertinent, timeline, code words, emergency/lost comms. Role details stay in the mission briefing. Open questions: max number of A5 pages; source of the aerodrome charts (vSOP site not reachable from the build environment – files or a saved page are needed).
@@ -27,6 +27,7 @@
 
 ## Reserved areas UI (v1.11)
 - Demo airspace removed. Before the first generation the staff chooses: areas proposed by the generator, or only the ticked ones (manual: the generator never changes them). "Deseleziona tutte" in the zone table; custom union uses the ticked areas.
+- v1.13: editable BLUE/RED boundary (S.border polyline: move / add / remove points, straight extension beyond the ends, reset to automatic; reset on theatre change). Ground elements (SAM, EWR, MANPADS, AAA, armour, HVT, isolated personnel; IADS/GROUND/HVT/SHORAD/PERSONNEL areas RED, LOGISTICS BLUE) are generated on their own side when the reserved areas allow it; wrong-side elements are listed in the panel.
 - v1.12.3: with "Le scelgo io" the OAT corridors are off and never proposed; the staff turns them on one by one.
 - v1.12.2: the map draws the same areas as the list (all Italy, search, type, state); reserved areas always shown.
 - v1.12.1: the zone list keeps its scroll position when an area is ticked; search ignores spaces and dashes.
