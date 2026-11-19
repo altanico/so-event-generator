@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Bullseye on every map and in every document** (staff 19 Nov): today the mission bullseye is drawn only after phase 3 (BULLSEYE element in S.t) and only when REL().bull. Draw it always when the event uses a bullseye: staff map in all phases (also phase 1, before generating), public page map, masterplan / deck maps (generic and brief), GCI pack. Marker with name + 10 / 20 NM rings; the other bullseyes of the list near the theatre as small grey markers on the staff map only (clickable to choose the mission bullseye – to confirm with the staff whether they also go in the documents).
 - [ ] **Public page / masterplan / decks show only what is selected** (staff 19 Nov, screenshots):
   - AEW / AAR track tables use trkInArea() = every published track within 450 / 350 km of the front (INDIA 5 shown although only INDIA 9 is reserved). Show only the tracks whose areas are reserved, chosen by the staff (S.trkSel) or used by a tanker / AEW in phase 3; nothing if the AEW / AAR role is off. Same in the public page (index ~4604), masterplan (~4249) and the library slides (~3659).
   - "Support: AAR, AEW, ISR" is hard-coded for every combat event (public page ~4566, deck "Capabilities requested" ~3718). Build it from the roles actually requested in "Cosa serve" (reqTasks without the roles switched off), only the ones that are on; no row if none.
