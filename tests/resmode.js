@@ -6,11 +6,11 @@ await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.mi
 await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500); const fail=[];
 const html=await page.content(); if(/Dati DEMO|id="aspdemo"/.test(html)) fail.push('demo button still present');
 // fresh scenario, no mode chosen: the generate area asks
-await page.evaluate(()=>{ APP.S.custom=[]; APP.S.resMode=undefined; APP.S.zones=[]; APP.S.gen=null; APP.S.meta.theatre='NE'; APP.setEvents(['MIX']); APP.renderAll(); });
+await page.evaluate(()=>{ APP.S.custom=[]; APP.S.resMode=undefined; APP.S.zones=[]; APP.S.gen=null; APP.S.meta.theatre='NE'; APP.setEvents(['MIX']); APP.WOPEN='gen'; APP.renderAll(); });
 await page.click('[data-tab="scenario"]').catch(()=>{}); await page.waitForTimeout(200);
 if(!(await page.$('#genauto'))||!(await page.$('#genman'))) fail.push('no question before generating');
 // deselect all
-await page.evaluate(()=>{ APP.S.reserved=APP.RES().length?APP.S.reserved:['LI-R49A','LI-R49B']; APP.renderAll(); });
+await page.evaluate(()=>{ APP.S.reserved=APP.RES().length?APP.S.reserved:['LI-R49A','LI-R49B']; APP.WOPEN='asp'; APP.renderAll(); });
 if(await page.$('#resnone')){ await page.click('#resnone'); await page.waitForTimeout(100); } else fail.push('no deselect-all button');
 let r=await page.evaluate(()=>({n:APP.RES().length,m:APP.S.resMode})); if(r.n||r.m!=='manual') fail.push('deselect all: '+JSON.stringify(r));
 // manual: pick two areas and generate; the generator must keep them and stay inside
@@ -18,7 +18,7 @@ r=await page.evaluate(()=>{ const pick=['LI-R49A','LI-R49B']; APP.S.reserved=pic
   return {res:(APP.S.reserved||[]).slice().sort().join(','), iss:(APP.containmentIssues()||[]).length, ast:APP.S.t.airspace.length}; });
 if(r.res!=='LI-R49A,LI-R49B') fail.push('manual selection changed: '+r.res); if(r.iss) fail.push('manual: '+r.iss+' containment issues');
 // union of the ticked areas
-await page.evaluate(()=>APP.renderAll()); if(!(await page.$('#cuscombo'))) fail.push('no union button under the table'); else {
+await page.evaluate(()=>{ APP.WOPEN='asp'; APP.renderAll(); }); if(!(await page.$('#cuscombo'))) fail.push('no union button under the table'); else {
  await page.fill('#cuslo','FL100'); await page.fill('#cusup','FL240'); await page.click('#cuscombo'); await page.waitForTimeout(150);
  r=await page.evaluate(()=>{const c=(APP.S.custom||[]).slice(-1)[0]; return c?{lo:c.lower,up:c.upper,res:APP.RES().some(z=>z.id===c.id)}:null;});
  if(!r||r.lo!=='FL100'||r.up!=='FL240'||!r.res) fail.push('union: '+JSON.stringify(r)); }
@@ -31,7 +31,7 @@ r=await page.evaluate(()=>{ APP.S.meta.theatre='NE'; let hit=null; for (const z 
   if (!hit) return null; const h=APP.zonePickHtml(APP.zonesAt(hit.p)); return {n:hit.ids.length, boxes:(h.match(/data-res=/g)||[]).length}; });
 if(!r) fail.push('no overlapping point found'); else if(r.boxes!==r.n) fail.push('pick list '+JSON.stringify(r));
 // list filters: search, type, state, select shown
-await page.evaluate(()=>{ APP.S.reserved=[]; APP.renderAll(); });
+await page.evaluate(()=>{ APP.S.reserved=[]; APP.WOPEN='asp'; APP.renderAll(); });
 await page.fill('#zfq','R49'); await page.waitForTimeout(100);
 r=await page.evaluate(()=>[...document.querySelectorAll('tr[data-zrow]:not([hidden])')].map(t=>t.dataset.zrow));
 if(!r.length||r.some(id=>!/R49/i.test(id))) fail.push('search filter: '+r.slice(0,5));
@@ -63,7 +63,7 @@ await page.fill('#zfq','R49'); await page.waitForTimeout(100); r=await page.eval
 await page.fill('#zfq',''); await page.selectOption('#zfall','');
 
 // manual mode: OAT corridors off unless ticked; auto mode proposes them
-r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.S.meta.theatre='SA'; APP.setEvents(['MIX']); APP.renderAll();
+r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.S.meta.theatre='SA'; APP.setEvents(['MIX']); APP.WOPEN='asp'; APP.renderAll();
   APP.S.resMode='auto'; APP.S.reserved=[]; APP.generateGeneric(); APP.parseLines('4x F-35A\n1x KC-767'); APP.tailor(); o.auto=(APP.S.cor||[]).length;
   document.querySelector('#resman').click(); o.afterSwitch=(APP.S.cor||[]).length;
   APP.generateGeneric(); APP.parseLines('4x F-35A\n1x KC-767'); APP.tailor(); o.manual=(APP.S.cor||[]).length; return o; });

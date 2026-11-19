@@ -27,6 +27,7 @@
 
 ## Reserved areas UI (v1.11)
 - Demo airspace removed. Before the first generation the staff chooses: areas proposed by the generator, or only the ticked ones (manual: the generator never changes them). "Deseleziona tutte" in the zone table; custom union uses the ticked areas.
+- v1.14: phase 1 is a step-by-step wizard (one step open, done steps folded into a summary line). New events start empty (no default "Misto"). Civil events hide the reserved-airspace step ("Mostra" to open it anyway) and have no threat step. Data source of the airspace folded under "Fonte dei dati". Clear restart actions: "Rigenera scenario" (same event) and "Nuovo evento vuoto" (back to step 1).
 - v1.13: editable BLUE/RED boundary (S.border polyline: move / add / remove points, straight extension beyond the ends, reset to automatic; reset on theatre change). Ground elements (SAM, EWR, MANPADS, AAA, armour, HVT, isolated personnel; IADS/GROUND/HVT/SHORAD/PERSONNEL areas RED, LOGISTICS BLUE) are generated on their own side when the reserved areas allow it; wrong-side elements are listed in the panel.
 - v1.12.3: with "Le scelgo io" the OAT corridors are off and never proposed; the staff turns them on one by one.
 - v1.12.2: the map draws the same areas as the list (all Italy, search, type, state); reserved areas always shown.

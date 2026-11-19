@@ -498,9 +498,9 @@ function newScenario() {
   const th = pick(THEATRES);
   return {
     version: 1, id: uid(), updated: Date.now(),
-    meta: { op: 'OPERATION ' + pick(OP_A) + ' ' + pick(OP_B), events: ['MIX'], theatre: th.id, difficulty: 'MEDIUM', hHour: '', date: '', bullseye: pick(WORDS) },
+    meta: { op: 'EXERCISE ' + pick(WORDS), events: [], theatre: th.id, difficulty: 'MEDIUM', hHour: '', date: '', bullseye: pick(WORDS) },
     factions: { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) },
-    cats: ['IADS', 'AIR', 'GROUND', 'HVT', 'PERSONNEL', 'SHORAD'],
+    cats: [],
     blueBases: [...th.blue], redBases: [...th.red.bases],
     background: '', zones: [],
     roster: { pilots: [], controllers: [] },
@@ -856,7 +856,7 @@ const EVT = {
     rules: ['All drops are authorised by the fire operations director (DOS).', 'Aircraft fly the drop circuit in the briefed direction and sequence.', 'No overflight of the fire below the minimum altitude set by the DOS.'],
     tl: [['H+05', 'Fire reported, units alerted'], ['H+15 – H+75', 'Drop sequences and refills']], words: [['FIRE CONTAINED – drops complete']] },
 };
-const evIds = () => ((S.meta && S.meta.events && S.meta.events.length) ? S.meta.events : ['MIX']).filter(e => EVT[e]);
+const evIds = () => ((S.meta && S.meta.events) || []).filter(e => EVT[e]);
 function PROF() {
   const ids = evIds(), list = ids.map(e => EVT[e]);
   const all = list.some(e => e.all);
@@ -864,7 +864,7 @@ function PROF() {
   return { ids, list, all, tasks, sober: !list.some(e => e.kind === 'combat'), civil: list.every(e => e.kind === 'civil') };
 }
 function setEvents(ids) {
-  ids = ids.filter(e => EVT[e]); if (!ids.length) ids = ['MIX'];
+  ids = ids.filter(e => EVT[e]);
   S.meta.events = ids; S.cats = [...new Set(ids.flatMap(e => EVT[e].cats))];
   if (PROF().sober !== /^EXERCISE/.test(S.meta.op || '')) S.meta.op = opName();
   S.off = []; S.mpSec = {}; S.c2sel = proposeC2();
@@ -2617,9 +2617,9 @@ function aspCard() {
   const src = !a || a.source === 'none' || a.source === 'demo' ? 'nessuna (file AIP non caricato)' : a.source === 'aip' ? 'AIP Italia – aree militari (ENR 5 e SUP)' : a.source === 'api' ? 'API database' : 'file importato';
   return `<h2>Spazio aereo riservato</h2>
   <p class="muted">Zone R / D / TSA / TRA dal database della divisione: tutta la missione deve restare dentro quelle selezionate (deconflittazione con il traffico civile).</p>
-  <div class="card"><div class="muted" style="font-size:12px">Fonte: <b>${src}</b> · ${LIB().length} zone · ${((a && a.freqs) || []).length} frequenze · ${BUL().length} bullseye · ${TRK().filter(t => t.kind === 'AAR').length} track AAR · ${TRK().filter(t => t.kind === 'AEW').length} track AEW${a ? ' · ' + new Date(a.loaded).toLocaleString() : ''}</div>
+  <div class="card"><details${a && a.source === 'aip' ? '' : ' open'}><summary class="muted" style="font-size:12px;cursor:pointer">Fonte dei dati: <b>${src}</b> · ${LIB().length} zone <span style="color:var(--accent,#2563eb)">(cambia)</span></summary><div class="muted" style="font-size:12px;margin-top:4px">${LIB().length} zone · ${((a && a.freqs) || []).length} frequenze · ${BUL().length} bullseye · ${TRK().filter(t => t.kind === 'AAR').length} track AAR · ${TRK().filter(t => t.kind === 'AEW').length} track AEW${a ? ' · ' + new Date(a.loaded).toLocaleString() : ''}</div>
   <div class="row" style="margin-top:6px;flex-wrap:wrap">${AIPDATA && S.asp && S.asp.source !== 'aip' ? '<button class="b sm shrink" id="aspaip">Torna alle zone AIP</button>' : ''}<label class="b sm shrink">Importa JSON / GeoJSON<input type="file" id="aspfile" accept=".json,.geojson" hidden></label></div>
-  <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div>
+  <div class="row"><div><label>API database (URL)</label><input id="aspurl" value="${esc((a && a.url) || lsGet('ivao-so-asp-url', ''))}" placeholder="https://…/api/airspace?fir=${theatre().fir}"></div><div style="flex:0 0 120px"><label>Token</label><input id="asptoken" type="password" value="${esc(lsGet('ivao-so-asp-token', ''))}"></div><button class="b shrink" id="aspapi">Collega</button></div></details>
   <div class="row" style="margin-top:10px;flex-wrap:wrap;align-items:center"><span style="font-size:13px"><b>Aree riservate</b> (${RES().length} selezionate):</span>
     <button class="b sm shrink ${S.resMode !== 'manual' ? 'primary' : ''}" id="resauto" title="Il generatore propone le aree in base a teatro ed evento">Proponile tu</button>
     <button class="b sm shrink ${S.resMode === 'manual' ? 'primary' : ''}" id="resman" title="Selezioni tu le aree: il generatore non le cambia">Le scelgo io</button>
@@ -2656,46 +2656,91 @@ function c2Card() {
   ${rows.map(r => `<tr><td><input type="checkbox" data-c2="${r.id}" data-f="on" ${r.on ? 'checked' : ''} style="width:auto"></td><td><input data-c2="${r.id}" data-f="role" value="${esc(r.role)}">${r.real ? '<span class="muted" style="font-size:11px">ATC reale</span>' : '<span class="muted" style="font-size:11px">ruolo evento</span>'}</td><td>${opts(r)}${r.real && !r.cs ? '<div class="muted" style="font-size:11px;color:#b45309">da confermare</div>' : ''}</td><td><input data-c2="${r.id}" data-f="freq" value="${esc(r.freq)}" placeholder="DB"></td><td><button class="b sm danger" data-c2del="${r.id}">✕</button></td></tr>`).join('')}</table>
   <div class="row" style="margin-top:6px;flex-wrap:wrap"><button class="b sm shrink" id="c2add">+ Postazione</button><button class="b sm shrink" id="c2reset">Riproponi</button><label class="b sm shrink">Importa postazioni (JSON / CSV)<input type="file" id="posfile" accept=".json,.csv,.txt" hidden></label></div>`;
 }
-function renderScenario() {
-  const th = Object.fromEntries(THEATRES.map(t => [t.id, `${t.name} (${t.fir})`])), P = PROF(), R = REL();
-  const step = (n, title, sub) => `<h2 style="margin-top:22px">${n} · ${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}`;
-  return `
-  <div class="intro"><b>Scheda 1 · Scenario</b> – compila dall'alto in basso. Ogni passo propone qualcosa in base al tipo di evento: togli quello che non serve. Poi premi <b>Genera scenario</b>.</div>
-  <label>Nome evento</label><div class="row"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop">🎲</button></div>
-  ${step(1, 'Tipo di evento', 'Combinabile. "Misto" è uno scenario operativo completo: toglilo per un evento specifico.')}
-  ${Object.entries(EVT_GROUPS).map(([gk, gl]) => `<div class="muted" style="font-size:11px;margin-top:6px">${gl}</div><div class="chips">${Object.entries(EVT).filter(([k, v]) => v.kind === gk).map(([k, v]) => `<label class="chip"><input type="checkbox" data-evt="${k}" ${evIds().includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>`).join('')}
-  ${P.sober ? `<p class="muted" style="font-size:12px">Evento senza opposizione: niente fazioni, minacce o uso di armi.</p>` : ''}
-  ${step(2, 'Cosa serve', 'Ruoli richiesti ai partecipanti. Un ruolo tolto non viene assegnato e sparisce dai documenti.')}
-  ${reqCard()}
-  ${step(3, 'Teatro e zone', 'Spazio aereo reale, zone riservate dal database e, dopo la generazione, le aree dell\'evento sulla mappa.')}
-  <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', th, S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth">🎲</button></div>
-  ${R.bull ? `<div><label>Bullseye (dalla lista)</label><input id="bull" list="bulllist" value="${esc(S.meta.bullseye)}">${bullSelectHtml()}</div>` : ''}</div>
-  ${aspCard()}
-  ${R.points ? ptsCard() : ''}
-  ${R.threats ? `${step(4, 'Minacce', 'Proposte in base al tipo di evento: togli quelle che non vuoi. Quantità e posizioni si sistemano in fase 3.')}
-  <div class="row"><div><label><span class="dot" style="background:var(--blue)"></span>Fazione BLUE</label><input id="fblue" value="${esc(S.factions.blue)}"></div>
-  <div><label><span class="dot" style="background:var(--red)"></span>Fazione RED</label><input id="fred" value="${esc(S.factions.red)}"></div><button class="b shrink" id="rfac">🎲</button></div>
-  ${borderHtml()}
-  <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>` : ''}
-  ${step(R.threats ? 5 : 4, 'Postazioni ATC / C2', '')}
-  ${c2Card()}
-  ${GEN() ? '' : S.resMode ? `<div class="row" style="margin-top:14px"><button class="b primary" id="gen">Genera scenario</button><button class="b shrink" id="newscn">Nuovo</button></div><p class="muted" style="font-size:12px;margin:4px 0">Aree riservate: ${cusLocked() ? 'solo le aree custom' : S.resMode === 'manual' ? `scelte da te (${RES().length})` : 'proposte dal generatore'} – si cambia nel riquadro dello spazio aereo.</p>`
-    : `<div class="card" style="margin-top:14px"><b>Prima di generare: le aree riservate</b><p class="muted" style="margin:4px 0 8px;font-size:12px">${cusLocked() ? 'Ci sono aree custom: tutta l\'esercitazione sarà dentro di esse.' : 'Le propongo io in base a teatro ed evento, oppure usi solo quelle che hai selezionato nella lista?'}</p>
-      <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" id="genauto">Proponile tu e genera</button><button class="b shrink" id="genman">Uso le mie (${RES().length}) e genera</button><button class="b shrink" id="newscn">Nuovo</button></div></div>`}
-  ${GEN() ? `
-  <h2>Basi</h2>
+// ---- phase 1 as a step-by-step wizard: one step open, the others folded into a summary line ----
+let WOPEN = null, WREACH = null; // open step id; index of the furthest step reached (null = all, e.g. a saved event)
+const evChosen = () => !!((S.meta && S.meta.events) || []).filter(e => EVT[e]).length;
+const aspNeeded = () => !PROF().civil; // civil events fly in normal airspace: no reserved areas unless the staff asks
+function wSteps() {
+  const P = PROF(), R = REL(), st = [{ id: 'ev', t: 'Tipo di evento' }];
+  if (!evChosen()) return st;
+  st.push({ id: 'req', t: 'Cosa serve' }, { id: 'th', t: 'Nome e teatro' });
+  st.push({ id: 'asp', t: 'Spazio aereo riservato', off: !aspNeeded() && !S.showAsp });
+  if (R.points) st.push({ id: 'pts', t: 'Punti di navigazione' });
+  if (R.threats) st.push({ id: 'thr', t: 'Minacce e fazioni' });
+  st.push({ id: 'c2', t: 'Postazioni ATC / C2' }, { id: 'gen', t: GEN() ? 'Scenario generato' : 'Genera' });
+  return st;
+}
+function wOpen() { const st = wSteps(); if (!evChosen()) return 'ev'; if (WOPEN && st.some(x => x.id === WOPEN && !x.off)) return WOPEN; return GEN() || WREACH == null ? 'gen' : st[Math.min(WREACH, st.length - 1)].id; }
+function wSummary(id) {
+  const th = theatre();
+  switch (id) {
+    case 'ev': return evChosen() ? PROF().list.map(e => e.it).join(' + ') : 'nessuno scelto';
+    case 'req': { const ts = reqTasks().filter(t => ROLES[t]); return `${ts.filter(t => !offT(t)).length} di ${ts.length} ruoli`; }
+    case 'th': return `${S.meta.op} · ${th.name}`;
+    case 'asp': return !aspNeeded() && !S.showAsp ? 'non serve per eventi civili' : `${RES().length} aree · ${cusLocked() ? 'solo aree custom' : S.resMode === 'manual' ? 'scelte da te' : 'proposte dal generatore'}${(S.cor || []).length ? ` · ${S.cor.length} corridoi OAT` : ''}`;
+    case 'pts': return POINTS.items.length ? `${POINTS.items.length} punti` : 'punti sintetici';
+    case 'thr': return `${S.factions.blue} vs ${S.factions.red} · ${S.cats.filter(c => !CATS[c].evt).length} tipi di minaccia`;
+    case 'c2': return `${(S.c2sel || []).length} postazioni`;
+    case 'gen': return GEN() ? 'fatto' : 'da fare';
+  }
+  return '';
+}
+function wBody(id) {
+  const P = PROF(), R = REL(), thl = Object.fromEntries(THEATRES.map(t => [t.id, `${t.name} (${t.fir})`])), strip = h => h.replace(/^\s*<h2>[^<]*<\/h2>/, '');
+  switch (id) {
+    case 'ev': return `<p class="muted" style="margin-top:0">Scegli uno o più tipi (si possono combinare). "Misto" è uno scenario operativo completo con tutte le minacce.</p>
+      ${Object.entries(EVT_GROUPS).map(([gk, gl]) => `<div class="muted" style="font-size:11px;margin-top:6px">${gl}</div><div class="chips">${Object.entries(EVT).filter(([k, v]) => v.kind === gk).map(([k, v]) => `<label class="chip"><input type="checkbox" data-evt="${k}" ${evChosen() && evIds().includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>`).join('')}
+      ${evChosen() && P.sober ? `<p class="muted" style="font-size:12px">${P.civil ? 'Evento civile: niente fazioni, minacce né spazio aereo riservato.' : 'Evento senza opposizione: niente fazioni, minacce o uso di armi.'}</p>` : ''}`;
+    case 'req': return `<p class="muted" style="margin-top:0">Ruoli richiesti ai partecipanti. Un ruolo tolto non viene assegnato e sparisce dai documenti.</p>${reqCard()}`;
+    case 'th': return `<label>Nome evento</label><div class="row"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop" title="Nome casuale">🎲</button></div>
+      <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', thl, S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth" title="Teatro casuale">🎲</button></div>
+      ${R.bull ? `<div><label>Bullseye (dalla lista)</label><input id="bull" list="bulllist" value="${esc(S.meta.bullseye)}">${bullSelectHtml()}</div>` : ''}</div>`;
+    case 'asp': return `${!aspNeeded() ? '<div class="row" style="align-items:center"><span class="muted" style="font-size:12px;flex:1">Per gli eventi civili non serve: lo mostri solo se vuoi riservare comunque un\'area.</span><button class="b sm shrink" id="aspoff">Nascondi</button></div>' : ''}${strip(aspCard())}`;
+    case 'pts': return strip(ptsCard());
+    case 'thr': return `<p class="muted" style="margin-top:0">Proposte in base al tipo di evento: togli quelle che non vuoi. Quantità e posizioni si sistemano nella fase 3.</p>
+      <div class="row"><div><label><span class="dot" style="background:var(--blue)"></span>Fazione BLUE</label><input id="fblue" value="${esc(S.factions.blue)}"></div>
+      <div><label><span class="dot" style="background:var(--red)"></span>Fazione RED</label><input id="fred" value="${esc(S.factions.red)}"></div><button class="b shrink" id="rfac">🎲</button></div>
+      <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>
+      ${borderHtml()}`;
+    case 'c2': return c2Card();
+    case 'gen': return GEN() ? genDoneHtml() : genAskHtml();
+  }
+  return '';
+}
+function genAskHtml() {
+  const ask = aspNeeded() || S.showAsp;
+  if (!ask || S.resMode) return `<p class="muted" style="margin-top:0">Crea basi, background${REL().threats ? ', zone di minaccia' : ''} e aree dell'evento con le scelte dei passi sopra. Poi le controlli qui e passi ai partecipanti.</p>
+    ${ask ? `<p class="muted" style="font-size:12px">Aree riservate: ${cusLocked() ? 'solo le aree custom' : S.resMode === 'manual' ? `scelte da te (${RES().length})` : 'proposte dal generatore'} (si cambia nel passo "Spazio aereo riservato").</p>` : ''}
+    <button class="b primary" id="gen">Genera scenario</button>`;
+  return `<p class="muted" style="margin-top:0">${cusLocked() ? 'Ci sono aree custom: tutta l\'esercitazione sarà dentro di esse.' : 'Ultima domanda: le aree riservate le propongo io in base a teatro ed evento, oppure uso solo quelle che hai spuntato nel passo "Spazio aereo riservato"?'}</p>
+    <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" id="genauto">Proponile tu e genera</button><button class="b shrink" id="genman">Uso le mie (${RES().length}) e genera</button></div>`;
+}
+function genDoneHtml() {
+  const R = REL();
+  return `<h3 style="margin:4px 0">Basi</h3>
   <label><span class="dot" style="background:var(--blue)"></span>Basi BLUE (ICAO, separati da virgola)</label><input id="bb" value="${esc(S.blueBases.join(', '))}">
   ${R.threats ? `<label><span class="dot" style="background:var(--red)"></span>Aeroporti in mano RED</label><input id="rb" value="${esc(RB().join(', '))}">` : ''}
-  <h2>Background</h2><textarea id="bg" style="min-height:150px">${esc(S.background)}</textarea>
-  <div class="row"><span></span><button class="b sm shrink" id="regbg">Rigenera testo</button></div>
-  <h2>${PROF().sober ? 'Zone dell\'evento' : 'Zone di minaccia'}</h2>
+  <h3 style="margin:12px 0 4px">Background</h3><textarea id="bg" style="min-height:150px">${esc(S.background)}</textarea>
+  <div class="row"><span></span><button class="b sm shrink" id="regbg">Rigenera solo il testo</button></div>
+  <h3 style="margin:12px 0 4px">${PROF().sober ? 'Zone dell\'evento' : 'Zone di minaccia'}</h3>
   <table><tr><th>Zona</th><th>Categoria</th><th>km</th><th></th></tr>
   ${S.zones.map(z => `<tr><td><input data-edit="zone" data-id="${z.id}" data-f="name" value="${esc(z.name)}"></td><td class="${z.side === 'BLUE' ? 'blue' : 'red'}">${esc(CATS[z.cat].it)}</td><td style="width:60px"><input type="number" data-edit="zone" data-id="${z.id}" data-f="r" value="${z.r}"></td><td><button class="b sm danger" data-del="zone" data-id="${z.id}">✕</button></td></tr>`).join('')}
   </table>
   <p class="muted">Puoi trascinare le zone sulla mappa o aggiungerne di nuove dal menu in alto a destra.</p>
-  <div class="card" style="margin-top:16px;border-left:4px solid #16a34a"><b>✓ Scenario generato</b>
-    <p class="muted" style="margin:4px 0 8px;font-size:12.5px">Controlla basi, background e aree dell'evento qui sopra. Se cambi i passi sopra, rigenera per applicarli.</p>
-    <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" data-tab="roster">Avanti: Partecipanti →</button><button class="b sm shrink" id="gen">↻ Rigenera da capo</button><button class="b sm shrink" id="newscn">Nuovo evento</button></div></div>` : ''}`;
+  <div class="row" style="margin-top:10px"><button class="b primary" data-tab="roster">Avanti: Partecipanti →</button></div>
+  <div class="card" style="margin-top:14px"><b style="font-size:13px">Ricominciare</b>
+    <div class="row" style="align-items:center;margin-top:6px"><button class="b sm shrink" id="gen">↻ Rigenera scenario</button><span class="muted" style="font-size:12px;flex:1">Stesso evento: ricrea basi, background${R.threats ? ' e zone di minaccia' : ' e zone'} con le scelte dei passi sopra (serve dopo averle cambiate). Si perdono le modifiche fatte a mano a queste parti e l'adattamento della fase 3; i partecipanti restano.</span></div>
+    <div class="row" style="align-items:center;margin-top:6px"><button class="b sm shrink" id="newscn">＋ Nuovo evento vuoto</button><span class="muted" style="font-size:12px;flex:1">Chiude questo evento e riparte dal passo 1 senza scelte. Se ti serve ancora, salvalo prima da 📁 Eventi salvati.</span></div></div>`;
+}
+function renderScenario() {
+  const st = wSteps(), open = wOpen(), oi = st.findIndex(x => x.id === open), reach = WREACH == null ? st.length - 1 : Math.max(WREACH, oi);
+  return `<div class="intro"><b>Fase 1 · Scenario</b> – un passo alla volta: completa quello aperto e premi <b>Avanti</b>. I passi fatti restano qui sotto forma di riga: cliccala per modificarli.</div>
+  ${st.map((x, i) => { if (i > reach + (evChosen() && i === 1 ? 1 : 0)) return '';
+    const head = `<div class="wstep-h" data-wstep="${x.id}" style="display:flex;gap:8px;align-items:baseline;cursor:pointer;padding:8px 10px;border-radius:8px;background:${x.id === open ? 'transparent' : 'var(--chip,#f1f5f9)'};margin-top:8px">
+      <b style="font-size:${x.id === open ? 16 : 13}px">${i < oi || (x.id === 'gen' && GEN()) ? '<span style="color:#16a34a">✓</span> ' : ''}${i + 1} · ${x.t}</b><span class="muted" style="font-size:12px;flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.id === open ? '' : esc(wSummary(x.id))}</span>${x.id === open ? '' : `<span style="font-size:12px;color:var(--accent,#2563eb)">${x.off ? 'Mostra' : 'Modifica'}</span>`}</div>`;
+    if (x.id !== open) return head;
+    const nx = st.slice(i + 1).find(y => !y.off);
+    return head + `<div class="wstep-b" style="padding:2px 4px 6px">${wBody(x.id)}${x.id !== 'gen' && nx && evChosen() ? `<div class="row" style="margin-top:12px"><button class="b primary shrink" data-wnext="${nx.id}">Avanti: ${nx.t} →</button></div>` : ''}</div>`; }).join('')}`;
 }
 function rosterSummary() {
   const P = S.roster.pilots, C = S.roster.controllers;
@@ -2942,7 +2987,7 @@ document.addEventListener('change', e => {
   if (t.id === 'asptoken') { lsSet('ivao-so-asp-token', t.value); return; }
   if (t.id === 'aspfile' && t.files[0]) { t.files[0].text().then(txt => { try { const d = parseAirspace(JSON.parse(txt)); if (!d.zones.length && !d.freqs.length) throw 0; setAirspace(d, 'file', { file: t.files[0].name }); renderAll(); toast(`Importate ${d.zones.length} zone e ${d.freqs.length} frequenze`); } catch (err) { toast('File non riconosciuto (vedi formato in DB_INTERFACE.md)'); } }); return; }
   if (t.dataset.mp) { mpGet()[t.dataset.mp] = t.value; save(); return; }
-  if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
+  if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); WOPEN = 'ev'; if (!GEN() && S.resMode !== 'manual' && !cusLocked()) { S.reserved = autoReserve(); S.cor = corPick(); } if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (t.id === 'cuslock') { S.cusLock = t.checked; if (S.cusLock) S.reserved = cusLocked() ? cusLocked().map(c => c.id) : S.reserved; save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cus) { const c = CUS().find(x => x.id === t.dataset.cus); if (c) { c[t.dataset.cf] = t.dataset.cf === 'name' ? t.value.toUpperCase() : t.value.trim(); save(); drawMap(); } return; }
   if (t.dataset.ncfg) { const c = notamCfg(); c[t.dataset.ncfg] = ['series', 'fir'].includes(t.dataset.ncfg) ? t.value.toUpperCase().trim() : +t.value; save(); renderPanel(); return; }
@@ -2990,8 +3035,10 @@ document.addEventListener('change', e => {
   save();
 });
 document.addEventListener('click', e => {
-  const t = e.target.closest('button,[data-tab]'); if (!t) return;
+  const t = e.target.closest('button,[data-tab],[data-wstep]'); if (!t) return;
   if (t.dataset.tab) { TAB = t.dataset.tab; ADDMODE = ''; renderAll(); return; }
+  if (t.dataset.wstep || t.dataset.wnext) { const id = t.dataset.wstep || t.dataset.wnext, st = wSteps(), i = st.findIndex(x => x.id === id); if (i < 0) return;
+    if (st[i].off) S.showAsp = true; if (t.dataset.wnext && WREACH != null) WREACH = Math.max(WREACH, i); WOPEN = id; ADDMODE = ''; save(); renderPanel(); drawMap(); $('#panel').scrollTop = 0; return; }
   if (t.dataset.sub) { SUBTAB = t.dataset.sub; renderPanel(); return; }
   if (t.dataset.copy !== undefined) { try { navigator.clipboard.writeText(t.dataset.copy).then(() => toast('Copiato')); } catch (err) { toast('Copia non disponibile'); } return; }
   if (t.dataset.cfg) { const c = CFG().find(x => x.id === t.dataset.cfg); if (c) { const gz = new Set(CFG().filter(x => x.group === c.group).flatMap(x => x.zones)), on = activeConfigs().includes(c);
@@ -3026,7 +3073,7 @@ document.addEventListener('click', e => {
     case 'rop': S.meta.op = 'OPERATION ' + pick(OP_A) + ' ' + pick(OP_B); break;
     case 'rth': { S.meta.theatre = pick(THEATRES).id; S.border = null; BEDIT = false; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); else S.reserved = autoReserve(); if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
     case 'rfac': { const o = { ...S.factions }; S.factions = { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) }; FAC_ED = null; if (S.background) S.background = S.background.split(o.blue).join(S.factions.blue).split(o.red).join(S.factions.red); break; }
-    case 'gen': generateGeneric(); return;
+    case 'gen': WOPEN = 'gen'; generateGeneric(); return;
     case 'aspaip': defaultAirspace(); renderAll(); toast('Zone AIP caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'resauto': S.resMode = 'auto'; S.reserved = autoReserve(); S.cor = autoCor(); save(); renderAll(); toast('Aree proposte dal generatore'); return;
@@ -3037,8 +3084,8 @@ document.addEventListener('click', e => {
       S.reserved = [...set]; if (t.id === 'zfon') S.reserved = fixConfigs(S.reserved); toManual(); save(); renderAll(); return; }
     case 'zfreset': Object.assign(ZF, { q: '', type: '', sel: '' }); renderPanel(); drawMap(); return;
     case 'resnone': S.resMode = 'manual'; S.cor = []; S.reserved = (S.custom || []).filter(c => cusLocked()).map(c => c.id); save(); renderAll(); return;
-    case 'genauto': S.resMode = 'auto'; generateGeneric(); return;
-    case 'genman': toManual(); generateGeneric(); return;
+    case 'genauto': S.resMode = 'auto'; WOPEN = 'gen'; generateGeneric(); return;
+    case 'genman': toManual(); WOPEN = 'gen'; generateGeneric(); return;
     case 'mpreset': S.mpSec = {}; S.mpTxt = {}; save(); renderPanel(); toast('Sezioni e testi riportati alla proposta automatica'); return;
     case 'aibregen': genAIB(); if (S.t) { applyAIB(S.t); } save(); renderAll(true); toast('Scenari AIB generati'); return;
     case 'sarregen': genSAR(); if (S.t) applySAR(S.t); save(); renderAll(true); toast('Scenari SAR generati'); return;
@@ -3057,7 +3104,9 @@ document.addEventListener('click', e => {
     case 'issuerev': issueRevision(v('revnote').trim()); renderPanel(); toast('Emessa ' + revLabel()); return;
     case 'mapfit': fitMission(); return;
     case 'demo': if (evDirty() && S.zones.length && !evConfirm('demo')) return toast('Modifiche non salvate: premi di nuovo per caricare comunque l\'esempio'); loadDemo(); return;
-    case 'newscn': document.getElementById('evbtn').click(); return;
+    case 'newscn': if (evDirty() && S.zones.length && !evConfirm('new')) return toast('Evento non salvato: premi di nuovo "Nuovo evento vuoto" per scartarlo, oppure salvalo da 📁 Eventi salvati');
+      S = newScenario(); if (AIPDATA) defaultAirspace(); lsSet('ivao-so-current', S); WOPEN = 'ev'; WREACH = 0; TAB = 'scenario'; renderAll(true); toast('Nuovo evento: scegli il tipo'); return;
+    case 'aspoff': S.showAsp = false; WOPEN = null; save(); renderAll(); return;
     case 'regbg': S.background = genBackground(); break;
     case 'addp': if (!v('mtype')) return toast('Indica il tipo di velivolo'); addPilot({ vid: v('mvid'), name: v('mname'), typeRaw: v('mtype') }); break;
     case 'addc': addCtrl({ vid: v('cvid'), name: v('cname'), rating: v('crat'), pref: v('cpref') }); break;
@@ -4020,7 +4069,7 @@ Stefano R.; ATC; APP
 Irene S.; ATC; JTAC`;
 function loadDemo() {
   S = newScenario();
-  Object.assign(S.meta, { op: 'OPERATION SILENT TRIDENT', theatre: 'SA', difficulty: 'MEDIUM', date: '12 DEC 2026', hHour: '19:00Z' });
+  S.meta.events = ['MIX']; Object.assign(S.meta, { op: 'OPERATION SILENT TRIDENT', theatre: 'SA', difficulty: 'MEDIUM', date: '12 DEC 2026', hHour: '19:00Z' });
   S.factions = { blue: 'Aurelian Coalition', red: 'Volkar Federation' };
   S.cats = ['IADS', 'AIR', 'GROUND', 'HVT', 'PERSONNEL', 'SHORAD', 'RENEGADE', 'LOGISTICS'];
   S.asp = null; generateGeneric(); issueRevision('Initial issue – published before sign-ups'); parseLines(DEMO_ROSTER); tailor(); issueRevision();
@@ -4286,7 +4335,7 @@ document.addEventListener('click', e => { const b = e.target.closest('button'); 
   if (b.id === 'evsave') return evSave(false);
   if (b.id === 'evsavenew') return evSave(true);
   if (b.id === 'evexp') return evExportFile();
-  if (b.id === 'evnew') { if (evDirty() && S.zones.length && !evConfirm('new')) return toast('Modifiche non salvate: premi di nuovo per creare comunque un nuovo evento'); S = newScenario(); lsSet('ivao-so-current', S); EVOPEN = false; renderEvPanel(); TAB = 'scenario'; renderAll(true); return; }
+  if (b.id === 'evnew') { if (evDirty() && S.zones.length && !evConfirm('new')) return toast('Modifiche non salvate: premi di nuovo per creare comunque un nuovo evento'); S = newScenario(); if (AIPDATA) defaultAirspace(); WOPEN = 'ev'; WREACH = 0; lsSet('ivao-so-current', S); EVOPEN = false; renderEvPanel(); TAB = 'scenario'; renderAll(true); return; }
   if (b.dataset.evopen) { const id = b.dataset.evopen; if (id !== S.id && evDirty() && S.zones.length && !evConfirm('open:' + id)) return; return evLoad(id); }
   if (b.dataset.evdel) { const id = b.dataset.evdel; if (!evConfirm('del:' + id)) return; return evDelete(id); }
 });
@@ -4298,9 +4347,9 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
-loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
+loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
