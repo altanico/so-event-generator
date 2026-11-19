@@ -496,13 +496,12 @@ function resolveType(raw) {
    4. STATE
    ===================================================================== */
 function newScenario() {
-  const th = pick(THEATRES);
   return {
     version: 1, id: uid(), updated: Date.now(),
-    meta: { op: 'EXERCISE ' + pick(WORDS), events: [], theatre: th.id, difficulty: 'MEDIUM', hHour: '', date: '', bullseye: pick(WORDS) },
+    meta: { op: 'EXERCISE ' + pick(WORDS), events: [], theatre: '', difficulty: 'MEDIUM', hHour: '', date: '', bullseye: pick(WORDS) },
     factions: { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) },
     cats: [],
-    blueBases: [...th.blue], redBases: [...th.red.bases],
+    blueBases: [], redBases: [],
     background: '', zones: [],
     roster: { pilots: [], controllers: [] },
     asp: null, reserved: [], revs: [],
@@ -513,6 +512,7 @@ let MODE = 'staff';
 let S = lsGet('ivao-so-current', null) || newScenario();
 let TAB = 'scenario', SUBTAB = 'manual', CSV_PENDING = null;
 function save() { if (MODE !== 'staff') return; S.updated = Date.now(); lsSet('ivao-so-current', S); if (typeof renderEvBadge === 'function') renderEvBadge(); }
+const thChosen = () => !!(S && S.meta && S.meta.theatre) && (S.meta.theatre !== 'CUSTOM' || !!S.thCustom); // a new / reset event has no theatre until the staff picks one
 const theatre = () => (S.meta.theatre === 'CUSTOM' && S.thCustom) ? S.thCustom : THEATRES.find(t => t.id === S.meta.theatre) || THEATRES[0];
 // theatre drawn by hand: every field the generator needs is derived from the polygon and the nearest airports / preset theatre
 function mkTheatre(poly, name) {
@@ -692,7 +692,7 @@ function autoCor() { const res = RES(), bases = (S.blueBases || []).map(ap).filt
   return out; }
 const nearZones = (km = 320) => { const c = theatre().red.center; return LIB().filter(z => z.type !== 'COR' && dist(c, centroid(z.poly)) < km).sort((a, b) => dist(c, centroid(a.poly)) - dist(c, centroid(b.poly))); };
 const zArea = poly => { const c = centroid(poly), k = Math.cos(c[0] * Math.PI / 180) * 111.32; let a = 0; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) a += (poly[j][1] * k) * (poly[i][0] * 110.57) - (poly[i][1] * k) * (poly[j][0] * 110.57); return Math.abs(a / 2); };
-function autoReserve() { if (cusLocked()) return cusLocked().map(c => c.id); return fixConfigs([...new Set(autoReserve0().concat((S.custom || []).map(c => c.id)))]); }
+function autoReserve() { if (!thChosen()) return []; if (cusLocked()) return cusLocked().map(c => c.id); return fixConfigs([...new Set(autoReserve0().concat((S.custom || []).map(c => c.id)))]); }
 // level bands (FL) each task needs from a reserved area; an area qualifies if it overlaps one band by ≥ 5000 ft
 const TASK_FL = { AAR: [150, 280], RECEIVER: [150, 280], DCA: [100, 350], OCA: [100, 350], ESCORT: [100, 350], QRA: [100, 350], SEAD: [100, 300], STRIKE: [50, 300], CAS: [50, 200], ANTISHIP: [50, 250], MPA: [50, 250], RECCE: [50, 250] };
 const zBandOk = (z, b) => !/TBC|TBD/i.test(String(z.upper)) && zLo(z.lower) <= b[1] - 50 && zLimit(z.upper) >= b[0] + 50; // unknown upper limit: not proposed for a level band
@@ -1212,6 +1212,7 @@ function defaultBases(th = theatre()) {
   S.redBases = red.slice(0, 1);
 }
 function generateGeneric() {
+  if (!thChosen()) { WOPEN = 'th'; renderAll(); return toast('Prima scegli il teatro (passo 3)'); }
   const th = theatre();
   defaultBases(th);
   if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length && S.resMode !== 'manual') S.reserved = autoReserve();
@@ -2431,6 +2432,8 @@ function drawMap(fit) {
   const add = l => l.addTo(LAYERS);
   const drag = (m, setter) => { m.on('dragend', e => { const ll = e.target.getLatLng(); setter([+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); save(); renderPanel(); drawMap(); }); return m; };
   const showZones = TAB === 'scenario' || !S.t;
+  if (!thChosen()) { if ((S.thDraft || []).length) { add(L.polyline(S.thDraft.concat(S.thDraft.length > 2 ? [S.thDraft[0]] : []), { color: '#0f172a', weight: 2, dashArray: '6 4' })); S.thDraft.forEach(p => add(L.circleMarker(p, { radius: 4, color: '#0f172a' }))); }
+    if (fit && MAP.setView) MAP.setView([42.3, 12.6], 6); return; }
   if (S.aib && REL().aib && TAB === 'aib') for (const sc of S.aib.list) { const G = aibGeom(sc);
     add(L.circle(sc.pos, { radius: G.opR * 1000, color: '#b45309', weight: 1, dashArray: '4 6', fill: false })).bindTooltip(`Fire ${sc.id} – operations area ${sc.opR} NM`);
     add(L.polygon(G.risk, { color: '#f59e0b', weight: 1, dashArray: '3 5', fillColor: '#fbbf24', fillOpacity: .12 })).bindTooltip(`Vegetation at risk ${sc.atRisk} ha`);
@@ -2720,7 +2723,7 @@ function wSummary(id) {
   switch (id) {
     case 'ev': return evChosen() ? PROF().list.map(e => e.it).join(' + ') : 'nessuno scelto';
     case 'req': { const ts = reqTasks().filter(t => ROLES[t]); return `${ts.filter(t => !offT(t)).length} di ${ts.length} ruoli`; }
-    case 'th': return `${S.meta.op} · ${th.name}`;
+    case 'th': return thChosen() ? `${S.meta.op} · ${th.name}` : 'teatro da scegliere';
     case 'asp': return !aspNeeded() && !S.showAsp ? 'non serve per eventi civili' : `${RES().length} aree · ${cusLocked() ? 'solo aree custom' : S.resMode === 'manual' ? 'scelte da te' : 'proposte dal generatore'}${(S.cor || []).length ? ` · ${S.cor.length} corridoi OAT` : ''}`;
     case 'pts': return POINTS.items.length ? `${POINTS.items.length} punti` : 'punti sintetici';
     case 'thr': return `${S.factions.blue} vs ${S.factions.red} · ${S.cats.filter(c => !CATS[c].evt).length} tipi di minaccia`;
@@ -2737,7 +2740,7 @@ function wBody(id) {
       ${evChosen() && P.sober ? `<p class="muted" style="font-size:12px">${P.civil ? 'Evento civile: niente fazioni, minacce né spazio aereo riservato.' : 'Evento senza opposizione: niente fazioni, minacce o uso di armi.'}</p>` : ''}`;
     case 'req': return `<p class="muted" style="margin-top:0">Ruoli richiesti ai partecipanti. Un ruolo tolto non viene assegnato e sparisce dai documenti.</p>${reqCard()}`;
     case 'th': return `<label>Nome evento</label><div class="row"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop" title="Nome casuale">🎲</button></div>
-      <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', { ...thl, CUSTOM: S.thCustom ? `✏️ ${S.thCustom.name}${S.thCustom.name === 'Teatro disegnato' ? '' : ' (disegnato a mano)'}` : '✏️ Disegnalo tu sulla mappa…' }, ADDMODE === 'th:draw' ? 'CUSTOM' : S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth" title="Teatro casuale">🎲</button></div>
+      <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', { ...(thChosen() || ADDMODE === 'th:draw' ? {} : { '': '— scegli il teatro —' }), ...thl, CUSTOM: S.thCustom ? `✏️ ${S.thCustom.name}${S.thCustom.name === 'Teatro disegnato' ? '' : ' (disegnato a mano)'}` : '✏️ Disegnalo tu sulla mappa…' }, ADDMODE === 'th:draw' ? 'CUSTOM' : S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth" title="Teatro casuale">🎲</button></div>
       ${R.bull ? `<div><label>Bullseye (dalla lista)</label><input id="bull" list="bulllist" value="${esc(S.meta.bullseye)}">${bullSelectHtml()}</div>` : ''}</div>
       ${ADDMODE === 'th:draw' ? `<div class="card" style="margin-top:8px"><b style="font-size:13px">Disegna il teatro</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Clic sulla mappa per ogni vertice (${(S.thDraft || []).length} finora), poi "Chiudi teatro". Basi, FIR e posizione delle forze vengono ricavate dal disegno; le aree riservate proposte sono quelle che toccano il teatro.</p>
         <div class="row"><button class="b sm primary shrink" id="thclose" ${(S.thDraft || []).length < 3 ? 'disabled' : ''}>Chiudi teatro</button><button class="b sm shrink" id="thcancel">Annulla</button></div></div>`
@@ -2788,7 +2791,7 @@ function renderScenario() {
       <b style="font-size:${x.id === open ? 16 : 13}px">${i < oi || (x.id === 'gen' && GEN()) ? '<span style="color:#16a34a">✓</span> ' : ''}${i + 1} · ${x.t}</b><span class="muted" style="font-size:12px;flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.id === open ? '' : esc(wSummary(x.id))}</span>${x.id === open ? '' : `<span style="font-size:12px;color:var(--accent,#2563eb)">${x.off ? 'Mostra' : 'Modifica'}</span>`}</div>`;
     if (x.id !== open) return head;
     const nx = st.slice(i + 1).find(y => !y.off);
-    return head + `<div class="wstep-b" style="padding:2px 4px 6px">${wBody(x.id)}${x.id !== 'gen' && nx && evChosen() ? `<div class="row" style="margin-top:12px"><button class="b primary shrink" data-wnext="${nx.id}">Avanti: ${nx.t} →</button></div>` : ''}</div>`; }).join('')}`;
+    return head + `<div class="wstep-b" style="padding:2px 4px 6px">${wBody(x.id)}${x.id !== 'gen' && nx && evChosen() && (x.id !== 'th' || thChosen()) ? `<div class="row" style="margin-top:12px"><button class="b primary shrink" data-wnext="${nx.id}">Avanti: ${nx.t} →</button></div>` : ''}</div>`; }).join('')}`;
 }
 function rosterSummary() {
   const P = S.roster.pilots, C = S.roster.controllers;
@@ -3068,7 +3071,7 @@ document.addEventListener('change', e => {
   if (t.dataset.map !== undefined && CSV_PENDING) { CSV_PENDING.map[+t.dataset.map] = t.value; return; }
   const id = t.id;
   if (id === 'op') S.meta.op = t.value;
-  if (id === 'theatre') { if (t.value === 'CUSTOM' && !S.thCustom) { thDrawStart(); return; } setTheatre(t.value); return; }
+  if (id === 'theatre') { if (!t.value) return; if (t.value === 'CUSTOM' && !S.thCustom) { thDrawStart(); return; } setTheatre(t.value); return; }
   if (id === 'bull') { S.meta.bullseye = t.value.toUpperCase();
     if (S.t) { const el = S.t.airspace.find(a => a.type === 'BULLSEYE'); if (el) { el.name = `BULLSEYE ${S.meta.bullseye}`; el.pts = [bullPos()]; }
       if (S.t.spins && S.t.spins[0]) S.t.spins[0] = `Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}${(bullOf(S.meta.bullseye) || {}).ref ? ' (' + bullOf(S.meta.bullseye).ref + ')' : ''}. Threat calls in BULLSEYE format.`; } }
@@ -4402,7 +4405,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

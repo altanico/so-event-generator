@@ -12,13 +12,14 @@ if(!(await page.$('#gen'))||!(await page.$('#newscn'))) fail.push('generated ste
 await page.click('#newscn'); await page.waitForTimeout(100); if(await page.$('#newscn')) { await page.click('#newscn'); await page.waitForTimeout(150); }
 let r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, checked:document.querySelectorAll('[data-evt]:checked').length}));
 if(r.ev||r.gen||r.checked) fail.push('new event not empty '+JSON.stringify(r));
+r=await page.evaluate(()=>({th:APP.S.meta.theatre, bases:APP.S.blueBases.length, res:APP.RES().length})); if(r.th||r.bases||r.res) fail.push('new event has theatre/bases/areas '+JSON.stringify(r));
 let h=await heads(); if(h.join()!=='ev') fail.push('empty event shows steps: '+h);
 // every tab renders with no event chosen
 for (const tab of ['roster','tailor','export','scenario']) { await page.click(`[data-tab="${tab}"]`); await page.waitForTimeout(80); }
 // choose a military event: step 2 appears; Avanti walks through every step
 await page.check('[data-evt="CAS"]'); await page.waitForTimeout(100); h=await heads(); if(h.join()!=='ev,req') fail.push('after choosing: '+h);
 const all=await page.evaluate(()=>APP.wSteps().map(x=>x.id)); if(all.join()!=='ev,req,th,asp,thr,c2,gen') fail.push('CAS steps '+all);
-for (let i=0;i<10;i++) { const nx=await page.$('[data-wnext]'); if(!nx) break; await nx.click(); await page.waitForTimeout(60); }
+for (let i=0;i<10;i++) { let nx=await page.$('[data-wnext]'); if(!nx && await page.$('#theatre')) { if(i===2 && await page.$('[data-wnext]')) fail.push('Avanti without theatre'); await page.selectOption('#theatre','CT'); await page.waitForTimeout(80); nx=await page.$('[data-wnext]'); } if(!nx) break; await nx.click(); await page.waitForTimeout(60); }
 if(!(await page.$('#genauto'))) fail.push('last step does not ask about the reserved areas');
 // a done step reopens on click
 await page.click('[data-wstep="thr"]'); await page.waitForTimeout(60); if(!(await page.$('#fblue'))) fail.push('threat step does not reopen');
@@ -28,7 +29,7 @@ r=await page.evaluate(()=>({gen:!!APP.S.gen, zones:APP.S.zones.length, open:APP.
 await page.click('#newscn'); await page.waitForTimeout(80); if(await page.evaluate(()=>APP.S.meta.events.length)) { await page.click('#newscn'); await page.waitForTimeout(120); }
 await page.check('[data-evt="AIB"]'); await page.waitForTimeout(80);
 r=await page.evaluate(()=>APP.wSteps().map(x=>x.id+(x.off?'(off)':''))); if(r.join()!=='ev,req,th,asp(off),c2,gen') fail.push('AIB steps '+r);
-for (let i=0;i<10;i++) { const nx=await page.$('[data-wnext]'); if(!nx) break; const id=await nx.getAttribute('data-wnext'); if(id==='asp') fail.push('Avanti opens the hidden airspace step'); await nx.click(); await page.waitForTimeout(60); }
+for (let i=0;i<10;i++) { let nx=await page.$('[data-wnext]'); if(!nx && await page.$('#theatre')) { await page.selectOption('#theatre','SA'); await page.waitForTimeout(80); nx=await page.$('[data-wnext]'); } if(!nx) break; const id=await nx.getAttribute('data-wnext'); if(id==='asp') fail.push('Avanti opens the hidden airspace step'); await nx.click(); await page.waitForTimeout(60); }
 if(await page.$('#genauto')) fail.push('civil event asks about reserved areas'); if(!(await page.$('#gen'))) fail.push('civil: no generate button');
 // hidden step can still be shown on request
 await page.click('[data-wstep="asp"]'); await page.waitForTimeout(60); if(!(await page.$('#zfq'))) fail.push('show airspace on request');

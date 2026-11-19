@@ -27,6 +27,6 @@ if(r.length) fail.push('proposed areas outside the theatre: '+r);
 await page.evaluate(()=>{ APP.ZF.q='R49'; APP.S.border=[[43,12],[43.5,13]]; APP.POINTS().items.push(['AAA','FIX',43,12,'']); });
 await page.click('#fullreset'); await page.waitForTimeout(80); if(!(await page.evaluate(()=>APP.S.meta.events.length))) fail.push('reset without confirmation');
 await page.click('#fullreset'); await page.waitForTimeout(150);
-r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, border:APP.S.border||null, th:APP.S.thCustom||null, q:APP.ZF.q, pts:APP.POINTS().items.length, open:APP.wOpen(), asp:APP.S.asp&&APP.S.asp.source, cur:localStorage.getItem('ivao-so-current')?JSON.parse(localStorage.getItem('ivao-so-current')).meta.events.length:-1}));
-if(r.ev||r.gen||r.border||r.th||r.q||r.pts||r.open!=='ev'||r.cur) fail.push('reset left '+JSON.stringify(r)); if(r.asp!=='aip') fail.push('reset: AIP zones not loaded ('+r.asp+')');
+r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, border:APP.S.border||null, th:APP.S.thCustom||null, q:APP.ZF.q, pts:APP.POINTS().items.length, open:APP.wOpen(), asp:APP.S.asp&&APP.S.asp.source, thr:APP.S.meta.theatre, bases:APP.S.blueBases.length, res:APP.RES().length, cur:localStorage.getItem('ivao-so-current')?JSON.parse(localStorage.getItem('ivao-so-current')).meta.events.length:-1}));
+if(r.ev||r.gen||r.border||r.th||r.q||r.pts||r.open!=='ev'||r.cur||r.thr||r.bases||r.res) fail.push('reset left '+JSON.stringify(r)); if(r.asp!=='aip') fail.push('reset: AIP zones not loaded ('+r.asp+')');
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
