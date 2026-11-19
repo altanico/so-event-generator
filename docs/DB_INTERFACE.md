@@ -171,3 +171,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * GCI / AEW positions: LIVK_CRC_CTR PIOPPO RADAR 136.200 (north), LIRO_CRC_CTR BARCA RADAR 136.250 (south), LIZZ_AEW_CTR LEGION 136.400 (Manuale Guidacaccia v5). LEGION is reserved to the AEW.
 * AAR: `S.t.aar.cards` (RV type: ALPHA with a staffed GCI, otherwise ECHO; HAAR: DELTA), boom / drogue matching (`AAR_SYS`), AAR pack. HAAR areas: D266A/B/C.
 * Tracks are drawn as holdings (left turns) from the AP/TP points; OAT corridors have flat ends (`tools/aip_build.py` bufline).
+
+## v1.18 additions
+
+* Documents (public page, masterplan, decks) list only the tracks the event uses (`pubTracks`): areas reserved, chosen (`S.trkSel`) or flown in phase 3; the "Support" row is built from the requested roles (`supportRow`). The public payload carries only those tracks.
+* Bullseye: all bullseyes on the staff map (mission one highlighted, others clickable), mission bullseye on every map and document when the event uses one (`bullShown`).
+* Intercept targets: high-performance (jet / turboprop) by default; ID variant `tgt: SMI` adds slow movers (light aircraft, helicopters) and the SMI helicopter role.
