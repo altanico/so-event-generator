@@ -1,6 +1,10 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Public page / masterplan / decks show only what is selected** (staff 19 Nov, screenshots):
+  - AEW / AAR track tables use trkInArea() = every published track within 450 / 350 km of the front (INDIA 5 shown although only INDIA 9 is reserved). Show only the tracks whose areas are reserved, chosen by the staff (S.trkSel) or used by a tanker / AEW in phase 3; nothing if the AEW / AAR role is off. Same in the public page (index ~4604), masterplan (~4249) and the library slides (~3659).
+  - "Support: AAR, AEW, ISR" is hard-coded for every combat event (public page ~4566, deck "Capabilities requested" ~3718). Build it from the roles actually requested in "Cosa serve" (reqTasks without the roles switched off), only the ones that are on; no row if none.
+  - Test: AEW event with AAR off and only INDIA 9 reserved -> no AAR in the roles table, INDIA 5 absent from public page, masterplan and deck.
 - [ ] **HAAR: no phase-1 event zone when an HAAR area is reserved** (staff 19 Nov, screenshot "HAAR_T area …"): genZones creates a 15 km circle on the D266 centroid that duplicates the D266 areas (the HAAR track is drawn inside the D266 anyway). Create it only when no HAAR area is available (theatre far from the Adriatic), with a readable name.
 - [ ] **Readable names of the event zones**: genZones names them `${cat} area WORD` with the internal category key (HAAR_T, ID_T, AAR_T…). Use the English label (e.g. "HAAR area KESTREL", "Intercept area …", "AAR area …").
 - [ ] **AAR tracks follow the level filter of their areas** (staff 19 Nov): in phase 1, an AAR track whose areas are all hidden by the mission level band disappears from the map and from the "Track AAR" buttons, live while the sliders move (same as the areas). A track already chosen by the staff stays visible (like reserved areas), with the out-of-band warning. Tracks with no area in the database follow their own levels (lo–hi). Test.
