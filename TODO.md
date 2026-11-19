@@ -28,7 +28,7 @@
 ## AIP data layer (v1.3)
 - Default reserved areas = military R / D / TRA / TSA areas of AIP ENR 5.1.2-5.1.4 + ENR 5.1.4 configurations. Remove at the site handover (docs/DB_INTERFACE.md).
 - Update at each AIRAC with tools/aip_*.py. ENR 5.2 (other military areas, e.g. CBA) can be added the same way if needed.
-- Skipped as not explicitly military: R22 Frosinone (helicopter training and test flights) – add if the staff wants it.
+- AAR corridors (ENR 5.2.2.1) added; route points BULAR, TIVUK, SUBOK, RONAB, ADUKA, TRP/SIG TACAN, ELB VORTAC: lateral limits taken from Aurora – replace with ENR 4.4 / 4.1 coordinates if available.
 
 ## Assumptions to verify
 - AIB (v1.1): S-64 and other civil-operated types use registration + BAT (the manual gives CAN only for the CL-415); CL-415 numbers start at CAN 15; registrations are random I-XXXX; default separation (fixed wing 1500-2000 ft AGL at the entry point, helicopters below 1000 ft AGL) and phraseology examples are ours, since annex "M" is not in the manual; scooping lakes from a built-in list (approximate centres), sea scooping from the coastline; locality / municipality / province / elevation filled by the staff (no gazetteer / DEM).

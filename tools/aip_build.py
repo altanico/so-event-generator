@@ -84,7 +84,8 @@ for RAW,SEC,AIRAC in INPUTS:
     z=re.search(r'Zona "(\w)"',name)
     if z: code+=z.group(1)
     pre=re.match(r'[A-Z]+',code).group(0)
-    if not MIL.search(act_it_en) or re.search(r'civil',act_it_en,re.I): skipped.append(f'{SEC} {code} {name}: {english(x["c3"])}'); continue
+    KEEP={'R22'}  # staff decision: R22 Frosinone (helicopter training) is used as a military area
+    if code not in KEEP and (not MIL.search(act_it_en) or re.search(r'civil',act_it_en,re.I)): skipped.append(f'{SEC} {code} {name}: {english(x["c3"])}'); continue
     poly,notes=geom(' '.join(x['c1']))
     if len(poly)<3: skipped.append(f'{SEC} {code} {name}: GEOMETRY?'); continue
     up,lo=limits(x['c2']); act=english(x['c3']).rstrip('.')
@@ -95,6 +96,17 @@ for RAW,SEC,AIRAC in INPUTS:
       'notes':(f'{act}. ' + cross + ('Lateral limit partly along a coastline / border: drawn as straight lines. ' if notes else '') + f'Source: AIP Italia {SEC} (AIRAC {AIRAC}).').strip(),
       'source':'aip','section':SEC,'poly':[[round(a,5),round(b,5)] for a,b in poly]})
 import os
+# AAR corridors (ENR 5.2.2.1): data/aip_src/aar_corridors.json (levels / widths from the AIP; lateral limits from the AIP where it gives
+# coordinates, otherwise from the IVAO Aurora sector file because the route points are not in ENR 5.2.2.1)
+COR=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','aar_corridors.json')))
+for c in COR:
+  lo=min(c['blocks'],key=lambda b:int(b[0][2:]))[0]; hi=max(c['blocks'],key=lambda b:int(b[1][2:]))[1]
+  lv=' or '.join(f'{b[0]}-{b[1]}' for b in c['blocks'])
+  for i,(poly,ax) in enumerate(zip(c['polys'],c['axes'])):
+    zones.append({'id':'LI-'+c['id']+(f'-{i+1}' if len(c['polys'])>1 else ''),'name':c['name']+(f' ({i+1})' if len(c['polys'])>1 else ''),'type':'AAR','lower':lo,'upper':hi,
+      'blocks':c['blocks'],'axis':ax,'activity':'Air refuelling corridor for military aircraft','use':['AAR'],'hours':'','amc':False,
+      'notes':f"Air refuelling corridor. Route: {c['route']}{'; width '+str(c['width'])+' NM' if c['width'] else ''}. Levels: {lv}. {c['notes']} Source: AIP Italia ENR 5.2.2.1 (AIRAC 20 MAR 2025); lateral limits: {c['lat']}.",
+      'source':'aip','section':'ENR 5.2.2.1','poly':poly})
 CONF=json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','data','aip_src','tsa_configs.json')))
 json.dump({'source':'AIP Italia ENR 5.1.2 / 5.1.3 / 5.1.4 – military areas only','sections':{sec:air for _,sec,air in INPUTS},'zones':zones,'configs':CONF},open(OUT,'w'),ensure_ascii=False,separators=(',',':'))
 print(len(zones),'zones;',len(skipped),'skipped'); print('\n'.join('  - '+s for s in skipped))

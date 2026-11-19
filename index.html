@@ -529,8 +529,8 @@ function geom() {
    (JSON or GeoJSON) or REST API returning the same JSON (see DB_INTERFACE.md).
    Every mission element must lie inside the reserved areas (deconfliction).
    ===================================================================== */
-const ZTYPES = { R: 'Restricted', D: 'Danger', P: 'Prohibited', TSA: 'Temporary Segregated Area', TRA: 'Temporary Reserved Area', CBA: 'Cross-Border Area', MTA: 'Military Training Area', IND: 'India area (AEW)', OTHER: 'Other' };
-const ZCOL = { R: '#7C3AED', D: '#DB2777', P: '#B91C1C', TSA: '#0F766E', TRA: '#0E7490', CBA: '#4D7C0F', MTA: '#9333EA', IND: '#0369A1', OTHER: '#475569' };
+const ZTYPES = { R: 'Restricted', D: 'Danger', P: 'Prohibited', TSA: 'Temporary Segregated Area', TRA: 'Temporary Reserved Area', CBA: 'Cross-Border Area', AAR: 'Air refuelling corridor', MTA: 'Military Training Area', IND: 'India area (AEW)', OTHER: 'Other' };
+const ZCOL = { R: '#7C3AED', D: '#DB2777', P: '#B91C1C', TSA: '#0F766E', TRA: '#0E7490', CBA: '#4D7C0F', AAR: '#EA580C', MTA: '#9333EA', IND: '#0369A1', OTHER: '#475569' };
 const SNAP_AST = ['CAP', 'TRACK', 'ORBIT', 'IP', 'HOLD', 'KILLBOX'];
 const normType = t => { t = String(t || '').toUpperCase().replace(/[^A-Z]/g, ''); return ZTYPES[t] ? t : t.startsWith('RESTR') ? 'R' : t.startsWith('DANG') ? 'D' : t.startsWith('PROH') ? 'P' : 'OTHER'; };
 const ring = (c, r, n = 10) => Array.from({ length: n }, (_, i) => dest(c, i * 360 / n, r));
@@ -642,7 +642,7 @@ function parseAirspace(json) { // {zones|areas, frequencies|freqs} or a GeoJSON 
   };
   const addZ = (p, geo) => { const poly = toPoly(geo); if (!poly || poly.length < 3) return;
     zones.push({ id: String(p.id ?? p.code ?? p.designator ?? p.name ?? uid()), name: String(p.name ?? p.designator ?? p.id ?? 'Zone'), type: normType(p.type ?? p.class ?? p.category),
-      lower: String(p.lower ?? p.lower_limit ?? p.floor ?? 'GND'), upper: String(p.upper ?? p.upper_limit ?? p.ceiling ?? 'UNL'), notes: String(p.notes ?? p.remarks ?? p.activation ?? ''), activity: String(p.activity ?? ''), use: Array.isArray(p.use) ? p.use : [], hours: String(p.hours ?? ''), poly }); };
+      lower: String(p.lower ?? p.lower_limit ?? p.floor ?? 'GND'), upper: String(p.upper ?? p.upper_limit ?? p.ceiling ?? 'UNL'), notes: String(p.notes ?? p.remarks ?? p.activation ?? ''), activity: String(p.activity ?? ''), use: Array.isArray(p.use) ? p.use : [], hours: String(p.hours ?? ''), ...(Array.isArray(p.blocks) ? { blocks: p.blocks } : {}), ...(Array.isArray(p.axis) ? { axis: p.axis } : {}), poly }); };
   if (json && json.type === 'FeatureCollection') (json.features || []).forEach(f => addZ({ ...(f.properties || {}), id: f.id ?? (f.properties || {}).id }, f.geometry));
   ((json && (json.zones || json.areas)) || []).forEach(z => addZ(z, z.geometry || z.poly || z.coords || z.polygon));
   ((json && (json.frequencies || json.freqs)) || []).forEach(f => { const v = String(f.freq ?? f.frequency ?? f.mhz ?? ''); if (!v) return;
@@ -686,7 +686,7 @@ function sampleRes(center, rKm) {
   return snapRes(center);
 }
 function snapRes(p, alt) {
-  const fit = q => { const a = flRange(alt); return !a || (a[1] <= zLimit(q.upper) && !(a[0] < zLo(q.lower) && zLo(q.lower) > 0)); };
+  const fit = q => { const a = flRange(alt); return !a || zFit(q, a); };
   let r = RES(); if (alt) { const f = r.filter(fit); if (f.length) r = f; }
   if (!r.length || r.some(z => pip(p, z.poly))) return p;
   let best = null, bd = Infinity;
@@ -698,6 +698,8 @@ function flRange(s) { s = String(s || '').toUpperCase(); if (!s || s === '-') re
   if (!v.length) for (const m of s.matchAll(/(\d{3,5})\s?FT/g)) v.push(+m[1] / 100);
   if (/^\s*</.test(s) && v.length) return [0, Math.max(...v)];
   return v.length ? [Math.min(...v), Math.max(...v)] : null; }
+// level band a=[lo,hi] (FL) inside the area; AAR corridors only inside one of their blocks
+const zFit = (q, a) => (q.blocks && q.blocks.length ? q.blocks : [[q.lower, q.upper]]).some(([lo, up]) => a[1] <= zLimit(up) && !(a[0] < zLo(lo) && zLo(lo) > 0));
 const zLo = s => /TBC|TBD/i.test(String(s)) ? 0 : zLimit(s); // unknown vertical limits (sector file data) never block an element
 const zLimit = s => { if (/TBC|TBD/i.test(String(s))) return 999; const r = flRange(s); return r ? (/UNL/.test(String(s).toUpperCase()) ? 999 : r[1]) : 0; };
 function containmentIssues() {
@@ -705,7 +707,7 @@ function containmentIssues() {
   const out = [], chk = (label, p, alt) => {
     const zs = RES().filter(q => pip(p, q.poly)); if (!zs.length) { out.push(`${label}: fuori dalle zone riservate`); return; }
     const a = flRange(alt); if (!a) return;
-    const fits = q => a[1] <= zLimit(q.upper) && !(a[0] < zLo(q.lower) && zLo(q.lower) > 0); // overlapping areas: one that contains the altitude is enough
+    const fits = q => zFit(q, a); // overlapping areas: one that contains the altitude is enough
     if (zs.some(fits)) return; const z = zs[0];
     if (a[1] > zLimit(z.upper)) out.push(`${label}: quota ${alt} oltre il limite superiore di ${z.name} (${z.upper})`);
     if (a[0] < zLo(z.lower) && zLo(z.lower) > 0) out.push(`${label}: quota ${alt} sotto il limite inferiore di ${z.name} (${z.lower})`);
@@ -720,7 +722,7 @@ function containmentIssues() {
 }
 function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area whose vertical limits contain their altitude
   if (!t || !RES().length) return;
-  const fitQ = (q, alt) => { const a = flRange(alt); return !a || (a[1] <= zLimit(q.upper) && !(a[0] < zLo(q.lower) && zLo(q.lower) > 0)); };
+  const fitQ = (q, alt) => { const a = flRange(alt); return !a || zFit(q, a); };
   t.airspace.forEach(a => { if (!SNAP_AST.includes(a.type) || a.pub || !a.alt || RES().some(q => fitQ(q, a.alt))) return; // no reserved area for this level: add the nearest one that has it
     const c = LIB().filter(q => q.type !== 'P' && (q.type !== 'IND' || a.type === 'ORBIT') && fitQ(q, a.alt)).map(q => [q, dist(a.pts[0], centroid(q.poly))]).filter(x => x[1] < 250).sort((x, y) => x[1] - y[1])[0];
     if (c) S.reserved = fixConfigs([...new Set([...(S.reserved || []), c[0].id])]); });
@@ -1316,7 +1318,15 @@ function generateElements(flights) {
   if (S.cats.includes('SHORAD')) { const n = { EASY: 1, MEDIUM: 2, HARD: 3 }[D]; for (let i = 0; i < n; i++) T(i % 2 ? 'AAA' : 'MANPADS', zc('SHORAD', 0.8)); }
   // Support airspace
   const usedT = new Set(), useZ = t => trkZones(t).forEach(z => { S.reserved = S.reserved || []; if (!S.reserved.includes(z.id)) S.reserved.push(z.id); });
-  by('AAR').forEach((fl, i) => { const t = pickTrack('AAR', usedT);
+  const corUse = {}, corTrack = () => { // AIP air refuelling corridor nearest the front: a 50 NM segment of its axis at its (upper) block
+    const cs = LIB().filter(z => z.type === 'AAR' && (z.axis || []).length > 1).map(z => { const pts = []; z.axis.forEach((p, k) => { if (!k) return; const a = z.axis[k - 1], d = dist(a, p), n = Math.max(1, Math.round(d / 2)); for (let j = 0; j <= n; j++) pts.push(dest(a, bearing(a, p), d * j / n)); });
+      let bi = 0, bd = Infinity; pts.forEach((p, k) => { const d = dist(g.front, p); if (d < bd) { bd = d; bi = k; } }); return { z, pts, bi, bd }; }).filter(c => c.bd < 350).sort((a, b) => ((corUse[a.z.id] || 0) - (corUse[b.z.id] || 0)) || (a.bd - b.bd));
+    if (!cs.length) return null; const c = cs[0], n = (corUse[c.z.id] || 0) + 1, half = 23, shift = (n - 1) * 50;
+    let i0 = Math.max(0, Math.min(c.pts.length - 1, c.bi - half + shift)), i1 = Math.max(0, Math.min(c.pts.length - 1, c.bi + half + shift)); if (i1 - i0 < 10) { i0 = Math.max(0, i1 - 2 * half); }
+    return { z: c.z, d: c.bd, pts: [c.pts[i0], c.pts[i1]], alt: `${c.z.blocks[0][0]}-${c.z.blocks[0][1]}` }; };
+  by('AAR').forEach((fl, i) => { let t = pickTrack('AAR', usedT); const ct = corTrack();
+    if (t && ct && ct.d + 30 < dist(g.front, trkCenter(t))) t = null; // the AIP corridor is nearer than the published track
+    if (!t && ct) { corUse[ct.z.id] = (corUse[ct.z.id] || 0) + 1; S.reserved = S.reserved || []; if (!S.reserved.includes(ct.z.id)) S.reserved.push(ct.z.id); A('TRACK', `Track ${ct.z.name}`, ct.pts, { flight: fl.id, alt: ct.alt, cor: ct.z.id }); return; }
     if (t) { usedT.add(t.id); useZ(t); A('TRACK', `Track ${t.id}`, [t.ap1, t.ap2], { flight: fl.id, alt: trkAlt(t), pub: true, trk: t.id, loop: [t.ap1, t.tp2, t.ap2, t.tp1] }); }
     else { const c = toBlue(g.front, 90 + i * 25); A('TRACK', `Track ${pick(WORDS)}`, [dest(c, g.dir + 90, 30), dest(c, g.dir - 90, 30)], { flight: fl.id, alt: 'FL220-260' }); } });
   by('AEW').forEach(fl => { const t = pickTrack('AEW', usedT);

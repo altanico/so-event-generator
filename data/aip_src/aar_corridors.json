@@ -1,0 +1,396 @@
+[
+ {
+  "id": "AARALPHA",
+  "name": "AAR ALPHA",
+  "route": "385200N 0090000E \u2013 BULAR",
+  "width": 10,
+  "blocks": [
+   [
+    "FL260",
+    "FL280"
+   ],
+   [
+    "FL210",
+    "FL230"
+   ]
+  ],
+  "notes": "Activated on tactical basis by Roma SCCAM with at least 12 hours notice to Roma ACC. The two blocks of three levels cannot be used simultaneously; other levels by NOTAM.",
+  "polys": [
+   [
+    [
+     38.93258,
+     9.03685
+    ],
+    [
+     38.80081,
+     8.96176
+    ],
+    [
+     38.24719,
+     10.75941
+    ],
+    [
+     38.38154,
+     10.82753
+    ]
+   ]
+  ],
+  "lat": "IVAO Aurora sector file (route end point BULAR not in ENR 5.2.2.1)",
+  "axes": [
+   [
+    [
+     38.86669,
+     8.9993
+    ],
+    [
+     38.31437,
+     10.79347
+    ]
+   ]
+  ]
+ },
+ {
+  "id": "AARBRAVO",
+  "name": "AAR BRAVO",
+  "route": "TIVUK \u2013 BULAR \u2013 TRP TACAN \u2013 SIG TACAN",
+  "width": 20,
+  "blocks": [
+   [
+    "FL260",
+    "FL280"
+   ],
+   [
+    "FL210",
+    "FL230"
+   ]
+  ],
+  "notes": "Activated on tactical basis by Roma SCCAM with at least 12 hours notice to Roma ACC. The two blocks of three levels cannot be used simultaneously; other levels by NOTAM. TIVUK \u2013 BULAR portion 10 NM wide.",
+  "polys": [
+   [
+    [
+     38.15122,
+     10.71019
+    ],
+    [
+     37.7308,
+     12.43809
+    ],
+    [
+     37.23512,
+     14.91639
+    ],
+    [
+     37.55669,
+     15.02583
+    ],
+    [
+     38.06221,
+     12.57228
+    ],
+    [
+     38.47808,
+     10.86631
+    ],
+    [
+     38.31162,
+     10.79112
+    ]
+   ],
+   [
+    [
+     38.25003,
+     10.75962
+    ],
+    [
+     38.38183,
+     10.8271
+    ],
+    [
+     38.90485,
+     9.99493
+    ],
+    [
+     38.79613,
+     9.87499
+    ]
+   ]
+  ],
+  "lat": "IVAO Aurora sector file (route points not in ENR 5.2.2.1)",
+  "axes": [
+   [
+    [
+     37.3959,
+     14.97111
+    ],
+    [
+     38.23142,
+     10.75066
+    ]
+   ],
+   [
+    [
+     38.31593,
+     10.79336
+    ],
+    [
+     38.85049,
+     9.93496
+    ]
+   ]
+  ]
+ },
+ {
+  "id": "AARDELTA",
+  "name": "AAR DELTA",
+  "route": "Polygon",
+  "width": null,
+  "blocks": [
+   [
+    "FL260",
+    "FL280"
+   ],
+   [
+    "FL210",
+    "FL230"
+   ]
+  ],
+  "notes": "Activated on tactical basis by Roma SCCAM with at least 12 hours notice to Roma ACC. The two blocks of three levels cannot be used simultaneously; other levels by NOTAM.",
+  "polys": [
+   [
+    [
+     37.55667,
+     15.02583
+    ],
+    [
+     37.15,
+     17.78333
+    ],
+    [
+     37.13333,
+     19.0
+    ],
+    [
+     36.6,
+     19.0
+    ],
+    [
+     37.235,
+     14.91639
+    ]
+   ]
+  ],
+  "lat": "AIP ENR 5.2.2.1",
+  "axes": [
+   [
+    [
+     36.86666,
+     19.0
+    ],
+    [
+     37.39583,
+     14.97111
+    ]
+   ]
+  ]
+ },
+ {
+  "id": "AARECHO",
+  "name": "AAR ECHO",
+  "route": "SIG TACAN \u2013 SUBOK",
+  "width": 20,
+  "blocks": [
+   [
+    "FL260",
+    "FL280"
+   ],
+   [
+    "FL210",
+    "FL230"
+   ]
+  ],
+  "notes": "Activated on tactical basis by Roma SCCAM with at least 12 hours notice to Roma ACC. The two blocks of three levels cannot be used simultaneously; other levels by NOTAM.",
+  "polys": [
+   [
+    [
+     36.36214,
+     16.75226
+    ],
+    [
+     36.63991,
+     16.95873
+    ],
+    [
+     37.53322,
+     15.10309
+    ],
+    [
+     37.25985,
+     14.83469
+    ]
+   ]
+  ],
+  "lat": "IVAO Aurora sector file (route points not in ENR 5.2.2.1)",
+  "axes": [
+   [
+    [
+     36.50102,
+     16.85549
+    ],
+    [
+     37.39654,
+     14.96889
+    ]
+   ]
+  ]
+ },
+ {
+  "id": "AARADRIATICO",
+  "name": "AAR ADRIATICO",
+  "route": "Polygon",
+  "width": null,
+  "blocks": [
+   [
+    "FL155",
+    "FL195"
+   ]
+  ],
+  "notes": "Activated on tactical basis upon prior coordination between the MIL / CIV ATS units; radio contact with the designated military unit.",
+  "polys": [
+   [
+    [
+     43.42778,
+     14.57806
+    ],
+    [
+     42.42917,
+     16.10667
+    ],
+    [
+     42.19806,
+     15.85833
+    ],
+    [
+     43.25556,
+     14.2375
+    ]
+   ]
+  ],
+  "lat": "AIP ENR 5.2.2.1",
+  "axes": [
+   [
+    [
+     42.31361,
+     15.9825
+    ],
+    [
+     43.34167,
+     14.40778
+    ]
+   ]
+  ]
+ },
+ {
+  "id": "AARADRIATICOHIGH",
+  "name": "AAR ADRIATICO HIGH",
+  "route": "Polygon",
+  "width": null,
+  "blocks": [
+   [
+    "FL240",
+    "FL280"
+   ]
+  ],
+  "notes": "Activated on tactical basis upon prior coordination between the MIL / CIV ATS units; radio contact with the designated military unit.",
+  "polys": [
+   [
+    [
+     43.42778,
+     14.57806
+    ],
+    [
+     42.42917,
+     16.10667
+    ],
+    [
+     42.19806,
+     15.85833
+    ],
+    [
+     43.25556,
+     14.2375
+    ]
+   ]
+  ],
+  "lat": "AIP ENR 5.2.2.1",
+  "axes": [
+   [
+    [
+     42.31361,
+     15.9825
+    ],
+    [
+     43.34167,
+     14.40778
+    ]
+   ]
+  ]
+ },
+ {
+  "id": "AARTIRRENO",
+  "name": "AAR TIRRENO",
+  "route": "ELB VORTAC \u2013 RONAB \u2013 ADUKA",
+  "width": 10,
+  "blocks": [
+   [
+    "FL170",
+    "FL200"
+   ]
+  ],
+  "notes": "Activated on tactical basis upon prior coordination between the MIL / CIV ATS units; radio contact with Roma SCCAM.",
+  "polys": [
+   [
+    [
+     39.85346,
+     11.81699
+    ],
+    [
+     38.56154,
+     11.86205
+    ],
+    [
+     38.56353,
+     12.04044
+    ],
+    [
+     39.89822,
+     11.9683
+    ],
+    [
+     42.75535,
+     10.48907
+    ],
+    [
+     42.707,
+     10.3018
+    ]
+   ]
+  ],
+  "lat": "IVAO Aurora sector file (route points not in ENR 5.2.2.1)",
+  "axes": [
+   [
+    [
+     38.56253,
+     11.95125
+    ],
+    [
+     39.87584,
+     11.89264
+    ],
+    [
+     42.73118,
+     10.39543
+    ]
+   ]
+  ]
+ }
+]
