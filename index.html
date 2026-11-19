@@ -2189,26 +2189,36 @@ function cusFromParts(ids, lower, upper) {
   const lo = lower || parts.map(z => z.lower).sort((a, b) => zLo(a) - zLo(b))[0], up = upper || parts.map(z => z.upper).sort((a, b) => zLimit(b) - zLimit(a))[0];
   return cusAdd(cusMake('combo', poly, { lower: lo, upper: up, parts: parts.map(z => z.id), joined: rings.length === 1, notes: `Combination of ${parts.map(z => z.name).join(', ')} with exercise vertical limits.` }));
 }
-function cusFromThreats(marginKm = 5) {
-  const pts = [], circ = (c, r) => { for (let b = 0; b < 360; b += 15) pts.push(dest(c, b, r + marginKm)); };
-  (S.zones || []).filter(z => z.side !== 'BLUE').forEach(z => circ(z.center, z.r));
-  ((S.t && S.t.threats) || []).forEach(t => circ(t.pos, t.r || 5));
+function cusFromScenario(marginKm = 5) { // one polygon around the whole scenario: threat rings, areas, objectives, mission airspace, CAS / PR / SAR / AIB scenarios
+  const pts = [], circ = (c, r) => { for (let b = 0; b < 360; b += 15) pts.push(dest(c, b, (r || 0) + marginKm)); }, pt = p => circ(p, 0);
+  const isLL = v => Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number' && v[0] > 35 && v[0] < 48 && v[1] > 5 && v[1] < 20;
+  const SKIP = new Set(['hosp', 'mtf', 'water', 'waterH', 'base', 'bases', 'home', 'ap', 'airport', 'route', 'sardot']); // far-away support points stay out
+  const scan = (o, d = 0) => { if (!o || d > 6) return; if (isLL(o)) return pt(o); if (Array.isArray(o)) return o.forEach(x => scan(x, d + 1)); if (typeof o === 'object') for (const [k, v] of Object.entries(o)) if (!SKIP.has(k)) scan(v, d + 1); };
+  (S.zones || []).forEach(z => circ(z.center, z.r));
+  if (S.t) { S.t.threats.forEach(t => circ(t.pos, t.r || 5)); S.t.objectives.filter(o => !['WATER', 'ALIFT'].includes(o.type)).forEach(o => circ(o.pos, o.r || 0));
+    S.t.airspace.filter(a => !a.pub && !['BULLSEYE', 'FLOT'].includes(a.type)).forEach(a => (a.pts || []).forEach(pt)); }
+  if (S.cas && REL().cas) scan(S.cas.jtacs || S.cas);
+  if (S.pr && REL().pr) scan(S.pr);
+  if (S.sar && REL().sar) S.sar.list.forEach(sc => { sarAreas(sc).forEach(a => a.poly.forEach(pt)); pt(sc.truth); });
+  if (S.aib && REL().aib) S.aib.list.forEach(sc => { const G = aibGeom(sc); G.perim.concat(G.risk).forEach(pt); circ(sc.pos, G.opR); });
   if (pts.length < 3) return null;
-  const poly = reduceHull(hullPts(pts), 10).map(p => [Math.round(p[0] * 60) / 60, Math.round(p[1] * 60) / 60]), alts = ((S.t && S.t.threats) || []).map(t => (flRange(t.alt) || [0, 0])[1]);
-  const up = Math.max(250, ...alts.filter(x => x < 999)); return cusAdd(cusMake('threat', poly, { upper: `FL${Math.ceil(up / 10) * 10}`, notes: 'Custom area (not published) around all the threat rings: lateral limits as listed in the NOTAM.' }));
+  const poly = reduceHull(hullPts(pts), 10).map(p => [Math.round(p[0] * 60) / 60, Math.round(p[1] * 60) / 60]);
+  const alts = [...((S.t && S.t.threats) || []).map(t => t.alt), ...((S.t && S.t.airspace) || []).filter(a => !a.pub).map(a => a.alt)].map(a => (flRange(a) || [0, 0])[1]).filter(x => x > 0 && x < 999);
+  const up = PROF().civil ? Math.max(100, ...alts) : Math.max(250, ...alts);
+  return cusAdd(cusMake('scen', poly, { upper: `FL${String(Math.ceil(up / 10) * 10).padStart(3, '0')}`, notes: 'Custom area (not published) around the whole scenario: lateral limits as listed in the NOTAM.' }));
 }
 function cusFinishDraw() { const d = S.cusDraft || []; if (d.length < 3) return null; S.cusDraft = []; ADDMODE = ''; return cusAdd(cusMake('draw', d.map(roundMin))); }
 function cusHtml() {
   const o = (v, l) => l.map(([k, t]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${t}</option>`).join('');
   return `<div class="card" style="margin-top:10px"><b>Aree custom</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Aree non pubblicate create per l'evento: entrano nelle aree riservate e nel NOTAM (con i vertici lat/long se non sono pubblicate).</p>
-  ${CUS().map(c => `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px"><div><label>${c.kind === 'combo' ? 'Combinata' : c.kind === 'draw' ? 'Disegnata' : 'Attorno alle minacce'}</label><input data-cus="${c.id}" data-cf="name" value="${esc(c.name)}"></div>
+  ${CUS().map(c => `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px"><div><label>${c.kind === 'combo' ? 'Combinata' : c.kind === 'draw' ? 'Disegnata' : 'Tutto lo scenario'}</label><input data-cus="${c.id}" data-cf="name" value="${esc(c.name)}"></div>
     <div style="max-width:90px"><label>Tipo</label><select data-cus="${c.id}" data-cf="type">${o(c.type, [['TSA', 'TSA'], ['TRA', 'TRA'], ['R', 'R'], ['D', 'D']])}</select></div>
     <div style="max-width:120px"><label>Limite inf.</label><input data-cus="${c.id}" data-cf="lower" value="${esc(c.lower)}"></div><div style="max-width:120px"><label>Limite sup.</label><input data-cus="${c.id}" data-cf="upper" value="${esc(c.upper)}"></div>
     <button class="b sm shrink" data-cusdel="${c.id}">Elimina</button></div>${c.kind === 'combo' && !c.joined ? '<div class="warn" style="font-size:12px">Le aree scelte non sono adiacenti: il perimetro mostrato è l\'inviluppo convesso; il NOTAM elenca le singole aree.</div>' : ''}`).join('')}
   <div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:6px"><div style="min-width:240px"><label>Combina aree esistenti (Ctrl/⌘ per sceglierne più di una)</label><select id="cusparts" multiple size="5">${nearZones().filter(z => !z.custom).slice(0, 80).map(z => `<option value="${esc(z.id)}">${esc(z.name)} (${esc(z.lower)}-${esc(z.upper)})</option>`).join('')}</select></div>
     <div style="max-width:110px"><label>Limite inf.</label><input id="cuslo" placeholder="dalle aree"></div><div style="max-width:110px"><label>Limite sup.</label><input id="cusup" placeholder="dalle aree"></div><button class="b sm shrink" id="cuscombo">Crea area combinata</button></div>
   <div class="row" style="flex-wrap:wrap;margin-top:6px">${ADDMODE === 'cus:draw' ? `<span class="muted" style="font-size:12px">Clic sulla mappa per i vertici (${(S.cusDraft || []).length})</span><button class="b sm shrink primary" id="cusclose">Chiudi area</button><button class="b sm shrink" id="cuscancel">Annulla</button>` : '<button class="b sm shrink" id="cusdraw">Disegna sulla mappa</button>'}
-    <button class="b sm shrink" id="custhreat" ${GEN() ? '' : 'disabled'}>Area che contiene tutte le minacce</button></div></div>`;
+    <button class="b sm shrink" id="cusscen" ${GEN() ? '' : 'disabled'}>Area che contiene tutto lo scenario</button></div></div>`;
 }
 // ---- NOTAM (ICAO format, English) ----
 const notamCfg = () => { S.notamCfg = Object.assign({ series: 'W', num: 1001, start: -30, end: 240, fir: '' }, S.notamCfg || {}); return S.notamCfg; };
@@ -2905,7 +2915,7 @@ document.addEventListener('click', e => {
   if (t.id === 'cusdraw') { ADDMODE = 'cus:draw'; S.cusDraft = []; renderPanel(); drawMap(); toast('Clic sulla mappa per aggiungere i vertici'); return; }
   if (t.id === 'cuscancel') { ADDMODE = ''; S.cusDraft = []; save(); renderPanel(); drawMap(); return; }
   if (t.id === 'cusclose') { const c = cusFinishDraw(); toast(c ? `${c.name} creata` : 'Servono almeno 3 vertici'); renderPanel(); drawMap(); return; }
-  if (t.id === 'custhreat') { const c = cusFromThreats(); toast(c ? `${c.name} creata attorno alle minacce` : 'Nessuna minaccia'); renderPanel(); drawMap(); return; }
+  if (t.id === 'cusscen') { const c = cusFromScenario(); toast(c ? `${c.name} creata attorno a tutto lo scenario` : 'Scenario vuoto'); renderPanel(); drawMap(); return; }
   if (t.id === 'notamtxt') { download(`${fileBase()}_NOTAM.txt`, new Blob([notamList().map(n => n.text).join('\n\n') + '\n'], { type: 'text/plain' })); return; }
   if (t.dataset.cor) { const z = CORS().find(x => x.id === t.dataset.cor), st = new Set(S.cor || []); if (z) { st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
@@ -4194,7 +4204,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && S.asp && S.asp.source === 'demo' && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { AIRPORTS, cusFinishDraw, cusFromParts, cusFromThreats, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AIRPORTS, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, demoAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
