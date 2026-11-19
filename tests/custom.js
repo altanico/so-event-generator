@@ -18,8 +18,14 @@ const fail=await page.evaluate(()=>{const f=[]; const pip=(p,poly)=>{let ins=fal
  const N0=N;
  APP.setEvents(['AIB']); APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x CL-415\n1x AS350'); APP.tailor(); const c4=APP.cusFromScenario();
  if(!c4) f.push('AIB scenario area'); else { for (const sc of APP.S.aib.list) if(!pip(sc.pos,c4.poly)) f.push('fire '+sc.id+' outside'); if(!APP.RES().some(z=>z.id===c4.id)) f.push('AIB area not reserved'); if(!APP.notamList().some(n=>n.text.includes(c4.name))) f.push('AIB area not in NOTAM'); }
+ // area created BEFORE generation: the whole exercise inside it
+ APP.S.custom=[]; APP.S.cusLock=false; APP.S.gen=false; APP.S.zones=[]; APP.S.t=null; APP.S.meta.theatre='CT'; APP.setEvents(['MIX']);
+ APP.S.cusDraft=[[42.75,11.6],[42.75,12.5],[42.15,12.5],[42.15,11.6]]; const cl=APP.cusFinishDraw(); cl.upper='FL300'; if(!APP.S.cusLock) f.push('lock not set before generation');
+ APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('4x F-35A\n2x AMX\n1x KC-767\n1x E-3'); APP.tailor();
+ if(APP.RES().length!==1) f.push('locked: other areas reserved'); const L=APP.S.t; const P=[...L.threats.map(x=>x.pos),...L.objectives.filter(x=>!['WATER','ALIFT'].includes(x.type)).map(x=>x.pos),...L.airspace.filter(a=>!a.pub&&!['BULLSEYE','FLOT'].includes(a.type)).flatMap(a=>a.pts||[])];
+ if(P.some(p=>!pip(p,cl.poly))) f.push('locked: element outside the custom area'); if((APP.containmentIssues()||[]).length) f.push('locked: containment');
  return f;});
 await page.evaluate(()=>APP.renderAll()); await page.click('[data-tab="export"]'); await page.waitForTimeout(200);
 const [d]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('#mpdf')]); await d.saveAs('cus_mp.pdf');
-const mp=execSync('pdftotext cus_mp.pdf -').toString(); if(!/NOTAMN/.test(mp)||!/EXERCISE AREA BRAVO/.test(mp)) fail.push('NOTAM not in masterplan');
+const mp=execSync('pdftotext cus_mp.pdf -').toString(); if(!/NOTAMN/.test(mp)||!/EXERCISE AREA ALPHA/.test(mp)||!/BOUNDED BY/.test(mp)) fail.push('NOTAM not in masterplan');
 console.log(fail.length?'"err": '+fail.join('; '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
