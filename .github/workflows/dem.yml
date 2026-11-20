@@ -1,0 +1,26 @@
+name: Build terrain tiles (DEM)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['tools/dem_build.py', '.github/workflows/dem.yml']
+permissions:
+  contents: write
+jobs:
+  dem:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install numpy rasterio
+      - run: python tools/dem_build.py
+        env: { AWS_NO_SIGN_REQUEST: 'YES', GDAL_DISABLE_READDIR_ON_OPEN: 'EMPTY_DIR' }
+      - name: Commit the tiles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/dem
+          git diff --cached --quiet || git commit -m "Terrain tiles (Copernicus DEM GLO-90, 9 arc-sec) [skip ci]"
+          git pull --rebase && git push
