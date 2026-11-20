@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Racetrack / Figure 8 orientation** (staff 20 Nov): today they can be moved (drag the CP, or the keyhole point / E) but their axis is always parallel to the front (`casHoldShape`: geom().dir + 90). Proposal: per JTAC "Orientamento holding (°)" = direction of the long axis (default parallel to the front, as today), and on the map a small handle at the end of one leg to drag and rotate it; text "HOLD VERMONT, RACETRACK, 10 MILE LEGS, AXIS 090/270" (figure eight the same); also "Virate" right (standard) / left for the racetrack. Shape, AA deconfliction, JTAC pack map follow. Waiting for the staff: OK on axis text + turns?
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
