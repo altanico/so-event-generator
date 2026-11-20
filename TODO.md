@@ -2,6 +2,7 @@
 
 ## Next build (start only when the staff says "fai la build")
 - [ ] **Custom / combined areas: no duplicates, clear NOTAM** (staff 20 Nov: "combined all areas into one" -> 4 NOTAMs). Cause: one NOTAM per custom area in the reserved set; pressing "Unisci" again creates a NEW combined area each time (ALPHA, BRAVO, CHARLIE all made of R49A–F with different vertical limits), plus DELTA = "Area che contiene tutto lo scenario" (default SFC–FL250). Proposal: 1) combining the same set of areas again updates the existing combined area (limits) instead of creating a new one – toast "EXERCISE AREA ALPHA aggiornata"; 2) warning in the custom-areas card when two custom areas overlap ("ALPHA e DELTA si sovrappongono: 2 NOTAM per lo stesso spazio") with a button to delete the extra; 3) vertical limits typed as a bare number ("370") read as FL370 (today NOTAM shows "G) 370" and Q) upper 999); invalid limits flagged in red; 4) the NOTAM tab shows next to each NOTAM which area it covers, and the count ("4 NOTAM: 4 aree riservate / custom").
+- [ ] **Terrain (DEM): elevations and attack headings** (staff 20 Nov: "problema delle quote e della scelta delle prue di attacco"; staff authorised a GitHub Actions workflow in altanico/so-event-generator). Plan: 1) `.github/workflows/dem.yml` + `tools/dem_build.py`: download Copernicus DEM GLO-90 (AWS open data) over Italy + neighbours, resample to ~250 m (mean + max per cell), write 1° tiles in `data/dem/` (int16, gzip), commit; credits "Copernicus DEM GLO-90" in the about / docs. 2) App: load only the tiles of the event; `elev(p)` / `elevMax(poly|line)`; works in the artifact (tiles published with the page), GitHub Pages and locally. 3) Elevations: CAS targets (9-line line 4), LZ, SARDOT, MEDEVAC POI filled automatically with "DEM" mark, staff can override. 4) Attack headings: for each CAS task choose the final attack heading / IP bearing that keeps the run-in lowest (along valleys), avoids terrain rising above the run-in altitude within the last 5 NM, and still respects friendlies / offset / threats; show the terrain profile of the run-in in the task card. 5) Holdings / blocks: lowest block >= highest terrain under the holding + 2000 ft (combined with the AA floor); AGL area limits converted with the highest terrain in the area (containment / NOTAM unchanged). Tests.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
@@ -32,7 +33,6 @@
 - Consider splitting `index.html` into modules.
 
 ## CAS – possible next steps
-- **Terrain data (DEM)** once hosted on the division site (e.g. Open Topo Data SRTM 30 m): fill line 4 automatically and choose final attack headings along valleys / away from high ground.
 - Talk-on text generator (needs photoreal references, so probably staff-written).
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
 
