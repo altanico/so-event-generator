@@ -531,7 +531,7 @@ function newScenario() {
 let MODE = 'staff';
 let S = lsGet('ivao-so-current', null) || newScenario();
 let TAB = 'scenario', SUBTAB = 'manual', CSV_PENDING = null;
-function save() { if (MODE !== 'staff') return; S.updated = Date.now(); lsSet('ivao-so-current', S); if (typeof renderEvBadge === 'function') renderEvBadge(); }
+function save() { if (MODE !== 'staff') return; S.updated = Date.now(); lsSet('ivao-so-current', S); if (typeof renderEvBadge === 'function') renderEvBadge(); if (typeof demSoon === 'function') demSoon(); }
 const thChosen = () => !!(S && S.meta && S.meta.theatre) && (S.meta.theatre !== 'CUSTOM' || !!S.thCustom); // a new / reset event has no theatre until the staff picks one
 const theatre = () => (S.meta.theatre === 'CUSTOM' && S.thCustom) ? S.thCustom : THEATRES.find(t => t.id === S.meta.theatre) || THEATRES[0];
 // theatre drawn by hand: every field the generator needs is derived from the polygon and the nearest airports / preset theatre
@@ -682,6 +682,67 @@ function bullSelectHtml() { return `<datalist id="bulllist">${BUL().map(b => `<o
 // --- AIP layer (removable): military restricted areas from AIP Italia ENR 5.1.2, in data/aip_zones.json (built by tools/aip_*.py).
 // Deleting that file (and data/aip_src/) removes the layer: the app then uses the database / imported file / demo data.
 let AIPDATA = null;
+
+// ---- terrain (DEM): Copernicus DEM GLO-90 resampled to 9" (~250 m), 1° tiles in data/dem (tools/dem_build.py, GitHub Actions) ----
+// staff 20 Nov: elevations filled automatically (staff can override) and final attack headings chosen on the terrain
+const DEMN = 400, M2FT = 3.28084, DEM = { idx: null, tiles: new Map(), wait: new Map(), on: false };
+const demName = (la, lo) => `N${String(la).padStart(2, '0')}E${String(lo).padStart(3, '0')}`;
+async function demInit() { try { const r = await fetch('data/dem/index.json', { cache: 'no-cache' }); if (!r.ok) return; DEM.idx = await r.json(); DEM.has = new Set(DEM.idx.tiles || []); DEM.on = DEM.has.size > 0; } catch (e) { } }
+async function demTile(name) { if (DEM.tiles.has(name)) return DEM.tiles.get(name); if (DEM.wait.has(name)) return DEM.wait.get(name);
+  const pr = (async () => { try { const r = await fetch(`data/dem/${name}.bin`); if (!r.ok) throw 0; let buf = await r.arrayBuffer(), u = new Uint8Array(buf);
+      if (u[0] === 0x1f && u[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      const a = new Int16Array(buf), mean = a.subarray(0, DEMN * DEMN), max = a.subarray(DEMN * DEMN, 2 * DEMN * DEMN);
+      for (const b of [mean, max]) for (let r0 = 0; r0 < DEMN; r0++) { const o = r0 * DEMN; for (let c = 1; c < DEMN; c++) b[o + c] += b[o + c - 1]; } // undo the row delta
+      const t = { mean, max }; DEM.tiles.set(name, t); return t; } catch (e) { DEM.tiles.set(name, null); return null; } finally { DEM.wait.delete(name); } })();
+  DEM.wait.set(name, pr); return pr; }
+async function demLoad(pts, padDeg = 0.3) { if (!DEM.on || !pts.length) return; const need = new Set();
+  pts.forEach(p => { for (let la = Math.floor(p[0] - padDeg); la <= Math.floor(p[0] + padDeg); la++) for (let lo = Math.floor(p[1] - padDeg); lo <= Math.floor(p[1] + padDeg); lo++) { const n = demName(la, lo); if (DEM.has.has(n) && !DEM.tiles.has(n)) need.add(n); } });
+  await Promise.all([...need].map(demTile)); }
+function demCell(p, band) { if (!DEM.on) return null; const la = Math.floor(p[0]), lo = Math.floor(p[1]), n = demName(la, lo);
+  if (!DEM.has.has(n)) return 0; const t = DEM.tiles.get(n); if (!t) return null; // sea tile = 0, tile not loaded yet = unknown
+  const r = Math.min(DEMN - 1, Math.max(0, Math.floor((la + 1 - p[0]) * DEMN))), c = Math.min(DEMN - 1, Math.max(0, Math.floor((p[1] - lo) * DEMN))); return Math.max(0, t[band][r * DEMN + c]); }
+const elevM = p => demCell(p, 'mean'), elevMaxM = p => demCell(p, 'max');
+const elevFt = p => { const m = elevM(p); return m == null ? null : Math.round(m * M2FT / 10) * 10; };
+function elevMaxPts(pts) { let m = 0; for (const p of pts) { const v = elevMaxM(p); if (v == null) return null; if (v > m) m = v; } return m; } // metres; null if a tile is missing
+function elevMaxLine(a, b, stepKm = 0.25) { const d = dist(a, b), n = Math.max(2, Math.ceil(d / stepKm)), br = bearing(a, b), pts = []; for (let i = 0; i <= n; i++) pts.push(dest(a, br, d * i / n)); return elevMaxPts(pts); }
+const DEM_POLY = new Map();
+function elevMaxPoly(poly, key) { if (key && DEM_POLY.has(key)) return DEM_POLY.get(key); const bb = pbox(poly), st = 1 / DEMN * 2, pts = [];
+  for (let la = bb[0]; la <= bb[1]; la += st) for (let lo = bb[2]; lo <= bb[3]; lo += st) if (pip([la, lo], poly)) pts.push([la, lo]);
+  const v = elevMaxPts(pts.length ? pts : poly); if (key && v != null) DEM_POLY.set(key, v); return v; }
+// run-in profile: samples from the IP to the target (metres, max band)
+function runProfile(a, b, n = 48) { const d = dist(a, b), br = bearing(a, b), out = []; for (let i = 0; i <= n; i++) { const v = elevMaxM(dest(a, br, d * i / n)); if (v == null) return null; out.push(v); } return out; }
+// terrain score of a run-in: high ground above the target along the run-in, weighted on the last 5 NM (masking, pull-up over ridges)
+function runScore(a, b, tgtM) { const pr = runProfile(a, b); if (!pr) return null; const n = pr.length - 1, d = dist(a, b), last = Math.max(0, n - Math.round(n * Math.min(1, 5 * NMK / d)));
+  let mean = 0, worst = 0; pr.forEach((h, i) => { const e = Math.max(0, h - tgtM); mean += e / pr.length; if (i >= last) worst = Math.max(worst, e); }); return mean + 3 * worst; }
+// fixed-wing IPs turned on the terrain: same distance, bearing within ±50° of the generated one (stays on the friendly side), lowest run-in
+function casTerrainIPs(J) { if (!DEM.on) return; const g = geom();
+  J.tasks.filter(T => !T.rw).forEach(T => { const ip = casIP(J, T), tgt = J.targets.find(x => x.id === T.target); if (!ip || !tgt || ip.man || ip.heli) return;
+    const base = ip.pos0 || ip.pos, tm = elevMaxM(tgt.pos); if (tm == null) return; const d = dist(tgt.pos, base), b0 = ip.tb0 != null ? ip.tb0 : (ip.tb0 = bearing(tgt.pos, base));
+    let best = null; for (let k = -5; k <= 5; k++) { const b = b0 + 10 * k, q = snapRes(dest(tgt.pos, b, d)), sc = runScore(q, tgt.pos, tm); if (sc == null) return; const v = sc + Math.abs(k) * 15; if (!best || v < best.v) best = { v, q, sc }; }
+    T.runTerrain = Math.round(best.sc); const q = [+best.q[0].toFixed(5), +best.q[1].toFixed(5)];
+    if (ip.pos0) ip.pos0 = q; else if (dist(q, ip.pos) > 0.05) casSetPt(ip, q, ipAsName(ip)); }); }
+// run-in terrain for the task card: target elevation, highest ground along the run-in and in its last 5 NM, small profile (SVG)
+function runInfoHtml(J, T) { if (!DEM.on) return ''; const tgt = J.targets.find(x => x.id === T.target), ip = casIP(J, T); if (!tgt || !ip) return '';
+  const pr = runProfile(ip.pos, tgt.pos, 60); if (!pr) return '<div class="muted" style="font-size:11px">Terreno: caricamento…</div>';
+  const d = dist(ip.pos, tgt.pos), n = pr.length - 1, last = Math.max(0, n - Math.round(n * Math.min(1, 5 * NMK / d))), f = m => Math.round(m * M2FT / 10) * 10;
+  const tg = pr[n], mx = Math.max(...pr), l5 = Math.max(...pr.slice(last)), top = Math.max(mx, tg + 300, 300), W = 220, H = 40;
+  const pts = pr.map((h, i) => `${(i / n * W).toFixed(1)},${(H - h / top * H).toFixed(1)}`).join(' ');
+  return `<div class="muted" style="font-size:11px;display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="background:#f8fafc;border:1px solid var(--line);border-radius:4px"><polygon points="0,${H} ${pts} ${W},${H}" fill="#cbd5e1"/><line x1="${(last / n * W).toFixed(1)}" y1="0" x2="${(last / n * W).toFixed(1)}" y2="${H}" stroke="#d97706" stroke-dasharray="2 2"/><circle cx="${W - 2}" cy="${(H - tg / top * H).toFixed(1)}" r="2.5" fill="#b91c1c"/></svg>
+    <span>Run-in ${esc(ip.name)} → ${esc(tgt.id)} (${Math.round(d / NMK)} NM): bersaglio ${f(tg)} ft · rilievo max ${f(mx)} ft · ultimi 5 NM ${f(l5)} ft${ip.man ? '' : ' · prua scelta sul terreno'}</span></div>`; }
+// elevations filled from the DEM where the staff has not typed them (x.elevDem = value from the terrain)
+function demFill() { if (!DEM.on) return false; let ch = false; const put = (x, pos, unit = 'ft') => { if (!x || !pos) return; if (x.elevDem && String(x.elev) !== String(x._demV)) x.elevDem = false; // typed by the staff after the fill
+    if (x.elev !== '' && x.elev != null && !x.elevDem) return; const m = elevM(pos); if (m == null) return;
+    const v = unit === 'm' ? Math.round(m) : Math.round(m * M2FT / 10) * 10; if (x.elev !== v || !x.elevDem) { x.elev = v; x._demV = v; x.elevDem = true; ch = true; } };
+  if (S.cas) S.cas.jtacs.forEach(J => J.targets.forEach(x => put(x, x.pos)));
+  if (S.pr) (S.pr.csar || []).forEach(c => put(c, c.lz || c.surv));
+  if (S.aib) (S.aib.list || []).forEach(sc => put(sc, sc.pos, 'm'));
+  return ch; }
+function demPts() { const pts = []; if (S.cas) S.cas.jtacs.forEach(J => { pts.push(J.echo, ...J.targets.map(x => x.pos), ...J.ips.map(x => x.pos), ...J.cps.map(x => x.pos)); });
+  if (S.pr) (S.pr.csar || []).forEach(c => pts.push(c.lz || c.surv)); if (S.aib) (S.aib.list || []).forEach(sc => pts.push(sc.pos)); return pts.filter(Boolean); }
+let DEM_T = null;
+function demSoon() { if (!DEM.on || DEM_T) return; DEM_T = setTimeout(async () => { DEM_T = null; const n0 = DEM.tiles.size; await demLoad(demPts(), 0.4); const fresh = DEM.tiles.size !== n0, ch = demFill();
+  if (fresh && S.cas) casDeconfAll(); if (ch || fresh) { S.updated = Date.now(); lsSet('ivao-so-current', S); renderPanel(); drawMap(); } }, 250); } // after every save: new tiles / new points -> elevations and terrain
+async function demRefresh() { if (!DEM.on || MODE !== 'staff' || !S) return; await demLoad(demPts(), 0.4); const ch = demFill(); if (S.cas) casDeconfAll(); if (ch || S.cas) { save(); renderPanel(); drawMap(); } }
 async function loadAip() { try { const r = await fetch('data/aip_zones.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json(); const d = parseAirspace(j); if (d.zones.length) AIPDATA = { ...d, label: j.source || 'AIP' }; } catch (e) { } }
 const baseAsp = () => !S.asp || ['demo', 'aip', 'none'].includes(S.asp.source);
 function defaultAirspace() { if (AIPDATA) setAirspace({ zones: AIPDATA.zones, freqs: [], configs: AIPDATA.configs }, 'aip', { label: AIPDATA.label }); else setAirspace({ zones: [], freqs: [] }, 'none'); }
@@ -1766,7 +1827,7 @@ function casNine(J, T, t) {
     ['1', heli ? 'BP' : 'IP', !heli && casNorm(J).ref === 'KEYHOLE' ? `${khLabel(khOfTask(J, T), ip.pos)} (IP ${ip.name})` : ip.name],
     ['2', 'Heading' + (heli ? ' (BP to target)' : ''), `${magHdg(hdgT)}${T.offset ? ', OFFSET ' + T.offset.toUpperCase() : ''}`],
     ['3', 'Distance', heli ? `${Math.round(d * 1000 / 5) * 5} METERS` : `${(d / 1.852).toFixed(1)}`],
-    ['4', 'Target elevation', tgt.elev ? `${tgt.elev} FEET` : '____ FEET (MSL – read in the sim)'],
+    ['4', 'Target elevation', tgt.elev ? `${tgt.elev} FEET MSL` : '____ FEET (MSL – read in the sim)'],
     ['5', 'Target description', tgt.desc.toUpperCase()],
     ['6', 'Target location', casLoc(tgt.pos)],
     ['7', 'Mark type / code', { LASER: `LASER, ${J.laser}`, IR: 'IR POINTER', WP: 'WHITE PHOSPHORUS', NONE: 'NO MARK' }[T.mark] || T.mark],
@@ -1889,7 +1950,7 @@ function casWheelIPs(J) { // wheel: every fixed-wing IP inside the orbit (same b
     for (let d = 3; d >= 0.5; d -= 0.5) { const q = dest(tgt.pos, b, d * NMK); if (dist(c, q) <= R) { p = q; break; } }
     if (!p) p = dest(c, bearing(c, tgt.pos), Math.max(0, Math.min(R, dist(c, tgt.pos))));
     casSetPt(ip, [+p[0].toFixed(5), +p[1].toFixed(5)], ipAsName(ip)); }); }
-function casDeconf(J) { casNorm(J); J.holdWarn = ''; const chk = casHoldCheck(J, J.hold);
+function casDeconf(J) { casNorm(J); casTerrainIPs(J); J.holdWarn = ''; const chk = casHoldCheck(J, J.hold);
   if (!chk.ok) { const alt = [[J.ref, 'RACETRACK'], [J.ref, 'FIGURE8'], ['CP', 'RACETRACK'], ['CP', 'FIGURE8'], [J.ref, 'WHEEL'], ['CP', 'WHEEL']].find(([r, h]) => casHoldCheck(J, h, r).ok);
     const was = `${HOLD_IT[J.hold]}${J.ref === 'KEYHOLE' ? ' (keyhole)' : ''}`;
     if (alt) { J.holdWarn = `${was} non proponibile: ${chk.reason} – holding passata a ${HOLD_IT[alt[1]].toLowerCase()}${alt[0] === 'KEYHOLE' ? ' (keyhole)' : ' sul CP'}`; [J.ref, J.hold] = alt; }
@@ -1904,17 +1965,21 @@ function casDeconf(J) { casNorm(J); J.holdWarn = ''; const chk = casHoldCheck(J,
   if (!J.fitWarn && !holdInside(J)) { const b = holdBand(J); J.fitWarn = `Holding ${J.cs}: non entra nelle aree riservate${b ? ` con i blocchi FL${b[0]}–FL${b[1]}` : ''} – sistemala a mano o riserva un'area che copra quelle quote vicino al CP`; } }
 // blocks: 2000 ft thick, 1000 ft apart, from 10000 ft or from the threat ceiling + 2000 ft; only flights holding at the same time are stacked
 // (TOTs less than 25 min apart), so a long sequence reuses the lower blocks instead of climbing forever
-function casBlocks(J) { const c = casHoldCheck(J, J.hold), base = c.ok && c.floor ? c.floor : 10, fw = J.tasks.filter(T => !T.rw).sort((a, b) => a.tot - b.tot), used = [];
-  fw.forEach(T => { T.above = c.ok && c.floor ? `${c.what} (${c.ceil} ft)` : '';
+function casBlocks(J) { const c = casHoldCheck(J, J.hold), tm = DEM.on && J.tasks.some(T => !T.rw) ? elevMaxPts(casHoldShape(J).flat()) : null, tf = tm ? Math.ceil((tm * M2FT + 2000) / 1000) : 0; // terrain + 2000 ft
+  J.terrainFloor = tf; const base = Math.max(c.ok && c.floor ? c.floor : 10, tf), fw = J.tasks.filter(T => !T.rw).sort((a, b) => a.tot - b.tot), used = [];
+  fw.forEach(T => { T.above = c.ok && c.floor && c.floor >= tf ? `${c.what} (${c.ceil} ft)` : '';
     const busy = new Set(used.filter(u => Math.abs(u.tot - T.tot) < 25).map(u => u.k)); let k = 0; while (busy.has(k)) k++;
     if (!T.blockMan) T.block = `${base + 3 * k}-${base + 2 + 3 * k}`; used.push({ tot: T.tot, k: T.blockMan ? -1 : k }); }); }
 // holdings inside the reserved areas (staff 20 Nov): whole pattern inside areas whose vertical limits contain the blocks;
 // fit order: 1) rotate the axis (15° steps), 2) move the CP anchor, 3) shorter legs 10 -> 8 -> 6 -> 5 NM / wheel radius down to 3 NM; else warning. Hand-set items are never changed.
 function holdBand(J) { const v = J.tasks.filter(T => !T.rw).flatMap(T => String(T.block || '').split('-').map(Number)).filter(x => x > 0); return v.length ? [Math.min(...v) * 10, Math.max(...v) * 10] : null; }
 // vertical coverage by the union of the areas over the point (stacked areas, e.g. FL130-195 + FL195-370, together contain FL140-220)
-function vCovered(zs, a) { const iv = zs.flatMap(z => (z.blocks && z.blocks.length ? z.blocks : [[z.lower, z.upper]]).map(([lo, up]) => [zLo(lo), zLimit(up)])).sort((x, y) => x[0] - y[0]);
+// lower limits in FT AGL (e.g. "FL50 or 2000 FT AGL (whichever higher)") read on the highest terrain of the area when the DEM is available
+function zLoT(z, lo, p) { const L = String(lo || '').toUpperCase(), agl = L.match(/(\d{3,5})\s?FT\s?AGL/); if (!agl || typeof DEM === 'undefined' || !DEM.on || !z.poly) return zLo(lo);
+  const t = p ? elevMaxM(p) : elevMaxPoly(z.poly, z.id); if (t == null) return zLo(lo); /* AGL read on the terrain under the point (or the highest of the area) */ const fl = L.match(/FL\s?(\d{2,3})/); return Math.max(fl ? +fl[1] : 0, (t * M2FT + +agl[1]) / 100); }
+function vCovered(zs, a, p) { const iv = zs.flatMap(z => (z.blocks && z.blocks.length ? z.blocks : [[z.lower, z.upper]]).map(([lo, up]) => [zLoT(z, lo, p), zLimit(up)])).sort((x, y) => x[0] - y[0]);
   let top = a[0]; for (const [lo, hi] of iv) { if (lo > top) break; top = Math.max(top, hi); if (top >= a[1]) return true; } return top >= a[1]; }
-function holdInside(J, R = RES()) { if (!R.length) return true; const a = holdBand(J), ok = p => { const zs = R.filter(z => pip(p, z.poly)); return zs.length && (!a || vCovered(zs, a)); };
+function holdInside(J, R = RES()) { if (!R.length) return true; const a = holdBand(J), ok = p => { const zs = R.filter(z => pip(p, z.poly)); return zs.length && (!a || vCovered(zs, a, p)); };
   return casHoldShape(J).every(l => l.every(ok)); }
 const CAS_FAIL = new WeakMap();
 function casFit(J) { J.fitWarn = ''; const R = RES(); if (!R.length || !J.tasks.some(T => !T.rw) || holdInside(J, R)) return;
@@ -1931,7 +1996,7 @@ function casFit(J) { J.fitWarn = ''; const R = RES(); if (!R.length || !J.tasks.
   if (search(R, cpMov ? [...ring(p0), ...resRings()].filter((c, k) => k === 0 || near60(c)) : [p0])) return;
   // automatic reservation only: add the nearest area that covers the holding blocks (as fitAirspace does for CAPs / orbits)
   const band = holdBand(J), anc = J.tasks.filter(T => !T.rw).map(T => holdAnchor(J, T).pos)[0] || p0;
-  if (band && !cusLocked() && !manualRes()) { const cand = LIB().filter(q => q.poly && q.type !== 'P' && q.type !== 'COR' && q.type !== 'IND' && lvOk(q) && !(S.reserved || []).includes(q.id) && vCovered([q], band))
+  if (band && !cusLocked() && !manualRes()) { const cand = LIB().filter(q => q.poly && q.type !== 'P' && q.type !== 'COR' && q.type !== 'IND' && lvOk(q) && !(S.reserved || []).includes(q.id) && zLo(q.lower) < band[1] && zLimit(q.upper) > band[0]) // may cover the band together with areas already reserved (stacked)
       .map(q => [q, dist(anc, centroid(q.poly))]).filter(x => x[1] < 90).sort((x, y) => x[1] - y[1]).slice(0, 6);
     for (const [q] of cand) { const before = S.reserved || [], next = fixConfigs([...new Set([...before, q.id])]); if (before.some(id => !next.includes(id))) continue; // never drop an area already reserved
       S.reserved = next; const R2 = RES();
@@ -2128,7 +2193,7 @@ function renderPR() {
   <div class="row" style="margin:6px 0 10px;flex-wrap:wrap"><button class="b sm shrink" id="prregen">↻ Rigenera scenari</button><button class="b sm shrink primary" data-prpack="ALL">Scarica PR pack (tutti)</button></div>
   ${S.pr.csar.map(c => { const T = prTexts(c); return `<div class="card" style="margin-bottom:10px"><div class="row" style="align-items:flex-end;flex-wrap:wrap">
     <div><label>CSAR ${c.id} – personale isolato</label><input data-prc="${c.id}" data-cf="cs" value="${esc(c.cs)}"></div><div><label>Velivolo abbattuto</label><select data-prc="${c.id}" data-cf="type">${o(c.type, PR_AC.map(x => [x, x]))}</select></div>
-    <div style="max-width:100px"><label>Quota LZ ft</label><input data-prc="${c.id}" data-cf="elev" value="${esc(c.elev)}" placeholder="sim"></div>
+    <div style="max-width:100px"><label>Quota LZ ft</label><input data-prc="${c.id}" data-cf="elev" value="${esc(c.elev)}" placeholder="${DEM.on ? 'auto' : 'sim'}" title="${c.elevDem ? 'Quota dal terreno (DEM): scrivi un valore per sostituirla, svuota per tornare automatica' : 'Quota in piedi'}" ${c.elevDem ? 'style="color:#0369a1"' : ''}></div>
     <label class="chip shrink"><input type="checkbox" data-prc="${c.id}" data-cf="located" ${c.located ? 'checked' : ''}>Posizione nota</label><button class="b sm shrink" data-prpack="${c.id}">PR pack</button></div>
     <div class="muted" style="font-size:12px;margin:4px 0">Minaccia: <b>${c.threat}</b> · ${esc(c.cause)} · ${c.pob} POB · ${esc(c.inj)} · soccorso: ${c.rescue.map(fcs).join(', ') || 'nessun flight'} · RESCORT: ${c.rescort.map(fcs).join(', ') || '—'}</div>
     ${prPre(`MAYDAY e rilancio – ${c.cs}`, T.mayday)}${prPre('PR 11-line', T.eleven)}${prPre(`Briefing CSARTF (information ${c.info})`, T.brief)}${prPre('Briefing OSC per il recupero', T.osc)}${prPre('SPINS – autenticazione', T.spins)}${prPre('Code words', T.codes)}</div>`; }).join('')}
@@ -2447,7 +2512,7 @@ function renderAIB() {
 }
 
 // ===================== Custom areas (combined published areas / drawn / around the threats) and NOTAM =====================
-const CUS = () => S.custom || [];
+const CUS = () => { (S.custom || []).forEach(c => { if (/^\d{2,3}$/.test(String(c.lower || '').trim())) c.lower = 'FL' + String(c.lower).trim().padStart(3, '0'); if (/^\d{2,3}$/.test(String(c.upper || '').trim())) c.upper = 'FL' + String(c.upper).trim().padStart(3, '0'); }); return S.custom || []; }; // old events: bare numbers = FL
 const manualRes = () => S.resMode === 'manual' && !cusLocked() && RES().length ? RES() : null; // staff-selected areas: never changed by the generator
 const cusLocked = () => { const c = (S.custom || []).filter(x => x.poly && x.poly.length > 2); return S.cusLock && c.length ? c : null; }; // "everything inside the custom areas"
 const cusNum = () => { const used = new Set(CUS().map(c => c.code)); for (const w of NATO) if (!used.has(w)) return w; return 'X' + (CUS().length + 1); };
@@ -2495,11 +2560,16 @@ const roundMin = p => [Math.round(p[0] * 60) / 60, Math.round(p[1] * 60) / 60]; 
 function cusAdd(c) { if (!GEN() && !CUS().length) S.cusLock = true; S.custom = CUS().concat([c]); S.reserved = [...new Set([...(S.reserved || []), c.id])]; save(); return c; }
 function cusMake(kind, poly, extra = {}) { const code = cusNum();
   return { id: 'CUS-' + code, code, name: `EXERCISE AREA ${code}`, type: 'TSA', lower: 'SFC', upper: 'FL300', kind, poly, custom: true, notes: 'Custom area (not published): lateral limits as listed in the NOTAM.', ...extra }; }
+// vertical limits typed by the staff: a bare number is a flight level ("370" -> FL370, "95" -> FL095); valid = SFC / GND / FLnnn / nnnn FT [AMSL|AGL] / UNL / TBC
+const limNorm = v => { v = String(v || '').trim().toUpperCase(); if (/^\d{2,3}$/.test(v)) return 'FL' + v.padStart(3, '0'); if (/^FL\s*\d{2,3}$/.test(v)) return 'FL' + v.replace(/\D/g, '').padStart(3, '0'); return v; };
+const limOk = v => /^(SFC|GND|UNL|TBC|TBD)$|^FL\d{3}$|^\d{3,5}\s?FT(\s?(AMSL|AGL|MSL|SFC))?/.test(String(v || '').trim().toUpperCase()) || /FL\d{2,3}.*(OR|AND)|FT.*(OR|AND)/.test(String(v || '').toUpperCase());
 function cusFromParts(ids, lower, upper) {
   const parts = LIB().filter(z => ids.includes(z.id) && !z.custom && z.type !== 'COR'); if (parts.length < 1) return null;
+  const key = parts.map(z => z.id).sort().join(), same = CUS().find(c => c.kind === 'combo' && (c.parts || []).slice().sort().join() === key);
+  if (same) { if (lower) same.lower = limNorm(lower); if (upper) same.upper = limNorm(upper); same.updated = true; S.reserved = [...new Set([...(S.reserved || []), same.id])]; save(); return same; } // staff 20 Nov: no duplicates
   const rings = unionOutline(parts.map(z => z.poly)); if (!rings.length) return null;
   const poly = rings.length > 1 ? hullPts(parts.flatMap(z => z.poly)) : rings[0];
-  const lo = lower || parts.map(z => z.lower).sort((a, b) => zLo(a) - zLo(b))[0], up = upper || parts.map(z => z.upper).sort((a, b) => zLimit(b) - zLimit(a))[0];
+  const lo = limNorm(lower) || parts.map(z => z.lower).sort((a, b) => zLo(a) - zLo(b))[0], up = limNorm(upper) || parts.map(z => z.upper).sort((a, b) => zLimit(b) - zLimit(a))[0];
   return cusAdd(cusMake('combo', poly, { lower: lo, upper: up, parts: parts.map(z => z.id), joined: rings.length === 1, notes: `Combination of ${parts.map(z => z.name).join(', ')} with exercise vertical limits.` }));
 }
 function cusFromScenario(marginKm = 5) { // one polygon around the whole scenario: threat rings, areas, objectives, mission airspace, CAS / PR / SAR / AIB scenarios
@@ -2520,14 +2590,18 @@ function cusFromScenario(marginKm = 5) { // one polygon around the whole scenari
   const up = PROF().civil ? Math.max(100, ...alts) : Math.max(250, ...alts);
   return cusAdd(cusMake('scen', poly, { upper: `FL${String(Math.ceil(up / 10) * 10).padStart(3, '0')}`, notes: 'Custom area (not published) around the whole scenario: lateral limits as listed in the NOTAM.' }));
 }
+function cusOverlaps() { const cs = CUS().filter(c => (S.reserved || []).includes(c.id)), out = [];
+  cs.forEach((a, i) => cs.slice(i + 1).forEach(b => { const ov = a.poly.some(p => pip(p, b.poly)) || b.poly.some(p => pip(p, a.poly)) || pip(centroid(a.poly), b.poly) || pip(centroid(b.poly), a.poly);
+    const vert = zLo(a.lower) < zLimit(b.upper) && zLo(b.lower) < zLimit(a.upper); if (ov && vert) out.push([a, b]); })); return out; }
 function cusFinishDraw() { const d = S.cusDraft || []; if (d.length < 3) return null; S.cusDraft = []; ADDMODE = ''; return cusAdd(cusMake('draw', d.map(roundMin))); }
 function cusHtml() {
   const o = (v, l) => l.map(([k, t]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${t}</option>`).join('');
   return `<div class="card" style="margin-top:10px"><b>Aree custom (non pubblicate)</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Aree create per l'evento, in aggiunta a quelle AIP della lista: disegnale sulla mappa, falle racchiudere tutto lo scenario oppure unisci le aree selezionate qui sopra. Entrano nelle aree riservate e nel NOTAM con i vertici lat/long.</p>
+  ${cusOverlaps().map(([a, b]) => `<div class="warn" style="font-size:12px;margin:4px 0">${esc(a.name)} e ${esc(b.name)} si sovrappongono: ${2} NOTAM per lo stesso spazio. <button class="b sm shrink" data-cusdel="${b.id}">Elimina ${esc(b.name)}</button></div>`).join('')}
   ${CUS().length ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;margin:4px 0 8px"><input type="checkbox" id="cuslock" style="width:auto" ${S.cusLock ? 'checked' : ''}> Tutta l'esercitazione dentro le aree custom (vale alla prossima generazione / adattamento)</label>` : ''}
   ${CUS().map(c => `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px"><div><label>${c.kind === 'combo' ? 'Combinata' : c.kind === 'draw' ? 'Disegnata' : 'Tutto lo scenario'}</label><input data-cus="${c.id}" data-cf="name" value="${esc(c.name)}"></div>
     <div style="max-width:90px"><label>Tipo</label><select data-cus="${c.id}" data-cf="type">${o(c.type, [['TSA', 'TSA'], ['TRA', 'TRA'], ['R', 'R'], ['D', 'D']])}</select></div>
-    <div style="max-width:120px"><label>Limite inf.</label><input data-cus="${c.id}" data-cf="lower" value="${esc(c.lower)}"></div><div style="max-width:120px"><label>Limite sup.</label><input data-cus="${c.id}" data-cf="upper" value="${esc(c.upper)}"></div>
+    <div style="max-width:120px"><label>Limite inf.</label><input data-cus="${c.id}" data-cf="lower" value="${esc(c.lower)}" ${limOk(c.lower) ? '' : 'style="border-color:#dc2626;color:#b91c1c" title="Limite non valido: SFC, GND, FL095, 2000 FT AGL…"'}></div><div style="max-width:120px"><label>Limite sup.</label><input data-cus="${c.id}" data-cf="upper" value="${esc(c.upper)}" ${limOk(c.upper) ? '' : 'style="border-color:#dc2626;color:#b91c1c" title="Limite non valido: FL370, UNL…"'}></div>
     <button class="b sm shrink" data-cusdel="${c.id}">Elimina</button></div>${c.kind === 'combo' && !c.joined ? '<div class="warn" style="font-size:12px">Le aree scelte non sono adiacenti: il perimetro mostrato è l\'inviluppo convesso; il NOTAM elenca le singole aree.</div>' : ''}`).join('')}
   <div class="row" style="flex-wrap:wrap;margin-top:6px">${ADDMODE === 'cus:draw' ? `<span class="muted" style="font-size:12px">Clic sulla mappa per i vertici (${(S.cusDraft || []).length})</span><button class="b sm shrink primary" id="cusclose">Chiudi area</button><button class="b sm shrink" id="cuscancel">Annulla</button>` : '<button class="b sm shrink" id="cusdraw">Disegna sulla mappa</button>'}
     <button class="b sm shrink" id="cusscen" ${GEN() ? '' : 'disabled'}>Area che contiene tutto lo scenario</button></div></div>`;
@@ -2552,7 +2626,7 @@ function notamList() {
   const ex = String(S.meta.op || 'MILITARY EXERCISE').toUpperCase(), areas = RES().filter(z => z.type !== 'P'), cors = (typeof CORSEL === 'function') ? CORSEL() : [], out = [];
   const used = new Map(((S.t && S.t.airspace) || []).filter(a => a.cor).map(a => [a.cor, a.alt]));
   const one = (z, body) => { const ctr = centroid(z.poly), rad = Math.min(999, Math.ceil(Math.max(...z.poly.map(p => dist(ctr, p))) / 1.852) + 1);
-    let lo = z.lower, up = z.upper; if (z.blocks && z.blocks.length) { const b = (used.get(z.id) || '').match(/FL\d+/g); const bl = b ? z.blocks.find(x => x[0] === b[0]) || z.blocks[0] : z.blocks[0]; lo = bl[0]; up = bl[1]; }
+    let lo = z.custom ? limNorm(z.lower) : z.lower, up = z.custom ? limNorm(z.upper) : z.upper; if (z.blocks && z.blocks.length) { const b = (used.get(z.id) || '').match(/FL\d+/g); const bl = b ? z.blocks.find(x => x[0] === b[0]) || z.blocks[0] : z.blocks[0]; lo = bl[0]; up = bl[1]; }
     const q = z.custom ? 'QRTCA' : QCODE[z.type] || 'QRTCA', n = `${cfg.series}${String(+cfg.num + out.length).padStart(4, '0')}/${yr}`;
     out.push({ id: z.id, name: z.name, text: [`(${n} NOTAMN`, `Q) ${fir}/${q}/IV/BO/W/${qLev(lo)}/${qLev(up, true)}/${nLL(ctr).replace(/(\d{4})\d{2}([NS])(\d{5})\d{2}([EW])/, '$1$2$3$4')}${String(rad).padStart(3, '0')}`,
       `A) ${fir} B) ${B ? B.code : 'YYMMDDHHMM'} C) ${C ? C.code : 'YYMMDDHHMM'}`, `E) ${body}`, `F) ${nLim(lo)} G) ${nLim(up)})`].join('\n') }); };
@@ -2573,7 +2647,7 @@ function notamHtml() { const cfg = notamCfg(), L = notamList(), B = notamTime(+c
   <div style="max-width:120px"><label>Inizio (min da H)</label><input data-ncfg="start" type="number" value="${esc(String(cfg.start))}"></div><div style="max-width:120px"><label>Fine (min da H)</label><input data-ncfg="end" type="number" value="${esc(String(cfg.end))}"></div>
   <div style="max-width:100px"><label>FIR</label><input data-ncfg="fir" placeholder="${esc(theatre().fir || 'LIRR')}" value="${esc(cfg.fir)}"></div></div>
   ${B ? '' : '<div class="warn" style="font-size:12px">Imposta data e H-hour dell\'evento per compilare B) e C).</div>'}
-  ${L.length ? `${prPre(`NOTAM (${L.length})`, [L.map(n => n.text).join('\n\n')])}<div class="row" style="margin-top:6px"><button class="b sm shrink" data-copy="${esc(L.map(n => n.text).join('\n\n'))}">Copia</button><button class="b sm shrink" id="notamtxt">Scarica .txt</button></div>` : '<p class="muted">Nessuna area riservata.</p>'}</div>`;
+  ${L.length ? `<div class="muted" style="font-size:12px;margin:4px 0">${L.length} NOTAM: ${L.map(n => `<b>${esc(n.text.match(/^\(([^ ]+)/)[1])}</b> ${esc(n.name)}`).join(' · ')}</div>${prPre(`NOTAM (${L.length})`, [L.map(n => n.text).join('\n\n')])}<div class="row" style="margin-top:6px"><button class="b sm shrink" data-copy="${esc(L.map(n => n.text).join('\n\n'))}">Copia</button><button class="b sm shrink" id="notamtxt">Scarica .txt</button></div>` : '<p class="muted">Nessuna area riservata.</p>'}</div>`;
 }
 
 /* =====================================================================
@@ -2853,7 +2927,8 @@ function initMap() {
   MAP = L.map('map', { zoomControl: true }).setView([v[0], v[1]], v[2]);
   MAP.createPane('land'); MAP.getPane('land').style.zIndex = 350;
   MAP.createPane('bulls'); MAP.getPane('bulls').style.zIndex = 450; // bullseyes above the areas (overlay pane 400) so they can be clicked
-  MAP.attributionControl.addAttribution('Map data: amCharts geodata / Natural Earth');
+  MAP.attributionControl.addAttribution('Map data: amCharts geodata / Natural Earth · relief: Copernicus DEM GLO-90');
+  MAP.on('moveend', () => drawRelief(MAP));
   if (LAND) drawLandLayer();
   LAYERS = L.layerGroup().addTo(MAP);
   MAP.on('click', e => onMapClick([+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5)]));
@@ -3059,7 +3134,8 @@ function renderMapTools() {
     opts += '<optgroup label="Aggiungi minaccia RED">' + Object.entries(TT).map(([k, v]) => `<option value="threat:${k}">${esc(v.label)}</option>`).join('') + '</optgroup>';
     opts += '<optgroup label="Aggiungi obiettivo BLUE">' + Object.entries(OBJT).map(([k, v]) => `<option value="obj:${k}">${esc(v.label)}</option>`).join('') + '</optgroup>';
   }
-  el.innerHTML = `<select id="addmode" style="width:280px">${opts}</select><span class="muted" style="font-size:11px">Trascina i marker per spostarli · clic per modificarli</span>`;
+  el.innerHTML = `<select id="addmode" style="width:280px">${opts}</select><select id="mapstyle" title="Sfondo della mappa (vale anche per le mappe di PDF e slide)" style="width:150px">${MSTYLES.map(([k, l]) => `<option value="${k}" ${mapStyle() === k ? 'selected' : ''} ${k !== 'clean' && k !== 'dark' && !DEM.on ? 'disabled' : ''}>${l}</option>`).join('')}</select><span class="muted" style="font-size:11px">Trascina i marker per spostarli · clic per modificarli</span>`;
+  $('#mapstyle').onchange = e => { S.mapStyle = e.target.value; save(); applyMapStyle(); };
   $('#addmode').value = ADDMODE;
   $('#addmode').onchange = e => ADDMODE = e.target.value;
 }
@@ -3397,7 +3473,7 @@ function renderCas() {
       return notes.length ? `<div class="muted" style="font-size:12px;margin-top:4px">${notes.map(esc).join('<br>')}</div>` : ''; })()}
     ${J.fitWarn ? `<div style="font-size:12px;color:#b45309;margin-top:4px">⚠ ${esc(J.fitWarn)}</div>` : ''}
     <div class="muted" style="font-size:12px;margin:4px 0">Minaccia AA: <b>${J.threat === 'HIGH' ? 'alta' : 'bassa'}</b> · laser JTAC ${esc(J.laser)} · CP ${J.cps.map(c => esc(c.name)).join(', ')} · ECHO ${esc(casLoc(J.echo))}</div>
-    <table><tr><th>Bersaglio</th><th>Descrizione</th><th style="width:80px">Quota ft</th><th>Posizione</th></tr>${J.targets.map(x => `<tr><td>${x.id}</td><td><input data-cast="${J.id}:${x.id}" data-cf="desc" value="${esc(x.desc)}"></td><td><input data-cast="${J.id}:${x.id}" data-cf="elev" value="${esc(x.elev)}" placeholder="sim"></td><td style="font-size:11px">${esc(casLoc(x.pos))}</td></tr>`).join('')}</table>
+    <table><tr><th>Bersaglio</th><th>Descrizione</th><th style="width:80px">Quota ft</th><th>Posizione</th></tr>${J.targets.map(x => `<tr><td>${x.id}</td><td><input data-cast="${J.id}:${x.id}" data-cf="desc" value="${esc(x.desc)}"></td><td><input data-cast="${J.id}:${x.id}" data-cf="elev" value="${esc(x.elev)}" placeholder="${DEM.on ? 'auto' : 'sim'}" title="${x.elevDem ? 'Quota dal terreno (DEM): scrivi un valore per sostituirla, svuota per tornare automatica' : 'Quota in piedi'}" ${x.elevDem ? 'style="color:#0369a1"' : ''}></td><td style="font-size:11px">${esc(casLoc(x.pos))}</td></tr>`).join('')}</table>
     ${J.friendlies.length ? `<table style="margin-top:4px"><tr><th>Amici</th><th>Mark (riga 8)</th></tr>${J.friendlies.map((x, fi) => `<tr><td style="font-size:12px">${esc(x.desc)}</td><td><select data-casf="${J.id}:${fi}" data-cf="mark">${o(x.mark || 'none', [['none', 'Nessuno'], ...CAS_FMARK.filter(m => m !== 'none').map(m => [m, m])])}</select></td></tr>`).join('')}</table>` : ''}
     <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:12px">Mappa: ${J.tasks.filter(casVis).length}/${J.tasks.length} scenari visibili</span><button class="b sm shrink" data-casall="${J.id}:show">Mostra tutti</button><button class="b sm shrink" data-casall="${J.id}:hide">Nascondi tutti</button></div>
     ${J.tasks.map((T, i) => { const f = casFlight(T), k = `${J.id}:${i}`, E = casEgress(J, T), fl = (lab, ctl) => `<div><label>${lab}</label>${ctl}</div>`;
@@ -3411,7 +3487,7 @@ function renderCas() {
         ${fl('Offset', `<select data-cask="${k}" data-cf="offset">${o(T.offset || '', [['', 'Nessuno'], ['LEFT', 'Left'], ['RIGHT', 'Right']])}</select>`)}<div style="align-self:end"><button class="b sm" data-offsug="${k}" title="Offset sul lato lontano da amici / minaccia più vicini">Suggerisci</button></div>
         ${fl('Egress', `<select data-cask="${k}" data-cf="egrTo">${o(E.to, egrOpts(J, T))}</select>`)}${fl('Virata', `<select data-cask="${k}" data-cf="egrTurn">${o(E.turn, [['LEFT', 'Sinistra'], ['RIGHT', 'Destra']])}</select>`)}
         ${T.rw ? fl('Quota egress', '<input value="200 ft AGL" disabled>') : fl('Blocco egress', `<input data-cask="${k}" data-cf="egrBlock" value="${esc((T.egr || {}).block || '')}" placeholder="${esc(T.block)}">`)}
-        ${E.to === 'PT' ? fl('Nome punto egress', `<input data-cask="${k}" data-cf="egrName" value="${esc(E.name)}">`) : ''}</div>${T.above ? `<div class="muted" style="font-size:11px;margin-top:2px">Blocco sopra la minaccia ${esc(T.above)}</div>` : ''}</div>`; }).join('')}
+        ${E.to === 'PT' ? fl('Nome punto egress', `<input data-cask="${k}" data-cf="egrName" value="${esc(E.name)}">`) : ''}</div>${T.above ? `<div class="muted" style="font-size:11px;margin-top:2px">Blocco sopra la minaccia ${esc(T.above)}</div>` : ''}${T.rw ? '' : runInfoHtml(J, T)}</div>`; }).join('')}
     ${J.tasks.map(T => casPreview(J, T, t)).join('')}</div>`).join('')}
   ${casDone().ok ? `<div class="row" style="margin-top:6px"><button class="b primary shrink" data-jpack="ALL">Scarica JTAC pack (tutti)</button></div>` : `<p class="muted" style="font-size:12px">JTAC pack disponibile a scenario completato: ${esc(casDone().why)}.</p>`}`;
 }
@@ -3559,7 +3635,7 @@ document.addEventListener('change', e => {
   if (t.dataset.mp) { mpGet()[t.dataset.mp] = t.value; save(); return; }
   if (t.dataset.evt) { setEvents([...document.querySelectorAll('[data-evt]')].filter(x => x.checked).map(x => x.dataset.evt)); WOPEN = 'ev'; if (!GEN() && S.resMode === 'auto' && !cusLocked()) { S.reserved = autoReserve(); S.cor = corPick(); } if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); return; }
   if (t.id === 'cuslock') { S.cusLock = t.checked; if (S.cusLock) S.reserved = cusLocked() ? cusLocked().map(c => c.id) : S.reserved; save(); renderPanel(); drawMap(); return; }
-  if (t.dataset.cus) { const c = CUS().find(x => x.id === t.dataset.cus); if (c) { c[t.dataset.cf] = t.dataset.cf === 'name' ? t.value.toUpperCase() : t.value.trim(); save(); drawMap(); } return; }
+  if (t.dataset.cus) { const c = CUS().find(x => x.id === t.dataset.cus); if (c) { const f = t.dataset.cf; c[f] = f === 'name' ? t.value.toUpperCase() : ['lower', 'upper'].includes(f) ? limNorm(t.value) : t.value.trim(); save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.ncfg) { const c = notamCfg(); c[t.dataset.ncfg] = ['series', 'fir'].includes(t.dataset.ncfg) ? t.value.toUpperCase().trim() : +t.value; save(); renderPanel(); return; }
   if (t.dataset.aibg) { const c = aibCfg(); c[t.dataset.aibg] = ['req', 'fmt'].includes(t.dataset.aibg) ? t.value : Math.max(1, +t.value || 1); save(); renderPanel(); return; }
   if (t.dataset.aib && S.aib) { const sc = S.aib.list.find(x => x.id === t.dataset.aib); if (!sc) return; const f = t.dataset.cf;
@@ -3621,7 +3697,7 @@ document.addEventListener('click', e => {
     S.reserved = (S.reserved || []).filter(z => !gz.has(z)).concat(on ? [] : c.zones); save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.cusdel) { S.custom = CUS().filter(c => c.id !== t.dataset.cusdel); if (!S.custom.length) S.cusLock = false; S.reserved = (S.reserved || []).filter(z => z !== t.dataset.cusdel); save(); renderPanel(); drawMap(); return; }
   if (t.id === 'cuscombo') { const ids = RES().filter(z => !z.custom).map(z => z.id); if (ids.length < 2) return toast('Seleziona almeno due aree');
-    const c = cusFromParts(ids, ($('#cuslo').value || '').trim(), ($('#cusup').value || '').trim()); toast(c ? `${c.name} creata` : 'Impossibile combinare le aree'); renderPanel(); drawMap(); return; }
+    const c = cusFromParts(ids, ($('#cuslo').value || '').trim(), ($('#cusup').value || '').trim()); toast(c ? `${c.name} ${c.updated ? 'aggiornata (stesse aree: nessun doppione)' : 'creata'}` : 'Impossibile combinare le aree'); if (c) delete c.updated; renderPanel(); drawMap(); return; }
   if (t.id === 'cusdraw') { ADDMODE = 'cus:draw'; S.cusDraft = []; renderPanel(); drawMap(); toast('Clic sulla mappa per aggiungere i vertici'); return; }
   if (t.id === 'cuscancel') { ADDMODE = ''; S.cusDraft = []; save(); renderPanel(); drawMap(); return; }
   if (t.id === 'cusclose') { const c = cusFinishDraw(); toast(c ? `${c.name} creata` : 'Servono almeno 3 vertici'); renderPanel(); drawMap(); return; }
@@ -3757,16 +3833,22 @@ async function renderMap(mode, opt = {}) {
   const P = p => { const [x, y] = mercator(p[0], p[1], z); return [x - ox, y - oy]; };
   const kmPx = lat => 1000 / (156543.03392 * Math.cos(rad(lat)) / 2 ** z);
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
-  c.fillStyle = K2('#0d1626'); c.fillRect(0, 0, W, H);
+  const MS = mapStyle(), dark = MS === 'dark' && LT, LS = LAND_ST[MS] || LAND_ST.clean;
+  c.fillStyle = dark ? LS.sea : K2('#0d1626'); c.fillRect(0, 0, W, H);
   const tiles = !!(LAND && LAND.length);
   if (tiles) { // vector coastlines / borders
-    c.fillStyle = K2('#1c2a40'); c.strokeStyle = K2('#33476a'); c.lineWidth = 1;
+    c.fillStyle = dark ? LS.fill : K2('#1c2a40'); c.strokeStyle = dark ? LS.color : K2('#33476a'); c.lineWidth = 1;
     for (const ring of LAND) {
       c.beginPath(); let inView = false;
       ring.pts.forEach((p, i) => { const [x, y] = P(p); if (x > -W && x < 2 * W && y > -H && y < 2 * H) inView = true; i ? c.lineTo(x, y) : c.moveTo(x, y); });
       if (!inView) continue; c.closePath(); c.fill(); c.stroke();
     }
   }
+  if (LT && ['relief', 'tint'].includes(MS) && DEM.on) { // relief of the selected style (light maps only)
+    const names = []; for (let a = Math.floor(minLa); a <= Math.floor(maxLa); a++) for (let b = Math.floor(minLo); b <= Math.floor(maxLo); b++) { const n = demName(a, b); if (DEM.has.has(n)) names.push(n); }
+    await Promise.all(names.slice(0, 60).map(demTile)); c.save(); if (MS === 'relief') c.globalCompositeOperation = 'multiply';
+    names.slice(0, 60).forEach(n => { const rc = reliefCanvas(n, MS); if (!rc) return; const a = +n.slice(1, 3), b = +n.slice(4, 7), [x0, y0] = P([a + 1, b]), [x1, y1] = P([a, b + 1]); c.drawImage(rc, x0, y0, x1 - x0, y1 - y0); });
+    c.restore(); }
   if (true) { // graticule
     c.strokeStyle = K2('#1f2d47'); c.lineWidth = 1; c.fillStyle = K2('#4b5d7a'); c.font = '12px Arial';
     for (let a = Math.floor(minLa * 2) / 2; a <= maxLa; a += 0.5) { const [, y] = P([a, minLo]); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); c.fillText(a.toFixed(1) + '°N', 6, y - 3); }
@@ -4716,11 +4798,46 @@ async function loadLand() {
   for (const src of sources) { try { LAND = await src(); break; } catch (e) { LAND = null; } }
   if (LAND) drawLandLayer();
 }
+
+// ---- map background styles (staff 20 Nov): clean, relief (hillshade), relief + elevation tints, dark ----
+const MSTYLES = [['clean', 'Sfondo: pulito'], ['relief', 'Sfondo: rilievo'], ['tint', 'Sfondo: rilievo + quote'], ['dark', 'Sfondo: scuro']];
+const RELIEF_EV = /^(CAS|SAR|AIB|CSAR|HAAR|NAVI|LOWNAV|MEDEVAC)$/;
+const mapStyle = () => S && S.mapStyle ? S.mapStyle : (((S && S.meta && S.meta.events) || []).some(e => RELIEF_EV.test(e)) && DEM.on ? 'relief' : 'clean');
+const LAND_ST = { clean: { color: '#9DB0D0', fill: '#FBFCFE', sea: '#D9E4F5' }, relief: { color: '#9DB0D0', fill: '#FBFCFE', sea: '#D9E4F5' }, tint: { color: '#8aa0c2', fill: '#FBFCFE', sea: '#cfdcf0' }, dark: { color: '#475569', fill: '#1f2937', sea: '#0f172a' } };
+const TINT = [[0, [168, 198, 140]], [300, [214, 220, 158]], [700, [222, 200, 140]], [1200, [200, 164, 118]], [2000, [168, 134, 110]], [2800, [190, 178, 172]], [3600, [244, 244, 244]]];
+function tintAt(h) { for (let i = 1; i < TINT.length; i++) if (h <= TINT[i][0]) { const [h0, a] = TINT[i - 1], [h1, b] = TINT[i], k = (h - h0) / (h1 - h0); return a.map((v, j) => v + (b[j] - v) * k); } return TINT[TINT.length - 1][1]; }
+const RELIEF_IMG = new Map(), RELIEF_CV = new Map(); // style:tile -> object URL / canvas
+async function reliefImg(name, style) { const key = style + ':' + name; if (RELIEF_IMG.has(key)) return RELIEF_IMG.get(key); const t = await demTile(name); if (!t) return null;
+  const cv = reliefCanvas(name, style); const url = await new Promise(res => cv.toBlob(b => res(b ? URL.createObjectURL(b) : cv.toDataURL()))); RELIEF_IMG.set(key, url); return url; }
+function reliefCanvas(name, style) { const key = style + ':' + name; if (RELIEF_CV.has(key)) return RELIEF_CV.get(key); const t = DEM.tiles.get(name); if (!t) return null;
+  const la = +name.slice(1, 3), cv = document.createElement('canvas'); cv.width = cv.height = DEMN; const cx = cv.getContext('2d'), im = cx.createImageData(DEMN, DEMN), z = t.mean;
+  const dx = 111320 * Math.cos((la + 0.5) * Math.PI / 180) / DEMN, dy = 110570 / DEMN, az = 315 * Math.PI / 180, alt = 45 * Math.PI / 180, ex = 1.6;
+  for (let r = 0; r < DEMN; r++) for (let c = 0; c < DEMN; c++) { const i = r * DEMN + c, h = z[i], o = i * 4; if (h <= 0) { im.data[o + 3] = 0; continue; }
+    const zl = z[r * DEMN + Math.max(0, c - 1)], zr = z[r * DEMN + Math.min(DEMN - 1, c + 1)], zu = z[Math.max(0, r - 1) * DEMN + c], zd = z[Math.min(DEMN - 1, r + 1) * DEMN + c];
+    const gx = (zr - zl) / (2 * dx) * ex, gy = (zd - zu) / (2 * dy) * ex, slope = Math.atan(Math.hypot(gx, gy)), aspect = Math.atan2(gy, -gx);
+    const sh = Math.max(0, Math.cos(alt) * Math.cos(slope) + Math.sin(alt) * Math.sin(slope) * Math.cos(az - Math.PI / 2 - aspect)), v = 0.38 + 0.62 * sh;
+    if (style === 'tint') { const col = tintAt(h); im.data[o] = col[0] * v; im.data[o + 1] = col[1] * v; im.data[o + 2] = col[2] * v; im.data[o + 3] = 235; }
+    else { const g = 255 * Math.min(1, v * 1.08); im.data[o] = g; im.data[o + 1] = g; im.data[o + 2] = g; im.data[o + 3] = 255; } }
+  cx.putImageData(im, 0, 0); RELIEF_CV.set(key, cv); return cv; }
+let RELIEF_RUN = 0;
+async function drawRelief(map) { if (!map || typeof L === 'undefined' || !L.imageOverlay) return; const st = mapStyle(), run = ++RELIEF_RUN;
+  if (!map._relief) { if (!map.getPane('relief')) { map.createPane('relief'); const pn = map.getPane('relief'); pn.style.zIndex = 360; pn.style.pointerEvents = 'none'; } map._relief = { group: L.layerGroup().addTo(map), on: new Map() }; }
+  const R = map._relief, pn = map.getPane('relief'); if (pn) pn.style.mixBlendMode = st === 'relief' ? 'multiply' : 'normal';
+  if (!['relief', 'tint'].includes(st) || !DEM.on) { R.group.clearLayers(); R.on.clear(); return; }
+  [...R.on.keys()].forEach(k => { if (!k.startsWith(st + ':')) { R.group.removeLayer(R.on.get(k)); R.on.delete(k); } });
+  const b = map.getBounds ? map.getBounds() : null; if (!b || !b.getSouth) return; const names = [];
+  for (let la = Math.floor(b.getSouth()); la <= Math.floor(b.getNorth()); la++) for (let lo = Math.floor(b.getWest()); lo <= Math.floor(b.getEast()); lo++) { const n = demName(la, lo); if (DEM.has.has(n)) names.push(n); }
+  for (const n of names.slice(0, 120)) { const key = st + ':' + n; if (R.on.has(key)) continue; const url = await reliefImg(n, st); if (run !== RELIEF_RUN || !url) continue;
+    const la = +n.slice(1, 3), lo = +n.slice(4, 7); const ov = L.imageOverlay(url, [[la, lo], [la + 1, lo + 1]], { pane: 'relief', interactive: false, opacity: 1 }); R.group.addLayer(ov); R.on.set(key, ov); } }
+function applyMapStyle() { const st = LAND_ST[mapStyle()] || LAND_ST.clean; [MAP, PMAP].forEach(m => { if (!m) return; const c = m.getContainer ? m.getContainer() : null; if (c) c.style.background = st.sea;
+    if (m._landLayer && m._landLayer.eachLayer) m._landLayer.eachLayer(l => l.setStyle && l.setStyle({ color: st.color, fillColor: st.fill })); drawRelief(m); }); }
 function drawLandOn(map) {
   if (!map || !LAND || typeof L === 'undefined') return;
   if (map._landLayer) map._landLayer.remove();
   const r = L.canvas({ pane: 'land' });
-  map._landLayer = L.layerGroup(LAND.map(rg => L.polygon(rg.pts, { renderer: r, pane: 'land', interactive: false, color: '#9DB0D0', weight: 1, fillColor: '#FBFCFE', fillOpacity: 1 }))).addTo(map);
+  const st = LAND_ST[mapStyle()] || LAND_ST.clean;
+  map._landLayer = L.layerGroup(LAND.map(rg => L.polygon(rg.pts, { renderer: r, pane: 'land', interactive: false, color: st.color, weight: 1, fillColor: st.fill, fillOpacity: 1 }))).addTo(map);
+  applyMapStyle();
 }
 function drawLandLayer() { drawLandOn(MAP); drawLandOn(PMAP); }
 const DEMO_ROSTER = `Marco R.; tipo F-35A
@@ -5024,9 +5141,9 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
-loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
+demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

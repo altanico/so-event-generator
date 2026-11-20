@@ -214,3 +214,11 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 
 * `S.casView = { hide: { <task id>: true }, noThr }`: CAS scenarios hidden on the staff map and RED threats / objectives switched off in the CAS tab (staff map only, documents unchanged).
 * The serials are titled "Task allocation" in the masterplan, mission deck and public page (column "No."); the data stay in `t.serials`.
+
+## v1.19 additions
+
+* Terrain: `data/dem/index.json` + `data/dem/N{lat}E{lon}.bin` (gzip, int16 LE, 400×400 mean then 400×400 max, metres, rows north→south, row-delta encoded), built by `.github/workflows/dem.yml` (`tools/dem_build.py`, Copernicus DEM GLO-90). Credit: Copernicus DEM © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA.
+* `x.elev` (CAS targets, CSAR, AIB) may come from the terrain: `x.elevDem = true`, `x._demV` = value written; a different value means typed by the staff.
+* CAS: `ip.tb0` (generated bearing target→IP), `T.runTerrain` (terrain score of the run-in), `J.terrainFloor` (thousands of ft).
+* `S.mapStyle`: 'clean' | 'relief' | 'tint' | 'dark' (missing = default by event type).
+* Custom areas: combining the same parts updates the existing combined area; limits normalised (`limNorm`: bare number = FL).

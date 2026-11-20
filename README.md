@@ -64,3 +64,8 @@ Tests run offline: Leaflet is replaced by `tests/mocks/lmock3.js`, other CDN cal
 ## Status
 
 Version 0.8. Open work and assumptions to verify: [`TODO.md`](TODO.md).
+
+
+## Terrain data
+
+Relief, elevations and run-in headings use the Copernicus DEM GLO-90 (© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA), resampled to ~250 m tiles in `data/dem` by the GitHub Actions workflow `dem.yml` (`tools/dem_build.py`).
