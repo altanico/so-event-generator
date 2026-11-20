@@ -1,0 +1,84 @@
+{
+ "pilots": [
+  {
+   "vid": "710300",
+   "name": "Marco Ferri",
+   "typeRaw": "EF-2000",
+   "callsign": "DARDO"
+  },
+  {
+   "vid": "710353",
+   "name": "Luca Bassi",
+   "typeRaw": "EF-2000",
+   "callsign": "DARDO"
+  },
+  {
+   "vid": "710406",
+   "name": "Andrea Conti",
+   "typeRaw": "F-35A",
+   "callsign": "FALCO"
+  },
+  {
+   "vid": "710459",
+   "name": "Paolo Rinaldi",
+   "typeRaw": "F-35A",
+   "callsign": "FALCO"
+  },
+  {
+   "vid": "710512",
+   "name": "Stefano Gallo",
+   "typeRaw": "AMX"
+  },
+  {
+   "vid": "710565",
+   "name": "Davide Moretti",
+   "typeRaw": "AMX"
+  },
+  {
+   "vid": "710618",
+   "name": "Matteo Colombo",
+   "typeRaw": "M-346"
+  },
+  {
+   "vid": "710671",
+   "name": "Simone Fabbri",
+   "typeRaw": "Tornado IDS"
+  },
+  {
+   "vid": "710724",
+   "name": "Fabio Marchi",
+   "typeRaw": "KC-767A"
+  },
+  {
+   "vid": "710777",
+   "name": "Giorgio Testa",
+   "typeRaw": "C-130J"
+  },
+  {
+   "vid": "710830",
+   "name": "Alessio Barbieri",
+   "typeRaw": "HH-139A"
+  },
+  {
+   "vid": "710883",
+   "name": "Riccardo Leone",
+   "typeRaw": "HH-101A"
+  },
+  {
+   "vid": "710936",
+   "name": "Nicola Sala",
+   "typeRaw": "CL-415"
+  },
+  {
+   "vid": "710989",
+   "name": "Enrico Pellegrini",
+   "typeRaw": "E-550 CAEW"
+  },
+  {
+   "vid": "711042",
+   "name": "Lorenzo Villa",
+   "typeRaw": "MQ-9"
+  }
+ ],
+ "controllers": []
+}
