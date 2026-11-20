@@ -1,7 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
-- [ ] **"Serials" -> tasking in ATO style** (staff 20 Nov: not sure the list of flights is called "serials" in reality). In air operations the list of flights with their tasks is the Air Tasking Order (ATO): each mission line has mission number, callsign, number and type of aircraft, mission type, take-off time, etc. ("serial" is used for numbered events in exercise programmes / MEL, not for the flight list). Proposal waiting for the staff: rename the chapter / slides / public section to "Air Tasking (ATO)" – simplified, not the real message format; IDs S1, S2… replaced by a mission number per flight (one series, also used as the CAS "#" mission number); columns Mission no. · Callsign · Aircraft · Mission type (CAS, AR, DCA, CSAR, SAR, AIB…) · Task · Success criteria; glossary entry ATO.
+- [ ] **Rename "Serials" -> "Task allocation"** (staff 20 Nov: ATO would be realistic but it has a precise format that this is not; name may change again later). Rename only: masterplan chapter, mission deck slides ("Task allocation"), public page section, staff UI masterplan-section label, flight paragraph reference ("see the task allocation in the Briefing section"), docs. Column "Serial" -> "No."; IDs stay S1, S2… unless the staff decides otherwise (T… is taken by the threats). No change to the content.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
