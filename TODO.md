@@ -1,6 +1,13 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Keyhole: default cardinal, E on the target, movable / rotatable** (staff 20 Nov, manual page: "A-Nord, B-Est, C-Sud, D-West", E can coincide with the target, IP given as "A7" or radial "150/7"). Proposal sent to the staff, waiting for answers:
+  - Data: `J.kh = { pos: null (= on the target), rot: 0 (= A north) }`; one keyhole per JTAC sector, E on the sector's first target by default.
+  - Default: A = N, B = E, C = S, D = W; E = target (no more ALPHA towards the IP).
+  - Staff map: drag E to move the template (button "Riporta E sul bersaglio"); drag the A marker to rotate it (rot = bearing E -> drop point); field "Orientamento A (°)" in the CAS tab.
+  - IP / holding from the keyhole: for each fixed-wing task the IP is expressed as keyhole point + NM ("A7") when within ±20° of a letter, otherwise radial / distance ("150/7"); holding orbit there with the AA-deconflicted block; texts "KEYHOLE, ECHO IS <coords>, HOLD A7 …"; 9-line line 1 = "A7" or "150/7".
+  - Open question 1: keyhole IP replaces the generated IP in the 9-line (manual: the keyhole is used to set up an IP when there is no pre-planned CP) or the generated IP stays and the keyhole is only for holding?
+  - Open question 2: E on the first target of the sector (one keyhole per JTAC) or a keyhole per task on its own target?
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
