@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Masterplan airfields: no ENAV AIP line for military aerodromes** (staff 20 Nov: ENAV charts exist only for civil aerodromes). Today every base gets "Charts: current AIP Italia (ENAV), AD 2 <ICAO>" (Airfields section) and Resources always lists "Charts: current AIP Italia (ENAV)". Change: MIL bases (e.g. LIPS, LIPA, LIPI, LIPL, LIPC) -> only "SOP & charts: <IVAO Italy military vSOP link>"; CIV and JOINT (civil-military, published in the AIP, e.g. LIPX) keep the AIP line (JOINT also keeps the military SOP); Resources lists the ENAV AIP only if a CIV / JOINT aerodrome is used; a chart URL set by the staff (mp.charts) still wins for every base. Same in the public page / decks if the line appears there. Test.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
