@@ -200,3 +200,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * CAS sector: `J.hold` RACETRACK / FIGURE8 / WHEEL, `J.ref` CP / KEYHOLE (old `KEYHOLE` hold is migrated to WHEEL + KEYHOLE), `J.wheelR` (NM, default 5), `J.kh[<first target id>] = { pos, rot }` (keyhole E moved by the staff / rotation of A; default A = north, E on the target or the centre of targets within 5 NM).
 * IP: `ip.pos0` (original position while the wheel moved it inside the orbit), `ip.man` (dragged by the staff).
 * Task egress: `T.egr = { to: 'OVH' | 'CP:<i>' | 'IP:<name>' | 'KH:<A-D>' | 'PT', turn: 'LEFT' | 'RIGHT', block, pt, name }`; missing = default (wheel: back to overhead; otherwise the CP not used for the holding; turn away from the nearest threat).
+
+## v1.18.6 additions
+
+* CAS task `T.offset`: '' | 'LEFT' | 'RIGHT' (side of the IP/BP–target line where the aircraft may manoeuvre): 9-line line 2 "…, OFFSET LEFT", restriction line, shaded band on the staff map and in the JTAC pack map.
