@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **CAS tab too wide: no horizontal scrolling** (staff 20 Nov, screenshot: task table cut off, selects truncated "BO", "Cl", "Racetrack – blocch…"). Proposal sent, waiting for the choice: (A, recommended) each task as a card on 2–3 wrapped rows (row 1: target · type · method · mark · TOT; row 2: block · egress · turn · egress block; row 3 only for the free egress name), fields with a minimum width so values are readable, the "blocchi da … ft" note under the holding select instead of inside the option; (B) optional draggable divider between map and panel (width saved per browser) – useful on large screens but does not fix narrow ones. A and B can be combined.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
