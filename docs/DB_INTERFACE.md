@@ -190,3 +190,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.18.3 additions
 
 * CAS points are draggable in the CAS tab (`J.echo`, `J.jtacPos`, `J.friendlies[].pos`, `J.targets[].pos`, `J.cps[].pos`, `J.ips[].pos`); moving a CP / IP also updates its copy in `S.t.airspace` (`casMovePt`).
+
+## v1.18.4 additions
+
+* CAS: `T.above` (threat the block is deconflicted from), `T.blockMan` (block typed by the staff), `J.holdWarn` (why wheel / keyhole was switched to racetrack). Rule: blocks from highest covering threat ceiling + 2000 ft; MR / LR SAM or event upper level exceeded -> wheel / keyhole not proposed.
