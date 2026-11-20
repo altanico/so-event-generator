@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **CAS wheel / keyhole deconflicted from the AA threat, or not proposed** (staff 20 Nov): today `J.threat` HIGH/LOW only picks the default holding (casAA: any SHORAD / MANPADS / AAA / SAM within 25 km). Use the threat ceilings already in TT (AAA 8000 ft, MANPADS 12000 ft, SR-SAM 15000 ft, MR-SAM FL450, LR-SAM FL800) and their ranges (r): for the threats whose WEZ covers the wheel orbit / keyhole holding points, holding blocks start at (highest ceiling + buffer, proposed 2000 ft); before phase 3 the CAS zones count as MANPADS / AAA (SHORAD) or SAM (IADS). Wheel / keyhole NOT proposed (disabled in the select with the reason, and switched to racetrack outside the WEZ) when: an MR / LR SAM covers the holding, or the deconflicted block goes above the event upper level (S.meta.levels) / the reserved area ceiling. Texts (holding line, game plan, JTAC pack) state the block "ABOVE THE THREAT" with the threat named; staff can still override the block per task. Recompute after dragging points or threats. Test.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
