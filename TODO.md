@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Airfield choice easier to find** (staff 20 Nov: "non è più possibile scegliere gli aeroporti?"). Today: BLUE bases and RED-held airfields are free-text ICAO fields only in phase 1, step 7 "Scenario generato" (after generating), plus the base of each flight in phase 3 (Adattamento, column Base); before generating the main base comes from the theatre. Proposal: base picker in step 3 "Nome e teatro" (before generating): list of the theatre's airfields with MIL / CIV / JOINT tag and distance from the front, ticks for BLUE bases (first = main base), RED-held airfields in step 5; airfields also clickable on the map; the ICAO text field stays for quick typing. Waiting for the staff.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
