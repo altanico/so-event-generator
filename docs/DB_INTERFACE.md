@@ -194,3 +194,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.18.4 additions
 
 * CAS: `T.above` (threat the block is deconflicted from), `T.blockMan` (block typed by the staff), `J.holdWarn` (why wheel / keyhole was switched to racetrack). Rule: blocks from highest covering threat ceiling + 2000 ft; MR / LR SAM or event upper level exceeded -> wheel / keyhole not proposed.
+
+## v1.18.5 additions
+
+* CAS sector: `J.hold` RACETRACK / FIGURE8 / WHEEL, `J.ref` CP / KEYHOLE (old `KEYHOLE` hold is migrated to WHEEL + KEYHOLE), `J.wheelR` (NM, default 5), `J.kh[<first target id>] = { pos, rot }` (keyhole E moved by the staff / rotation of A; default A = north, E on the target or the centre of targets within 5 NM).
+* IP: `ip.pos0` (original position while the wheel moved it inside the orbit), `ip.man` (dragged by the staff).
+* Task egress: `T.egr = { to: 'OVH' | 'CP:<i>' | 'IP:<name>' | 'KH:<A-D>' | 'PT', turn: 'LEFT' | 'RIGHT', block, pt, name }`; missing = default (wheel: back to overhead; otherwise the CP not used for the holding; turn away from the nearest threat).

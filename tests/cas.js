@@ -17,7 +17,8 @@ const pre=await page.evaluate(()=>{ APP.S=JSON.parse(JSON.stringify(APP.S)); APP
 if(pre.j!==2||pre.n!==6) fail.push('prepared scenarios '+JSON.stringify(pre));
 if(await page.isHidden('#tabcas')) fail.push('CAS tab hidden');
 await page.click('#tabcas'); await page.waitForTimeout(200);
-const [d0]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.click('[data-jpack="ALL"]')]); await d0.saveAs('cas_jtac_pre.pdf');
+if(await page.$('[data-jpack="ALL"]')) fail.push('JTAC pack button before the scenario is complete');
+const [d0]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.evaluate(()=>APP.exportJtacPack('ALL'))]); await d0.saveAs('cas_jtac_pre.pdf');
 const jp=execSync('pdftotext cas_jtac_pre.pdf -').toString();
 if(!/FINAL ATTACK HEADING/.test(jp)||!/\[CALLSIGN\]/.test(jp)) fail.push('pre-signup JTAC pack incomplete');
 // 2) after sign-ups
