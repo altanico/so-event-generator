@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Custom / combined areas: no duplicates, clear NOTAM** (staff 20 Nov: "combined all areas into one" -> 4 NOTAMs). Cause: one NOTAM per custom area in the reserved set; pressing "Unisci" again creates a NEW combined area each time (ALPHA, BRAVO, CHARLIE all made of R49A–F with different vertical limits), plus DELTA = "Area che contiene tutto lo scenario" (default SFC–FL250). Proposal: 1) combining the same set of areas again updates the existing combined area (limits) instead of creating a new one – toast "EXERCISE AREA ALPHA aggiornata"; 2) warning in the custom-areas card when two custom areas overlap ("ALPHA e DELTA si sovrappongono: 2 NOTAM per lo stesso spazio") with a button to delete the extra; 3) vertical limits typed as a bare number ("370") read as FL370 (today NOTAM shows "G) 370" and Q) upper 999); invalid limits flagged in red; 4) the NOTAM tab shows next to each NOTAM which area it covers, and the count ("4 NOTAM: 4 aree riservate / custom").
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
