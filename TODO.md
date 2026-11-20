@@ -1,7 +1,6 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
-- [ ] **CAS points draggable on the map** (staff 20 Nov): in the CAS tab the IP / BP, CP, ECHO (sector centre), JTAC position, targets and friendly positions are fixed markers. Make them draggable like the other scenario points (existing `drag()` helper), "trascina per spostarlo" tooltip; after the drop: save, redraw the holding / keyhole / run-in / egress, and the texts (9-line, check-in, holding, JTAC pack) use the new positions and distances. Test: moving an IP changes the run-in and the keyhole ALPHA axis.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
@@ -35,6 +34,9 @@
 - **Terrain data (DEM)** once hosted on the division site (e.g. Open Topo Data SRTM 30 m): fill line 4 automatically and choose final attack headings along valleys / away from high ground.
 - Talk-on text generator (needs photoreal references, so probably staff-written).
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
+
+## v1.18.3 build (20 Nov 2026) – done
+- [x] **CAS points draggable on the map** (staff 20 Nov): in the CAS tab the IP / BP, CP, ECHO (sector centre), JTAC position, targets and friendly positions are fixed markers. Make them draggable like the other scenario points (existing `drag()` helper), "trascina per spostarlo" tooltip; after the drop: save, redraw the holding / keyhole / run-in / egress, and the texts (9-line, check-in, holding, JTAC pack) use the new positions and distances. Test: moving an IP changes the run-in and the keyhole ALPHA axis.
 
 ## v1.18.2 build (20 Nov 2026) – done
 - [x] **CAS holding shape not updated on the map** (staff 20 Nov): in the CAS tab, changing the JTAC holding (Racetrack / Figure 8 / Wheel) re-renders the panel but not the map (`data-cas` change handler calls `renderPanel()` without `drawMap()`), so the drawn holding stays the old one until another redraw. Fix: redraw the map after hold changes (and other CAS fields that move things on the map). Test: change J.hold → the holding polyline on the map changes shape.

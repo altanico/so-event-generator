@@ -186,3 +186,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.18.2 additions
 
 * CAS `J.hold` can be `RACETRACK`, `FIGURE8`, `WHEEL` (orbit 5 NM around ECHO) or `KEYHOLE` (template: ECHO centre, ALPHA towards the IP, B/C/D clockwise; holding point + distance per fixed-wing task).
+
+## v1.18.3 additions
+
+* CAS points are draggable in the CAS tab (`J.echo`, `J.jtacPos`, `J.friendlies[].pos`, `J.targets[].pos`, `J.cps[].pos`, `J.ips[].pos`); moving a CP / IP also updates its copy in `S.t.airspace` (`casMovePt`).
