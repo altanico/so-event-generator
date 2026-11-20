@@ -229,3 +229,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * Flights: `passes` (CAS passes), `casTasks` (task ids per pass), `trkSel` (AAR track chosen by the staff), `win` (receiver window of a tanker, min), receivers: `tankerMan` (moved by hand), `arct` (minutes from H), `arWin`.
 * CAS tasks: `reOf` (re-attack copy of a scenario), `totMan` (TOT typed by the staff); `J.timeWarn`. `t.aarWarn[]`, AAR cards: `tid`, `rcv[{cs, arct, win}]`, `win`.
 * Documents use `casDocJtacs()` (only scenarios with a flight after phase 3).
+
+## v1.21 additions
+
+* `S.bases = { <ICAO>: { side: 'BLUE' | 'RED' | 'BOTH', roles: ['ALL'] | [group keys], rroles: [...] } }`, `S.baseOrd` (order, first BLUE = main base), `S.basesSet` (chosen by the staff: kept when generating). Group keys: FTR, ATK, CAS, TKR, AEW, TRN, HEL, ISR, NAVM (military) and SAR, AIB, HUM, IFR (civil purposes, the only ones allowed on CIV airfields). `S.blueBases` is derived (BLUE / BOTH). `S.redBases` stays the list of RED-held airfields of the scenario (no players).

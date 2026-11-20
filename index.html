@@ -1413,7 +1413,7 @@ function defaultBases(th = theatre()) {
 function generateGeneric() {
   if (!thChosen()) { WOPEN = 'th'; renderAll(); return toast('Prima scegli il teatro (passo 3)'); }
   const th = theatre();
-  defaultBases(th);
+  if (!S.basesSet) { defaultBases(th); basesFromList(); } // bases / roles chosen by the staff before generating are kept
   if (baseAsp()) defaultAirspace(); else if (!(S.reserved || []).length && S.resMode === 'auto') S.reserved = autoReserve();
   if (S.resMode === 'manual' && !(S.reserved || []).length && !cusLocked()) toast('Nessuna area riservata selezionata: selezionale nella lista e usa "Riporta tutto dentro le zone"');
   if (cusLocked()) S.reserved = cusLocked().map(c => c.id);
@@ -1481,17 +1481,44 @@ function assignTasks(flights) {
   }
   return assigned;
 }
+// ---- bases with roles (staff 20 Nov): each base is used by BLUE, RED (live players) or both, with one or more roles; civil airfields only for civil purposes ----
+const ROLE_GROUPS = [
+  { k: 'FTR', it: 'Caccia (DCA, scorta, QRA)', en: 'fighters', tasks: ['DCA', 'OCA', 'ESCORT', 'QRA', 'LOWSLOW', 'TARGET', 'RECEIVER'] },
+  { k: 'ATK', it: 'SEAD / strike', en: 'SEAD / strike', tasks: ['SEAD', 'STRIKE', 'ANTISHIP'] },
+  { k: 'CAS', it: 'CAS', en: 'close air support', tasks: ['CAS'] },
+  { k: 'TKR', it: 'Tanker', en: 'tankers', tasks: ['AAR', 'HAAR'] },
+  { k: 'AEW', it: 'AEW', en: 'AEW', tasks: ['AEW'] },
+  { k: 'TRN', it: 'Trasporto / aviolancio', en: 'transport', tasks: ['AIRLIFT', 'AIRDROP'] },
+  { k: 'HEL', it: 'Elicotteri (CSAR, inserzione)', en: 'helicopters', tasks: ['CSAR', 'RESCORT', 'INSERT', 'SMI', 'HAARRCV'] },
+  { k: 'ISR', it: 'Ricognizione / pattugliamento', en: 'recce / maritime patrol', tasks: ['RECCE', 'MPA'] },
+  { k: 'NAVM', it: 'Navigazione bassa quota', en: 'low-level training', tasks: ['LOWNAV'] },
+  { k: 'SAR', it: 'SAR / HEMS / MEDEVAC', en: 'SAR / HEMS', tasks: ['SAR', 'HEMS', 'MEDEVAC', 'HOSPITAL'], civ: true },
+  { k: 'AIB', it: 'Antincendio (AIB)', en: 'firefighting', tasks: ['AIB'], civ: true },
+  { k: 'HUM', it: 'Trasporto umanitario', en: 'humanitarian airlift', tasks: ['HUMAN'], civ: true },
+  { k: 'IFR', it: 'Navigazione strumentale', en: 'instrument training', tasks: ['IFRNAV'], civ: true }];
+const grpOf = task => ROLE_GROUPS.find(g => g.tasks.includes(task));
+const isCivAp = icao => AIRPORTS[icao] && AIRPORTS[icao][3] === 'CIV';
+const baseInfo = icao => (S.bases && S.bases[icao]) || { side: (RB().includes(icao) ? 'HELD' : 'BLUE'), roles: ['ALL'], rroles: ['ALL'] };
+const baseGroups = icao => ROLE_GROUPS.filter(g => !isCivAp(icao) || g.civ); // civil airfields: civil purposes only
+function baseOk(icao, task) { if (task === 'STANDBY') return true; const g = grpOf(task); if (!g) return true; if (isCivAp(icao) && !g.civ) return false; const r = baseInfo(icao).roles || ['ALL']; return r.includes('ALL') || r.includes(g.k); }
+function syncBases() { S.bases = S.bases || {}; S.basesSet = true; const ord = (S.baseOrd || []).filter(k => S.bases[k]); Object.keys(S.bases).forEach(k => { if (!ord.includes(k)) ord.push(k); }); S.baseOrd = ord;
+  S.blueBases = ord.filter(k => ['BLUE', 'BOTH'].includes(S.bases[k].side)); S.c2sel = null; }
+function basesFromList() { S.bases = {}; S.baseOrd = []; S.blueBases.forEach(k => { S.bases[k] = { side: 'BLUE', roles: ['ALL'], rroles: ['ALL'] }; S.baseOrd.push(k); }); }
 function assignBases(flights, g) {
-  const bases = S.blueBases.filter(ap);
-  if (!bases.length) return;
-  const mil = bases.filter(b => AIRPORTS[b][3] !== 'CIV');
-  const nearFront = [...bases].sort((a, b) => dist(ap(a), g.front) - dist(ap(b), g.front))[0];
+  const bases = S.blueBases.filter(ap), warn = [];
+  if (!bases.length) return warn;
+  const near = arr => [...arr].sort((a, b) => dist(ap(a), g.front) - dist(ap(b), g.front)), allAll = bases.every(b => (baseInfo(b).roles || ['ALL']).includes('ALL'));
   let i = 0, j = 0;
   for (const f of flights) {
-    if (f.cat === 'HELO') f.base = nearFront;
-    else if (['FIGHTER', 'ATTACK'].includes(f.cat)) f.base = (mil.length ? mil : bases)[i++ % (mil.length || bases.length)];
-    else f.base = bases[j++ % bases.length];
+    const ok = bases.filter(b => baseOk(b, f.task));
+    if (!ok.length) { const mil = bases.filter(b => !isCivAp(b)); f.base = near(mil.length ? mil : bases)[0]; warn.push(`${f.cs} (${ROLES[f.task] || f.task}): nessuna base con questo ruolo${grpOf(f.task) && !grpOf(f.task).civ && bases.every(isCivAp) ? ' (gli aeroporti civili sono solo per scopi civili)' : ''} – messo a ${f.base}.`); continue; }
+    if (!allAll) { f.base = near(ok)[0]; continue; } // roles set by the staff: nearest base with the role
+    const mil = ok.filter(b => !isCivAp(b)); // all bases "Tutti i ruoli": previous spreading
+    if (f.cat === 'HELO') f.base = near(ok)[0];
+    else if (['FIGHTER', 'ATTACK'].includes(f.cat)) f.base = (mil.length ? mil : ok)[i++ % (mil.length || ok.length)];
+    else f.base = ok[j++ % ok.length];
   }
+  return warn;
 }
 const zoneOf = cat => S.zones.find(z => z.cat === cat);
 function generateElements(flights) {
@@ -2871,12 +2898,12 @@ function applyAAR(t) {
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
-  assignBases(flights, geom()); qraSetup(flights);
+  const baseWarn = assignBases(flights, geom()); qraSetup(flights);
   flights.forEach(f => f.pkg = PKG_OF[f.task] || 'S');
   // escorts join the package they protect
   const has = p => flights.some(f => f.pkg === p && f.task !== 'ESCORT');
   flights.filter(f => f.task === 'ESCORT').forEach(f => f.pkg = has('A') ? 'A' : has('F') ? 'F' : has('E') ? 'E' : 'A');
-  const el = generateElements(flights);
+  const el = generateElements(flights); if (baseWarn && baseWarn.length) el.warnings.unshift(...baseWarn.map(w => 'Basi: ' + w));
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
@@ -3141,7 +3168,7 @@ function toSide(p, want) { const sd = borderSide(p); if (!want || !sd || sd === 
   return p; }
 function borderIssues() {
   if (!borderGeom()) return []; const out = [], chk = (p, want, what) => { const sd = borderSide(p); if (sd && sd !== want) out.push(`${what} sul lato ${sd}`); };
-  S.blueBases.forEach(i => chk(ap(i), 'BLUE', `Base BLUE ${i}`)); RB().forEach(i => chk(ap(i), 'RED', `Base RED ${i}`));
+  S.blueBases.filter(i => baseInfo(i).side !== 'BOTH').forEach(i => chk(ap(i), 'BLUE', `Base BLUE ${i}`)); // a base shared by BLUE and RED players is not checked RB().forEach(i => chk(ap(i), 'RED', `Base RED ${i}`));
   (S.zones || []).forEach(z => SIDE_Z[z.cat] && chk(z.center, SIDE_Z[z.cat], `Zona ${z.name}`));
   if (S.t) S.t.threats.forEach(t => SIDE_T.has(t.type) && chk(t.pos, 'RED', `Minaccia ${t.id} (${TT[t.type].short})`));
   return out;
@@ -3200,7 +3227,7 @@ function fullReset() {
   if (MAP) MAP.closePopup(); try { renderEvPanel(); } catch (e) { } save(); renderAll(true); toast('Reset fatto: nuovo evento vuoto');
 }
 function thDrawStart() { ADDMODE = 'th:draw'; S.thDraft = []; WOPEN = 'th'; renderPanel(); drawMap(); toast('Clic sulla mappa per i vertici del teatro, poi "Chiudi teatro"'); }
-function setTheatre(id) { if (ADDMODE === 'th:draw') { ADDMODE = ''; S.thDraft = []; } S.meta.theatre = id; S.border = null; BEDIT = false; S.resMode = undefined; S.reserved = (S.custom || []).map(c => c.id); S.cor = []; S.trkSel = []; defaultBases(); S.c2sel = null; if (baseAsp()) defaultAirspace(); S.meta.bullseye = nearestBull().name;
+function setTheatre(id) { if (ADDMODE === 'th:draw') { ADDMODE = ''; S.thDraft = []; } S.meta.theatre = id; S.border = null; BEDIT = false; S.resMode = undefined; S.reserved = (S.custom || []).map(c => c.id); S.cor = []; S.trkSel = []; defaultBases(); basesFromList(); S.basesSet = false; S.c2sel = null; if (baseAsp()) defaultAirspace(); S.meta.bullseye = nearestBull().name;
   if (GEN()) { S.zones = genZones(); S.background = genBackground(); S.t = null; } save(); renderAll(true); }
 function onMapClick(p) {
   if (!ADDMODE) return;
@@ -3371,13 +3398,15 @@ function wBody(id) {
       ${ADDMODE === 'th:draw' ? `<div class="card" style="margin-top:8px"><b style="font-size:13px">Disegna il teatro</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Clic sulla mappa per ogni vertice (${(S.thDraft || []).length} finora), poi "Chiudi teatro". Basi, FIR e posizione delle forze vengono ricavate dal disegno; le aree riservate proposte sono quelle che toccano il teatro.</p>
         <div class="row"><button class="b sm primary shrink" id="thclose" ${(S.thDraft || []).length < 3 ? 'disabled' : ''}>Chiudi teatro</button><button class="b sm shrink" id="thcancel">Annulla</button></div></div>`
       : S.meta.theatre === 'CUSTOM' && S.thCustom ? `<div class="row" style="align-items:flex-end;margin-top:6px"><div><label>Nome del teatro disegnato</label><input id="thname" value="${esc(S.thCustom.name)}"></div><button class="b sm shrink" id="thdraw">Ridisegna</button></div>
-        <p class="muted" style="font-size:12px;margin:4px 0">FIR ${esc(S.thCustom.fir)} · basi proposte ${esc(S.thCustom.blue.join(', '))}${S.thCustom.red.bases.length ? ' · base RED ' + esc(S.thCustom.red.bases[0]) : ''} (le cambi dopo la generazione).</p>` : ''}`;
+        <p class="muted" style="font-size:12px;margin:4px 0">FIR ${esc(S.thCustom.fir)} · basi proposte ${esc(S.thCustom.blue.join(', '))}${S.thCustom.red.bases.length ? ' · base RED ' + esc(S.thCustom.red.bases[0]) : ''}.</p>` : ''}
+      ${thChosen() ? basePickHtml() : ''}`;
     case 'asp': return `${!aspNeeded() ? '<div class="row" style="align-items:center"><span class="muted" style="font-size:12px;flex:1">Per gli eventi civili non serve: lo mostri solo se vuoi riservare comunque un\'area.</span><button class="b sm shrink" id="aspoff">Nascondi</button></div>' : ''}${strip(aspCard())}`;
     case 'pts': return strip(ptsCard());
     case 'thr': return `<p class="muted" style="margin-top:0">Proposte in base al tipo di evento: togli quelle che non vuoi. Quantità e posizioni si sistemano nella fase 3.</p>
       <div class="row"><div><label><span class="dot" style="background:var(--blue)"></span>Fazione BLUE</label><input id="fblue" value="${esc(S.factions.blue)}"></div>
       <div><label><span class="dot" style="background:var(--red)"></span>Fazione RED</label><input id="fred" value="${esc(S.factions.red)}"></div><button class="b shrink" id="rfac">🎲</button></div>
       <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>
+      ${heldPickHtml()}
       ${borderHtml()}`;
     case 'c2': return `<label class="chip" style="margin-bottom:8px"><input type="checkbox" id="authon" ${authOn() ? 'checked' : ''}> Autenticazione richiesta (tabella di autenticazione + RAMROD nel briefing)</label>${authOn() && S.meta.ramrod ? `<span class="muted" style="font-size:12px"> RAMROD dell'evento: <b>${esc(S.meta.ramrod)}</b></span>` : ''}` + c2Card();
     case 'gen': return GEN() ? genDoneHtml() : genAskHtml();
@@ -3392,6 +3421,21 @@ function genAskHtml() {
   return `<p class="muted" style="margin-top:0">${cusLocked() ? 'Ci sono aree custom: tutta l\'esercitazione sarà dentro di esse.' : 'Ultima domanda: le aree riservate le propongo io in base a teatro ed evento, oppure uso solo quelle che hai spuntato nel passo "Spazio aereo riservato"?'}</p>
     <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" id="genauto">Proponile tu e genera</button><button class="b shrink" id="genman">Uso le mie (${RES().length}) e genera</button></div>`;
 }
+function basePickHtml() { if (!S.bases) basesFromList(); const g = geom(), all = !!S.baseAll;
+  const cand = Object.keys(AIRPORTS).map(k => [k, dist(ap(k), g.front)]).filter(([k, d]) => S.bases[k] || d < (all ? 450 : 220)).sort((a, b) => (!!S.bases[b[0]] - !!S.bases[a[0]]) || a[1] - b[1]).slice(0, all ? 80 : 24);
+  const tag = k => ({ MIL: 'MIL', CIV: 'CIV', JOINT: 'MIL/CIV' })[AIRPORTS[k][3]] || AIRPORTS[k][3];
+  const chips = (k, key, cur) => `<div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0">${[{ k: 'ALL', it: 'Tutti i ruoli' }, ...baseGroups(k)].map(gr => `<label style="display:inline-flex;gap:4px;align-items:center;font-size:11px;border:1px solid var(--line);border-radius:12px;padding:2px 8px;cursor:pointer"><input type="checkbox" style="width:auto;margin:0" data-brole="${k}:${key}:${gr.k}" ${(cur || ['ALL']).includes(gr.k) ? 'checked' : ''}>${esc(gr.it)}</label>`).join('')}</div>`;
+  const sum = (k, r) => (r || ['ALL']).includes('ALL') ? (isCivAp(k) ? 'tutti i ruoli civili' : 'tutti i ruoli') : r.map(x => (ROLE_GROUPS.find(g => g.k === x) || {}).it || x).join(', ');
+  return `<div class="card" style="margin-top:10px"><b style="font-size:13px">Basi di partenza e arrivo</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Per ogni aeroporto scegli chi lo usa (BLUE, giocatori RED o entrambi) e i ruoli. Una sola base con "Tutti i ruoli" va bene per tutto l'evento. Gli aeroporti civili sono solo per scopi civili. La prima base BLUE (★) è la principale.</p>
+    ${cand.map(([k, d]) => { const b = S.bases[k], side = b ? b.side : '';
+      return `<div style="border-top:1px solid var(--line);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:150px"><b>${k}</b> ${S.blueBases[0] === k ? '★' : ''} <span class="muted" style="font-size:11px">${esc(AIRPORTS[k][0])} · ${tag(k)} · ${Math.round(d / 1.852)} NM dal fronte</span></div>
+        ${b && ['BLUE', 'BOTH'].includes(side) && S.blueBases[0] !== k ? `<button class="b sm shrink" data-bmain="${k}">★ Principale</button>` : ''}<select data-bside="${k}" style="width:140px">${[['', '— non usata'], ['BLUE', 'BLUE'], ['RED', 'RED (giocatori)'], ['BOTH', 'BLUE + RED']].map(([v, l]) => `<option value="${v}" ${side === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        ${b && ['BLUE', 'BOTH'].includes(side) ? `<details${(S.bOpen || '') === k + 'roles' ? ' open' : ''} data-bopen="${k}roles"><summary style="font-size:12px;cursor:pointer">BLUE: ${esc(sum(k, b.roles))}</summary>${chips(k, 'roles', b.roles)}</details>` : ''}
+        ${b && ['RED', 'BOTH'].includes(side) ? `<details${(S.bOpen || '') === k + 'rroles' ? ' open' : ''} data-bopen="${k}rroles"><summary style="font-size:12px;cursor:pointer;color:#b91c1c">RED (giocatori): ${esc(sum(k, b.rroles))}</summary>${chips(k, 'rroles', b.rroles)}</details>` : ''}</div>`; }).join('')}
+    <button class="b sm shrink" id="baseall" style="margin-top:6px">${all ? 'Mostra solo i vicini' : 'Mostra più aeroporti'}</button></div>`; }
+function heldPickHtml() { const g = geom(), toR = dest(g.front, g.dir + 180, 50), toB = dest(g.front, g.dir, 50);
+  const cand = Object.keys(AIRPORTS).filter(k => S.redBases.includes(k) || (dist(ap(k), g.front) < 200 && dist(ap(k), toR) < dist(ap(k), toB))).sort((a, b) => (isCivAp(a) - isCivAp(b)) || dist(ap(a), g.front) - dist(ap(b), g.front)).slice(0, 16);
+  return `<div style="margin-top:8px"><label><span class="dot" style="background:var(--red)"></span>Aeroporti occupati da RED (scenario, nessun giocatore)</label><div class="chips">${cand.map(k => `<label class="chip"><input type="checkbox" data-rheld="${k}" ${S.redBases.includes(k) ? 'checked' : ''}>${k} <span class="muted" style="font-size:11px">${esc(AIRPORTS[k][0])}${isCivAp(k) ? ' · civile' : ''}</span></label>`).join('') || '<span class="muted">nessun aeroporto sul lato RED</span>'}</div></div>`; }
 function genDoneHtml() {
   const R = REL();
   return `<h3 style="margin:4px 0">Basi</h3>
@@ -3722,6 +3766,10 @@ document.addEventListener('change', e => {
   if (t.dataset.aartrk && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aartrk); if (f) { f.trkSel = t.value || ''; asgApply(); } return; }
   if (t.dataset.aarwin && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarwin); if (f) { f.win = t.value === '' ? '' : Math.max(3, Math.min(30, Math.round(+t.value))); asgApply(); } return; }
   if (t.dataset.aarrcv && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarrcv); if (f) { f.tanker = t.value; f.tankerMan = true; asgApply(); } return; }
+  if (t.dataset.bside) { const k = t.dataset.bside; S.bases = S.bases || {}; if (!t.value) delete S.bases[k]; else S.bases[k] = Object.assign({ roles: ['ALL'], rroles: ['ALL'] }, S.bases[k] || {}, { side: t.value }); syncBases(); save(); renderAll(); return; }
+  if (t.dataset.brole) { const [k, key, gr] = t.dataset.brole.split(':'), b = S.bases && S.bases[k]; if (!b) return; S.bOpen = k + key; let r = (b[key] || ['ALL']).filter(x => x !== 'ALL');
+    if (gr === 'ALL') r = t.checked ? ['ALL'] : []; else r = t.checked ? [...new Set([...r, gr])] : r.filter(x => x !== gr); b[key] = r.length ? r : ['ALL']; syncBases(); save(); renderAll(); return; }
+  if (t.dataset.rheld) { const k = t.dataset.rheld; S.basesSet = true; S.redBases = t.checked ? [...new Set([...S.redBases, k])] : S.redBases.filter(x => x !== k); save(); renderAll(); return; }
   if (t.dataset.tl && S.t) { S.meta.tl = Object.assign({}, S.meta.tl || {}, { [t.dataset.tl]: Math.max(0, Math.round(+t.value || 0)) }); asgApply(); return; }
   if (t.dataset.asgp && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.asgp); if (f) { f.passes = Math.max(1, Math.min(6, Math.round(+t.value || 1))); asgApply(); } return; }
   if (t.dataset.asgt && S.t) { const [fid, ks] = t.dataset.asgt.split(':'), k = +ks, f = S.t.flights.find(x => x.id === fid), v = t.value; if (!f) return; f.casTasks = f.casTasks || [];
@@ -3757,7 +3805,8 @@ document.addEventListener('change', e => {
   if (id === 'hh') S.meta.hHour = t.value;
   if (id === 'edate') S.meta.date = t.value;
   if (id === 'thname' && S.thCustom) { S.thCustom.name = t.value.trim() || 'Teatro disegnato'; S.thCustom.region = `the exercise area ${S.thCustom.name} drawn by the staff`; save(); renderPanel(); return; }
-  if (id === 'bb' || id === 'rb') { const v = t.value.toUpperCase().split(/[\s,;]+/).filter(x => AIRPORTS[x]); if (id === 'bb') { S.blueBases = v; S.c2sel = null; } else S.redBases = v; save(); renderAll(); return; }
+  if (id === 'bb' || id === 'rb') { const v = t.value.toUpperCase().split(/[\s,;]+/).filter(x => AIRPORTS[x]); if (id === 'bb') { S.bases = S.bases || {}; Object.keys(S.bases).forEach(k => { if (['BLUE', 'BOTH'].includes(S.bases[k].side) && !v.includes(k)) { if (S.bases[k].side === 'BOTH') S.bases[k].side = 'RED'; else delete S.bases[k]; } });
+      v.forEach(k => { if (!S.bases[k]) S.bases[k] = { side: 'BLUE', roles: ['ALL'], rroles: ['ALL'] }; else if (S.bases[k].side === 'RED') S.bases[k].side = 'BOTH'; }); S.baseOrd = [...v, ...(S.baseOrd || []).filter(k => !v.includes(k))]; syncBases(); } else S.redBases = v; save(); renderAll(); return; }
   if (id === 'csvfile' && t.files[0]) { t.files[0].text().then(txt => { const rows = parseCSV(txt); if (rows.length < 2) return toast('CSV vuoto'); CSV_PENDING = { rows, map: rows[0].map(guessField) }; renderPanel(); }); return; }
   if (id === 'jsonfile' && t.files[0]) { t.files[0].text().then(txt => { try { const j = JSON.parse(txt); const ps = Array.isArray(j) ? j : j.pilots || []; ps.forEach(p => addPilot({ ...p, typeRaw: p.typeRaw || p.aircraft || p.type })); (j.controllers || []).forEach(addCtrl); save(); renderPanel(); toast('Roster importato'); } catch (err) { toast('JSON non valido'); } }); return; }
   if (id === 'jimp' && t.files[0]) { t.files[0].text().then(txt => { try { const j = JSON.parse(txt); if (!j.meta || !j.zones) throw 0; S = j; save(); renderAll(true); toast('Scenario importato'); } catch (err) { toast('File scenario non valido'); } }); return; }
@@ -3785,6 +3834,8 @@ document.addEventListener('click', e => {
   if (t.dataset.bullpick) { setBull(t.dataset.bullpick); if (MAP) MAP.closePopup(); save(); renderPanel(); drawMap(); toast(`Bullseye della missione: ${t.dataset.bullpick}`); return; }
   if (t.dataset.cor) { const z = CORS().find(x => x.id === t.dataset.cor), st = new Set(S.cor || []); if (z) { st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
+  if (t.dataset.bmain) { const k = t.dataset.bmain; S.baseOrd = [k, ...(S.baseOrd || []).filter(x => x !== k)]; syncBases(); save(); renderAll(); return; }
+  if (t.id === 'baseall') { S.baseAll = !S.baseAll; renderPanel(); return; }
   if (t.dataset.casvis && S.cas) { const h = casView().hide; if (h[t.dataset.casvis]) delete h[t.dataset.casvis]; else h[t.dataset.casvis] = true; save(); renderPanel(); drawMap(); return; }
   if (t.dataset.casall && S.cas) { const [jid, how] = t.dataset.casall.split(':'), J = S.cas.jtacs.find(x => x.id === jid), h = casView().hide; if (J) J.tasks.forEach(T => { if (how === 'hide') h[T.id] = true; else delete h[T.id]; }); save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cassolo && S.cas) { const [jid, tid] = t.dataset.cassolo.split(':'), h = casView().hide; S.cas.jtacs.forEach(J => J.tasks.forEach(T => { if (T.id === tid) delete h[T.id]; else h[T.id] = true; }));
@@ -4610,12 +4661,14 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec('Airports');
   if (mpOn('apt')) {
   para(PROF().sober ? 'Airports used during the event:' : 'Airports used by BLUE forces during the event:');
-  const bases = [...new Set([...(t ? t.flights.map(f => f.base) : []), ...S.blueBases.slice(0, t ? 1 : 99)])].filter(i => i && AIRPORTS[i]);
+  const bases = [...new Set([...(t ? t.flights.map(f => f.base) : []), ...S.blueBases.slice(0, t ? 1 : 99), ...Object.keys(S.bases || {}).filter(k => S.bases[k].side === 'RED' && !PROF().sober)])].filter(i => i && AIRPORTS[i]);
   const rwyData = {}; String(mp.runways || '').split('\n').map(l => l.split(';').map(x => x.trim())).filter(a => a.length >= 2 && AIRPORTS[a[0].toUpperCase()]).forEach(a => (rwyData[a[0].toUpperCase()] = rwyData[a[0].toUpperCase()] || []).push(a.slice(1)));
   for (const icao of bases) {
     const [name] = AIRPORTS[icao]; const short = name.replace(/\s+(AB|NAS)$/, '');
     h5(name);
     rich([{ t: 'ICAO: ', f: F.bold }, { t: icao }]);
+    { const bi = baseInfo(icao), rl = r => (r || ['ALL']).includes('ALL') ? (isCivAp(icao) ? 'all civil roles' : 'all roles') : r.map(k => (ROLE_GROUPS.find(g => g.k === k) || {}).en || k).join(', ');
+      if (S.bases && S.bases[icao]) rich([{ t: 'Used by: ', f: F.bold }, { t: bi.side === 'BOTH' ? `BLUE (${rl(bi.roles)}) and RED players (${rl(bi.rroles)})` : bi.side === 'RED' ? `RED players (${rl(bi.rroles)})` : `BLUE – ${rl(bi.roles)}` }]); }
     const chartUrl = mp.charts ? mp.charts.replace(/\{ICAO\}/g, icao) : '';
     // staff 20 Nov: ENAV charts exist only for civil / joint aerodromes; military ones -> IVAO Italy military vSOP only
     if (chartUrl) rich([{ t: 'Charts: ', f: F.bold }, { t: chartUrl, link: chartUrl }]); else if (AIRPORTS[icao][3] !== 'MIL') rich([{ t: 'Charts: ', f: F.bold }, { t: 'current AIP Italia (ENAV), AD 2 ' + icao }]);
@@ -5221,7 +5274,7 @@ initMap();
 route();
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
