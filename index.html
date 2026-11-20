@@ -689,7 +689,8 @@ const DEMN = 400, M2FT = 3.28084, DEM = { idx: null, tiles: new Map(), wait: new
 const demName = (la, lo) => `N${String(la).padStart(2, '0')}E${String(lo).padStart(3, '0')}`;
 async function demInit() { try { const r = await fetch('data/dem/index.json', { cache: 'no-cache' }); if (!r.ok) return; DEM.idx = await r.json(); DEM.has = new Set(DEM.idx.tiles || []); DEM.on = DEM.has.size > 0; } catch (e) { } }
 async function demTile(name) { if (DEM.tiles.has(name)) return DEM.tiles.get(name); if (DEM.wait.has(name)) return DEM.wait.get(name);
-  const pr = (async () => { try { const r = await fetch(`data/dem/${name}.bin`); if (!r.ok) throw 0; let buf = await r.arrayBuffer(), u = new Uint8Array(buf);
+  const pr = (async () => { try { const ext = (DEM.idx && DEM.idx.ext) || 'bin', r = await fetch(`data/dem/${name}.${ext}`); if (!r.ok) throw 0; // .bin in the repository, .b64.txt (base64) in the published artifact
+      let buf = /txt$/.test(ext) ? Uint8Array.from(atob((await r.text()).trim()), ch => ch.charCodeAt(0)).buffer : await r.arrayBuffer(), u = new Uint8Array(buf);
       if (u[0] === 0x1f && u[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
       const a = new Int16Array(buf), mean = a.subarray(0, DEMN * DEMN), max = a.subarray(DEMN * DEMN, 2 * DEMN * DEMN);
       for (const b of [mean, max]) for (let r0 = 0; r0 < DEMN; r0++) { const o = r0 * DEMN; for (let c = 1; c < DEMN; c++) b[o + c] += b[o + c - 1]; } // undo the row delta
