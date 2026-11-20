@@ -20,7 +20,7 @@ if(r.res!=='LI-R49A,LI-R49B') fail.push('manual selection changed: '+r.res); if(
 // union of the ticked areas
 await page.evaluate(()=>{ APP.WOPEN='asp'; APP.renderAll(); }); if(!(await page.$('#cuscombo'))) fail.push('no union button under the table'); else {
  await page.fill('#cuslo','FL100'); await page.fill('#cusup','FL240'); await page.click('#cuscombo'); await page.waitForTimeout(150);
- r=await page.evaluate(()=>{const c=(APP.S.custom||[]).slice(-1)[0]; return c?{lo:c.lower,up:c.upper,res:APP.RES().some(z=>z.id===c.id)}:null;});
+ r=await page.evaluate(()=>{const cs=APP.S.custom||[], c=cs.find(x=>x.kind==='combo'&&x.lower==='FL100')||cs.slice(-1)[0]; return c?{lo:c.lower,up:c.upper,res:APP.RES().some(z=>z.id===c.id)}:null;});
  if(!r||r.lo!=='FL100'||r.up!=='FL240'||!r.res) fail.push('union: '+JSON.stringify(r)); }
 // auto mode proposes again
 r=await page.evaluate(()=>{ APP.S.custom=[]; APP.S.reserved=[]; APP.S.resMode='auto'; APP.generateGeneric(); APP.parseLines('4x F-35A\n2x AMX'); APP.tailor(); return APP.RES().length; });

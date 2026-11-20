@@ -222,3 +222,10 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * CAS: `ip.tb0` (generated bearing target→IP), `T.runTerrain` (terrain score of the run-in), `J.terrainFloor` (thousands of ft).
 * `S.mapStyle`: 'clean' | 'relief' | 'tint' | 'dark' (missing = default by event type).
 * Custom areas: combining the same parts updates the existing combined area; limits normalised (`limNorm`: bare number = FL).
+
+## v1.20 additions
+
+* `S.meta.tl = { dur, dep, tr, ret, land }` (minutes; on-station window = dep+tr … dur-ret-land).
+* Flights: `passes` (CAS passes), `casTasks` (task ids per pass), `trkSel` (AAR track chosen by the staff), `win` (receiver window of a tanker, min), receivers: `tankerMan` (moved by hand), `arct` (minutes from H), `arWin`.
+* CAS tasks: `reOf` (re-attack copy of a scenario), `totMan` (TOT typed by the staff); `J.timeWarn`. `t.aarWarn[]`, AAR cards: `tid`, `rcv[{cs, arct, win}]`, `win`.
+* Documents use `casDocJtacs()` (only scenarios with a flight after phase 3).

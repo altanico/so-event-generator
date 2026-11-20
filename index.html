@@ -742,7 +742,7 @@ function demPts() { const pts = []; if (S.cas) S.cas.jtacs.forEach(J => { pts.pu
   if (S.pr) (S.pr.csar || []).forEach(c => pts.push(c.lz || c.surv)); if (S.aib) (S.aib.list || []).forEach(sc => pts.push(sc.pos)); return pts.filter(Boolean); }
 let DEM_T = null;
 function demSoon() { if (!DEM.on || DEM_T) return; DEM_T = setTimeout(async () => { DEM_T = null; const n0 = DEM.tiles.size; await demLoad(demPts(), 0.4); const fresh = DEM.tiles.size !== n0, ch = demFill();
-  if (fresh && S.cas) casDeconfAll(); if (ch || fresh) { S.updated = Date.now(); lsSet('ivao-so-current', S); renderPanel(); drawMap(); } }, 250); } // after every save: new tiles / new points -> elevations and terrain
+  if (fresh && S.cas) casDeconfAll(); if (ch || fresh) { S.updated = Date.now(); lsSet('ivao-so-current', S); const ae = document.activeElement; if (!(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && $('#panel') && $('#panel').contains(ae))) renderPanel(); drawMap(); } }, 250); } // never re-render under a field the staff is typing in // after every save: new tiles / new points -> elevations and terrain
 async function demRefresh() { if (!DEM.on || MODE !== 'staff' || !S) return; await demLoad(demPts(), 0.4); const ch = demFill(); if (S.cas) casDeconfAll(); if (ch || S.cas) { save(); renderPanel(); drawMap(); } }
 async function loadAip() { try { const r = await fetch('data/aip_zones.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json(); const d = parseAirspace(j); if (d.zones.length) AIPDATA = { ...d, label: j.source || 'AIP' }; } catch (e) { } }
 const baseAsp = () => !S.asp || ['demo', 'aip', 'none'].includes(S.asp.source);
@@ -1582,7 +1582,10 @@ function generateElements(flights) {
       const bp = ap(fl.base) || g.front, ax = dist(bp, ct.z.axis[0]) <= dist(bp, ct.z.axis[ct.z.axis.length - 1]) ? ct.z.axis.slice() : ct.z.axis.slice().reverse(); // AAR corridor: flown like an airway, entry = end nearest the base
       A('TRACK', ct.z.name, ax, { flight: fl.id, alt: ct.alt, cor: ct.z.id }); return; }
     if (t) { usedT.add(t.id); useZ(t); A('TRACK', `Track ${t.id}`, [t.ap1, t.ap2], { flight: fl.id, alt: trkAlt(t), pub: true, trk: t.id, loop: [t.ap1, t.tp2, t.ap2, t.tp1] }); }
-    else { const c = toBlue(g.front, 90 + i * 25); A('TRACK', `Track ${pick(WORDS)}`, [dest(c, g.dir + 90, 30), dest(c, g.dir - 90, 30)], { flight: fl.id, alt: 'FL220-260' }); } });
+    else { // no free published track: stack on a track already in use when its band leaves 5000 ft between the tankers (staff 20 Nov), otherwise a schematic track
+      const cnt = id => airspace.filter(x => x.type === 'TRACK' && x.trk === id).length, re = TRK().filter(d => d.kind === 'AAR' && usedT.has(d.id) && d.hi - d.lo >= 50 * cnt(d.id))[0];
+      if (re) { A('TRACK', `Track ${re.id}`, [re.ap1, re.ap2], { flight: fl.id, alt: trkAlt(re), pub: true, trk: re.id, loop: [re.ap1, re.tp2, re.ap2, re.tp1] }); return; }
+      const c = toBlue(g.front, 90 + i * 25); A('TRACK', `Track ${pick(WORDS)}`, [dest(c, g.dir + 90, 30), dest(c, g.dir - 90, 30)], { flight: fl.id, alt: 'FL220-260' }); } });
   by('AEW').forEach(fl => { const t = pickTrack('AEW', usedT);
     if (t) { usedT.add(t.id); useZ(t); A('ORBIT', `AEW ${t.id}`, [t.c1, t.c2], { flight: fl.id, alt: trkAlt(t), pub: true, trk: t.id, rad: t.radius }); }
     else A('ORBIT', `Orbit ${pick(WORDS)}`, [toBlue(g.front, 130)], { flight: fl.id, alt: 'FL300' }); });
@@ -1770,21 +1773,32 @@ function genCAS() {
   return S.cas;
 }
 // tailoring: put each CAS flight on a prepared scenario (same platform first), add slots if more flights than scenarios
+// ---- assignment after sign-ups (staff 20 Nov): missions prepared in advance, automatic proposal, every choice changeable ----
+// flight.passes = number of CAS passes (default 1), flight.casTasks = [task id per pass]; a task is a prepared scenario (one 9-line); "re-attack" = copy of a scenario (same target)
+const casTaskById = id => { if (!S.cas) return null; for (const J of S.cas.jtacs) { const T = J.tasks.find(x => x.id === id); if (T) return [J, T]; } return null; };
+function casReattack(J, T0) { const T = JSON.parse(JSON.stringify(T0)), k = J.tasks.filter(x => x.reOf === T0.id).length + 1, m = S.cas.jtacs.reduce((a, x) => a + x.tasks.length, 0);
+  Object.assign(T, { id: `${T0.id}R${k}`, reOf: T0.id, flight: null, totMan: false, missionNo: String(1010 + 10 * m) }); J.tasks.push(T); return T; }
+// event timeline: duration and phases -> on-station window (minutes from H)
+const tl = () => { const d = Object.assign({ dur: 150, dep: 15, tr: 20, ret: 20, land: 15 }, (S.meta && S.meta.tl) || {}); return { ...d, on0: d.dep + d.tr, on1: d.dur - d.ret - d.land }; };
 function assignCAS(t) {
   const cas = t.flights.filter(f => f.task === 'CAS');
   if (!cas.length) return;
   if (!S.cas || !S.cas.jtacs.length) genCAS();
   const g = geom(), used = new Set(S.cas.jtacs.flatMap(J => [...J.cps.map(c => c.name), ...J.ips.map(c => c.name)]));
   const uniq = pool => { const c = pool.filter(x => !used.has(x)); const v = c.length ? pick(c) : pick(pool) + ' ' + (used.size + 1); used.add(v); return v; };
-  const all = () => S.cas.jtacs.flatMap(J => J.tasks.map(T => [J, T]));
-  all().forEach(([J, T]) => { if (T.flight && !cas.some(f => f.id === T.flight)) T.flight = null; });
-  cas.forEach((f, i) => {
-    if (all().some(([J, T]) => T.flight === f.id)) return;
-    const rw = isHelo(f); let hit = all().find(([J, T]) => !T.flight && T.rw === rw);
-    if (!hit) { const J = S.cas.jtacs[i % S.cas.jtacs.length]; casSlot(J, J.tasks.length, rw, g, used, uniq); const T = J.tasks[J.tasks.length - 1]; const m = all().length - 1; T.missionNo = String(1010 + 10 * m); T.codes = [`15${(m % 8) + 1}1`]; hit = [J, T];
-      (t.warnings = t.warnings || []).push(`CAS: aggiunto lo scenario ${T.id} per ${f.cs} (${f.type}${rw ? ', elicottero: attacca da una battle position (BP)' : ''}) perché gli scenari preparati non bastavano. Rimanda il JTAC pack a ${J.cs}.`); }
-    hit[1].flight = f.id;
-  });
+  const all = () => S.cas.jtacs.flatMap(J => J.tasks.map(T => [J, T])), taken = new Map();
+  cas.forEach(f => { f.passes = Math.max(1, Math.min(6, +f.passes || 1)); const rw = !!isHelo(f); // keep the valid choices (staff or previous proposal)
+    f.casTasks = (f.casTasks || []).filter(id => { const h = casTaskById(id); return h && !!h[1].rw === rw && !taken.has(id); }).slice(0, f.passes); f.casTasks.forEach(id => taken.set(id, f.id)); });
+  all().forEach(([J, T]) => { const f = cas.find(x => x.id === T.flight); if (f && !taken.has(T.id) && f.casTasks.length < f.passes && !!T.rw === !!isHelo(f)) { f.casTasks.push(T.id); taken.set(T.id, f.id); } }); // older events
+  cas.forEach((f, i) => { const rw = !!isHelo(f);
+    while (f.casTasks.length < f.passes) { const J0 = f.casTasks.length ? casTaskById(f.casTasks[0])[0] : null; // further passes: same JTAC first
+      let hit = [...(J0 ? J0.tasks.map(T => [J0, T]) : []), ...all()].find(([J, T]) => !taken.has(T.id) && !!T.rw === rw && !T.reOf);
+      if (!hit) { const J = J0 || S.cas.jtacs[i % S.cas.jtacs.length]; casSlot(J, J.tasks.length, rw, g, used, uniq); const T = J.tasks[J.tasks.length - 1]; const m = all().length - 1; T.missionNo = String(1010 + 10 * m); T.codes = [`15${(m % 8) + 1}1`]; hit = [J, T];
+        (t.warnings = t.warnings || []).push(`CAS: aggiunto lo scenario ${T.id} per ${f.cs} (${f.type}${rw ? ', elicottero: attacca da una battle position (BP)' : ''}) perché gli scenari preparati non bastavano.`); }
+      f.casTasks.push(hit[1].id); taken.set(hit[1].id, f.id); } });
+  all().forEach(([J, T]) => T.flight = taken.get(T.id) || null);
+  S.cas.jtacs.forEach(J => { J.tasks = J.tasks.filter(T => !T.reOf || T.flight); }); // unused re-attack copies go away
+  casSchedule(t);
   all().forEach(([J, T]) => { const f = casFlight(T); if (!f) return;
     const w = wpnOf(f), gps = w.find(x => GPS_WPN.test(x)), laser = w.find(x => /GBU-1[26]|Paveway|Hellfire|Spike/.test(x));
     if (T.method === 'BOC' && !gps) { T.method = 'BOT'; T.control = 1; }
@@ -1792,6 +1806,17 @@ function assignCAS(t) {
     T.seq = f.size > 1 ? (T.seq || (laser ? 'SHOOTER-SPIKER' : 'SHOOTER-SHOOTER')) : '';
     const base = T.codes[0] ? T.codes[0].slice(0, 3) : '151'; T.codes = Array.from({ length: f.size }, (_, n) => `${base}${n + 1}`); });
 }
+// TOTs inside the on-station window: per JTAC, first passes of every flight, then the second passes...; 8 min between TOTs on a JTAC, 10 min between two passes of a flight
+function casSchedule(t) { if (!S.cas || !t) return; const w = tl(), out = [];
+  S.cas.jtacs.forEach(J => { const rows = J.tasks.map(T => { const f = casFlight(T); return f ? { T, f, k: (f.casTasks || []).indexOf(T.id) } : null; }).filter(Boolean).sort((a, b) => a.k - b.k || t.flights.indexOf(a.f) - t.flights.indexOf(b.f));
+    let cur = w.on0 + 10; const last = {}; J.timeWarn = '';
+    rows.forEach(r => { if (!r.T.totMan) { const v = Math.max(cur, (last[r.f.id] || -99) + 10); r.T.tot = v; } cur = Math.max(cur, r.T.tot) + 8; last[r.f.id] = r.T.tot; });
+    const over = rows.filter(r => r.T.tot > w.on1); if (over.length) { J.timeWarn = `${J.cs}: ${over.length} passate oltre la fine della permanenza (H+${w.on1}): ${over.map(r => `${r.f.cs} ${r.T.id} H+${r.T.tot}`).join(', ')}`; out.push(J.timeWarn); } });
+  return out; }
+// documents: only the scenarios with a flight once the event is tailored (the others stay in the staff library)
+function casDocJ(J) { if (!S.t) return J; const tasks = J.tasks.filter(T => casFlight(T)), tg = new Set(tasks.map(T => T.target)), ips = new Set(tasks.flatMap(T => [T.ip, ...((T.egr && /^IP:/.test(T.egr.to || '')) ? [T.egr.to.slice(3)] : [])]));
+  return { ...J, tasks, targets: J.targets.filter(x => tg.has(x.id)), ips: J.ips.filter(x => ips.has(x.name)) }; }
+const casDocJtacs = () => !S.cas ? [] : S.cas.jtacs.map(casDocJ).filter(J => !S.t || J.tasks.length);
 function applyCAS(t) { // after tailoring: assign flights, CP/IP as control measures, one C2 row per JTAC
   t.airspace = t.airspace.filter(a => !a.cas);
   t.c2 = t.c2.filter(r => !r.cas);
@@ -1882,7 +1907,7 @@ function casSitUpdate(J, t) {
 // public part (pilots): JTAC frequencies, CP/IP, mission numbers, laser codes – never targets or 9-lines
 function casPublic(cas) {
   if (!cas) return null;
-  return { jtacs: cas.jtacs.map(J => ({ id: J.id, cs: J.cs, freq: J.freq, controller: '', cps: J.cps, ips: J.ips.map(x => ({ name: x.name, pos: x.pos, heli: x.heli })), hold: J.hold,
+  return { jtacs: cas.jtacs.map(casDocJ).filter(J => !S.t || J.tasks.length).map(J => ({ id: J.id, cs: J.cs, freq: J.freq, controller: '', cps: J.cps, ips: J.ips.map(x => ({ name: x.name, pos: x.pos, heli: x.heli })), hold: J.hold,
     tasks: J.tasks.map(T => ({ flight: T.flight, missionNo: T.missionNo, codes: T.codes, block: T.block, ip: T.ip, rw: T.rw })), targets: [], friendlies: [], echo: null, jtacPos: null })) };
 }
 
@@ -2014,6 +2039,7 @@ function offsetBand(J, T) { if (!T.offset) return null; const tgt = J.targets.fi
 const casView = () => (S.casView = S.casView || { hide: {}, noThr: false });
 const casVis = T => !casView().hide[T.id];
 const casThrHidden = () => TAB === 'cas' && !!casView().noThr;
+function asgApply() { if (!S.t) return; if (S.cas) applyCAS(S.t); if (typeof aarApply === 'function') aarApply(S.t); save(); renderPanel(); drawMap(); }
 function casDone() { if (!S.cas) return { ok: false, why: 'nessuno scenario CAS' }; if (!S.t) return { ok: false, why: 'manca la fase 3 (adatta ai partecipanti)' };
   return S.cas.jtacs.some(J => J.tasks.some(T => casFlight(T))) ? { ok: true, why: '' } : { ok: false, why: 'nessun flight CAS assegnato ai task' }; } // tasks without a flight are spares
 const casDeconfAll = () => { if (S.cas) S.cas.jtacs.forEach(casDeconf); };
@@ -2785,25 +2811,48 @@ const TURN_RANGE = { B: { 25: [[230, 8.4], [250, 9.6], [270, 11.0], [290, 12.4],
 const AOB_TABLE = { tas: [250, 300, 350, 400, 450], rows: [[15, 3, 5, 7, 9, 11], [13, 4, 6, 8, 10, 12], [11, 5, 7, 9, 11, 13], [9, 6, 9, 11, 14, 18], [7, 7, 11, 15, 19, 23], [5, 10, 15, 20, 25, 30], [3, 17, 24, 31, 38, 45]] };
 const stationOf = (tk, rc) => { const t = aarSys(tk.type), r = aarSys(rc.type); return t === 'BOOM' || (t === 'BOTH' && r === 'BOOM') ? 'BOOM' : t === 'BOTH' ? 'WING PODS (left / right)' : 'HOSE (left / right pod)'; };
 const offloadKg = rc => rc.cat === 'HELO' ? 600 : ['TRANSPORT', 'AEW', 'MPA'].includes(rc.cat) ? 8000 : 2000;
+// receiver window (staff 20 Nov): time on the track / receivers of the tanker, between 5' and 15' (tk.win set by the staff wins)
+function aarWin(tk, n, w = tl()) { if (+tk.win) return Math.max(3, Math.min(30, +tk.win)); const avail = w.on1 - w.on0 - 5; return Math.max(5, Math.min(15, Math.floor(avail / Math.max(1, n)))); }
+// overloaded tanker -> receivers moved to another tanker of the same kind with free time (not the ones placed by the staff)
+function aarBalance(t, tks, w) { const rcvOf = tk => t.flights.filter(f => f.tanker === tk.id && ['RECEIVER', 'HAARRCV'].includes(f.task)), cap = tk => Math.max(1, Math.floor((w.on1 - w.on0 - 5) / (+tk.win || 5)));
+  for (const tk of tks) { let rs = rcvOf(tk); while (rs.length > cap(tk)) { const r = rs.filter(x => !x.tankerMan).pop(); if (!r) break; const to = tks.find(o => o !== tk && o.task === tk.task && rcvOf(o).length < cap(o)); if (!to) break; r.tanker = to.id; rs = rcvOf(tk); } } }
+function aarSetTrack(t, tk) { if (!tk.trkSel) return; const d = TRK().find(x => x.id === tk.trkSel); if (!d) return; const i = t.airspace.findIndex(a => a.type === 'TRACK' && a.flight === tk.id);
+  const el = { id: i >= 0 ? t.airspace[i].id : 'A' + (t.airspace.length + 1), type: 'TRACK', name: `Track ${d.id}`, pts: [d.ap1, d.ap2], flight: tk.id, alt: trkAlt(d), pub: true, trk: d.id, loop: [d.ap1, d.tp2, d.ap2, d.tp1] };
+  if (i >= 0) t.airspace[i] = el; else t.airspace.push(el); }
+function aarApply(t) { if (!t) return; t.flights.filter(f => f.task === 'AAR').forEach(tk => aarSetTrack(t, tk)); applyAAR(t); }
+function aarAsgHtml(t) { const tks = t.flights.filter(f => f.task === 'AAR' || f.task === 'HAAR'); if (!tks.length || !t.aar) return '';
+  const trks = TRK().filter(x => x.kind === 'AAR'), card = tk => t.aar.cards.find(c => c.tid === tk.id) || {};
+  return `<h3 style="margin:12px 0 4px">Rifornimento in volo</h3><table><tr><th>Tanker</th><th>Track</th><th>Quota</th><th>Finestra receiver</th><th>Receiver · ARCT</th></tr>${tks.map(tk => { const c = card(tk), cur = t.airspace.find(a => a.type === 'TRACK' && a.flight === tk.id);
+    return `<tr><td><b>${esc(tk.cs)}</b><br><span class="muted" style="font-size:11px">${esc(tk.type)}</span></td>
+    <td>${tk.task === 'HAAR' ? esc(cur ? cur.name : '—') : `<select data-aartrk="${tk.id}" style="max-width:170px"><option value="">Automatica${cur ? ' (' + esc(cur.name.replace(/^Track /, '')) + ')' : ''}</option>${trks.map(x => `<option value="${x.id}" ${tk.trkSel === x.id ? 'selected' : ''}>${esc(x.id)} · FL${x.lo}–${x.hi}</option>`).join('')}</select>`}</td>
+    <td>${esc(c.alt || '')}</td><td style="width:90px"><input data-aarwin="${tk.id}" type="number" min="3" max="30" value="${+tk.win || ''}" placeholder="auto ${c.win || ''}'"></td>
+    <td>${(c.rcv || []).map(r => { const f = t.flights.find(x => x.cs === r.cs); return `<div style="display:flex;gap:6px;align-items:center;margin:2px 0"><select data-aarrcv="${f ? f.id : ''}" style="max-width:150px">${tks.filter(o => o.task === tk.task).map(o => `<option value="${o.id}" ${o.id === tk.id ? 'selected' : ''}>${esc(r.cs)} → ${esc(o.cs)}</option>`).join('')}</select><span style="font-size:12px">ARCT ${esc(totClock(r.arct))} · ${r.win}'</span></div>`; }).join('') || '<span class="muted">nessun receiver</span>'}</td></tr>`; }).join('')}</table>
+  ${(t.aarWarn || []).map(x => `<div class="warn" style="font-size:12px">${esc(x)}</div>`).join('')}`; }
 function applyAAR(t) {
   if (!t) return; const tks = t.flights.filter(f => f.task === 'AAR' || f.task === 'HAAR'); if (!tks.length) { t.aar = null; return; }
   const gciOn = t.c2.find(c => ['GCI', 'AEW'].includes(c.key) && c.controller && !/not staffed/.test(c.controller)), ctl = gciOn ? `${gciOn.cs} PRI ${gciOn.freq}` : '';
+  const w = tl(), warn = t.aarWarn = []; aarBalance(t, tks, w);
+  const trkKey = tk => { const a = t.airspace.find(x => x.type === 'TRACK' && x.flight === tk.id); return a ? a.trk || a.cor || a.name : 'X:' + tk.id; }, groups = {}; tks.forEach(tk => (groups[trkKey(tk)] = groups[trkKey(tk)] || []).push(tk.id));
   const perTrack = {}, cards = tks.map((tk, i) => { const haar = tk.task === 'HAAR', rs = t.flights.filter(f => f.tanker === tk.id && ['RECEIVER', 'HAARRCV'].includes(f.task));
     const trk = t.airspace.find(a => a.type === 'TRACK' && a.flight === tk.id), def = trk && trk.trk ? TRK().find(x => x.id === trk.trk) : null;
     const v = haar ? ((S.variants && S.variants.HAAR && S.variants.HAAR.rv) || ['D'])[0] : ((S.variants && S.variants.AAR && S.variants.AAR.rv) || ['AUTO'])[0];
     const cor = !!(trk && trk.cor), rv = haar ? v : v === 'AUTO' ? (gciOn ? 'A' : cor ? 'G' : 'E') : cor && v === 'E' ? 'G' : v; // AAR corridor: en route, RV ECHO (anchor) becomes GOLF
     const key = trk ? trk.name : 'X', k = perTrack[key] = (perTrack[key] || 0) + 1;
-    let alt; if (haar) alt = '2000 FT'; else if (def) { const lv = Math.min(def.hi, Math.max(def.lo, 180)) + (k - 1) * 30; alt = `FL${Math.min(lv, def.hi)}`; } else { const r = flRange(trk && trk.alt) || [220, 260]; alt = `FL${Math.min(r[1], r[0] + (k - 1) * 30)}`; }
+    // staff 20 Nov: tankers on the same track at least 5000 ft apart, inside the published band of the track
+    let alt; const nOn = (groups[trkKey(tk)] || []).length; if (haar) alt = '2000 FT'; else { const [lo, hi] = def ? [def.lo, def.hi] : (flRange(trk && trk.alt) || [220, 260]), st = Math.max(lo, Math.min(nOn > 1 ? lo : 180, hi - 50 * (nOn - 1))), lv = st + 50 * (k - 1);
+      alt = `FL${String(Math.min(lv, hi)).padStart(3, '0')}`; if (lv > hi) warn.push(`${tk.cs}: sulla track ${trk ? trk.name.replace(/^Track /, '') : ''} (FL${lo}–FL${hi}) non c'è spazio per ${nOn} tanker con 5000 ft di separazione – scegli un'altra track.`); }
     const h = trk ? holdLoop(trk) : null, inb = h ? Math.round(h.arrows[0].brg) : null, course = def ? def.course : inb != null ? `${String(inb).padStart(3, '0')}/${String((inb + 180) % 360).padStart(3, '0')}` : '';
     const leg = def ? def.leg : trk ? Math.round(routeKm(trk.pts) / 1.852) : '', width = def ? def.width : trk && trk.w ? trk.w : 7;
     const alts = TRK().filter(x => x.kind === 'AAR' && def && x.id !== def.id).sort((a, b) => dist(trkCenter(a), trkCenter(def)) - dist(trkCenter(b), trkCenter(def)))[0];
     const anchor = cor ? 'NA (en route)' : def ? fmtLL(def.ap1) : trk ? fmtLL(trk.pts[trk.pts.length - 1]) : BLANK, corCp = cor ? dest(trk.pts[0], bearing(trk.pts[0], trk.pts[1]), Math.min(20 * 1.852, dist(trk.pts[0], trk.pts[1]) * 0.5)) : null;
     const arip = cor ? `${fmtLL(trk.pts[0])} (corridor entry)` : ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(dest(trk.pts[0], bearing(trk.pts[trk.pts.length - 1], trk.pts[0]), (rv === 'D' ? 10 : 30) * 1.852)) : rv === 'F' ? `${BLANK} (1 min after the tanker's TOC)` : 'NA';
     const arcp = cor ? fmtLL(corCp) : rv === 'E' ? anchor : ['B', 'C', 'G', 'D'].includes(rv) && trk ? fmtLL(trk.pts[0]) : 'NA';
-    const start = 15 + i * 5, card = [['RV TYPE', RV_EN[rv], 'EMCON', '1'], ['AAR TIME', totClock(start), 'END AAR', totClock(start + 45)], ['AR ENTRY POINT', cor ? fmtLL(trk.pts[0]) : 'NA', 'AR EXIT POINT', cor ? fmtLL(trk.pts[trk.pts.length - 1]) : 'NA'], ['ANCHOR POINT', anchor, 'ARIP', arip],
+    const start = w.on0, win = aarWin(tk, rs.length, w), endA = Math.min(w.on1, start + 5 + rs.length * win); rs.forEach((r, n) => { r.arct = start + 5 + n * win; r.arWin = win; });
+    if (rs.length && start + 5 + rs.length * 5 > w.on1) warn.push(`${tk.cs}: ${rs.length} receiver × 5' non stanno nel tempo sulla track (H+${w.on0}–H+${w.on1}): aggiungi un tanker o fai una seconda ondata.`);
+    const card = [['RV TYPE', RV_EN[rv], 'EMCON', '1'], ['AAR TIME', totClock(start), 'END AAR', totClock(Math.max(endA, start + 15))], ['AR ENTRY POINT', cor ? fmtLL(trk.pts[0]) : 'NA', 'AR EXIT POINT', cor ? fmtLL(trk.pts[trk.pts.length - 1]) : 'NA'], ['ANCHOR POINT', anchor, 'ARIP', arip],
       ['AAR PATTERN', cor ? `NA – the tanker flies the corridor like an airway (${leg} NM from entry to exit); receivers join en route and follow` : `LENGTH ${leg} NM · WIDTH ${width} NM · TURN LEFT · INB/OUTB ${course}`, '', ''], ['AAR TRK', trk ? trk.name.replace(/^Track /, '') : BLANK, 'ALTN AAR TRK', alts ? alts.id : 'NA'],
       ['ARCP', arcp, 'ARCT', cor ? totClock(start) : rv === 'E' ? `${totClock(start)}, then every 15 min` : ['B', 'C', 'G', 'D'].includes(rv) ? totClock(start) : 'NA'], ['AAR ALT', haar ? `${alt} (tanker) – receivers join ${'low 300 ft below'}` : `${alt} (base AAR altitude) – receivers ${alt.startsWith('FL') ? 'FL' + (+alt.slice(2) - 10) : '1000 ft below'} until visual`, 'AAR SPD', haar ? 'Receivers 115 KIAS (ARIP → ARCP)' : '270 KIAS'],
-      ['AAR FREQ', BLANK, 'AA TAC CHAN', BLANK], ['TANKER C/S', `${tk.cs} (${tk.type}, ${aarSys(tk.type) || 'drogue'})`, '', ''], ...rs.map(r => ['RECEIVERS C/S', `${r.cs} (${r.size} × ${r.type}) – ${stationOf(tk, r)}`, 'OFFLOAD', `≈ ${offloadKg(r) * r.size} kg`]),
+      ['AAR FREQ', BLANK, 'AA TAC CHAN', BLANK], ['TANKER C/S', `${tk.cs} (${tk.type}, ${aarSys(tk.type) || 'drogue'})`, '', ''], ...rs.map(r => ['RECEIVERS C/S', `${r.cs} (${r.size} × ${r.type}) – ${stationOf(tk, r)} – ARCT ${totClock(r.arct)}, window ${r.arWin} min`, 'OFFLOAD', `≈ ${offloadKg(r) * r.size} kg`]),
       ['AAR ABORT', 'NA', 'SPARE', 'NA'], ['RECEIVERS ALTN', [...new Set(rs.map(r => r.base).filter(Boolean))].join(' / ') || BLANK, 'TANK ALTN', tk.base || BLANK], ['AGENCIES', ctl || 'NIL (no GCI on station)', '', ''], ['NOTE', haar ? HAAR_RULES[1] : 'Receivers report fuel state and intentions after AAR in echelon left.', '', '']];
     if (haar) card.splice(5, 0, ['TRAIL DST', '< 2 NM after the turn', 'JOIN-UP', 'LOW (300 ft below) / HIGH (200 ft above)']);
     // phraseology filled with the event callsigns
@@ -2812,11 +2861,12 @@ function applyAAR(t) {
     if (['B', 'C'].includes(rv)) ph.push([`${RV_EN[rv]} – initial call and DF`, [[`${r0.cs}, ${tk.cs}`, `FOR RV ${rv === 'B' ? 'BRAVO' : 'CHARLIE'}, MY LEVEL ${alt}, WHEN CLEARED YOUR LEVEL ${BLANK}, SET AA TACAN ${BLANK}, MODE 3 ${BLANK}, TIMING ${BLANK}`], [`${tk.cs}, ${r0.cs}`, 'READBACK, NOSE COLD, SWITCHES SAFE'], [`${r0.cs}, ${tk.cs}`, 'TRANSMIT FOR DF'], [`${tk.cs}, ${r0.cs}`, 'TRANSMITTING FOR DF'], [`${r0.cs}, ${tk.cs}`, `TURN LEFT HEADING ${BLANK}`]]]);
     ph.push([`Tanker phase – ${boom ? 'BOOM' : 'PROBE AND DROGUE'}`, boom ? [[`${tk.cs}, ${r0.cs}`, 'CLEAR TO JOIN ECHELON LEFT, CONFIRM NOSE COLD, SWITCHES SAFE'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ASTERN'], [`${r0.cs}, ${tk.cs}`, 'ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED CONTACT WET (or DRY)'], [`${tk.cs}, ${r0.cs}`, '30 FT … 20 FT … 10 FT … 5 FT'], [`${r0.cs}, ${tk.cs}`, 'CONTACT'], [`${r0.cs}, ${tk.cs}`, 'REFUELLING COMPLETED, REQUEST DISCONNECT'], [`${tk.cs}, ${r0.cs}`, 'CLEARED TO DISCONNECT, REPORT ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ECHELON RIGHT'], [`${r0.cs}, ${tk.cs}`, 'ECHELON RIGHT, READY TO LEAVE'], [`${tk.cs}, ${r0.cs}`, `OFFLOAD ${BLANK} KG, CLEAR TO LEAVE, 1000 FT HIGHER${gc ? `, CONTACT ${gc} ON ${BLANK}` : ''}`]]
       : [[`${tk.cs}, ${r0.cs}`, `CLEAR TO JOIN ECHELON LEFT, ${st.split(' (')[0]} IN USE, CONFIRM NOSE COLD, SWITCHES SAFE`], [`${r0.cs}, ${tk.cs}`, 'ECHELON LEFT, REQUEST CONTACT WET'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ASTERN'], [`${r0.cs}, ${tk.cs}`, 'ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED CONTACT WET'], [`${r0.cs}, ${tk.cs}`, 'REFUELLING COMPLETED'], [`${tk.cs}, ${r0.cs}`, 'CLEARED TO DISCONNECT, REPORT ASTERN'], [`${tk.cs}, ${r0.cs}`, 'CLEARED ECHELON RIGHT'], [`${r0.cs}, ${tk.cs}`, 'ECHELON RIGHT, READY TO LEAVE'], [`${tk.cs}, ${r0.cs}`, `OFFLOAD ${BLANK} KG, CLEAR TO LEAVE${gc ? `, CONTACT ${gc} ON ${BLANK}` : ''}`]]]);
-    return { tanker: tk.cs, haar, rv, alt, card, cor, how: RV_HOW[rv] || [], ph, receivers: rs.map(r => r.cs), track: trk ? trk.name : '' }; });
+    return { tanker: tk.cs, tid: tk.id, haar, rv, alt, card, cor, how: RV_HOW[rv] || [], ph, receivers: rs.map(r => r.cs), rcv: rs.map(r => ({ cs: r.cs, arct: r.arct, win: r.arWin })), win, track: trk ? trk.name : '' }; });
   t.aar = { cards, emcon: 1, rules: AAR_RULES, haarRules: cards.some(c => c.haar) ? HAAR_RULES : [] };
   const sp = t.spins || (t.spins = []);
-  cards.forEach(c => sp.push(`${c.tanker}: ${RV_EN[c.rv]}, ${c.alt}${c.receivers.length ? ', receivers ' + c.receivers.join(', ') : ''} – AAR card in the AAR pack.`));
-  sp.push(`${EMCON_EN[1]}. MARSA inside each AAR formation; altimeter 1013.2 hPa above the transition altitude; receivers 1000 ft below the tanker until visual; at least 3000 ft between formations sharing a pattern.`);
+  for (let i = sp.length - 1; i >= 0; i--) if (/AAR card in the AAR pack\.$|^EMCON .*MARSA inside each AAR formation/.test(sp[i]) || / – AAR card in the AAR pack\./.test(sp[i])) sp.splice(i, 1); // re-applied: no duplicates
+  cards.forEach(c => sp.push(`${c.tanker}: ${RV_EN[c.rv]}, ${c.alt}${c.rcv.length ? `, receivers ${c.rcv.map(r => `${r.cs} ARCT ${totClock(r.arct)}`).join(', ')} (${c.win} min each)` : ''} – AAR card in the AAR pack.`));
+  sp.push(`${EMCON_EN[1]}. MARSA inside each AAR formation; altimeter 1013.2 hPa above the transition altitude; receivers 1000 ft below the tanker until visual; at least 5000 ft between tankers sharing a track. Receivers keep to their ARCT and window: leave the tanker at the end of the window.`);
 }
 function tailor() {
   const { flights, unknown } = buildFlights();
@@ -2830,7 +2880,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -2839,7 +2889,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -3492,6 +3542,21 @@ function renderCas() {
     ${J.tasks.map(T => casPreview(J, T, t)).join('')}</div>`).join('')}
   ${casDone().ok ? `<div class="row" style="margin-top:6px"><button class="b primary shrink" data-jpack="ALL">Scarica JTAC pack (tutti)</button></div>` : `<p class="muted" style="font-size:12px">JTAC pack disponibile a scenario completato: ${esc(casDone().why)}.</p>`}`;
 }
+// "Assegnazione missioni" (staff 20 Nov): timeline of the event, CAS passes per flight, AAR windows; automatic proposal, every choice changeable
+function asgHtml(t) { const w = tl(), cas = t.flights.filter(f => f.task === 'CAS'), num = (k, l, mx = 600) => `<div style="max-width:118px"><label>${l}</label><input data-tl="${k}" type="number" min="0" max="${mx}" value="${w[k]}"></div>`;
+  let h = `<div class="card" style="margin:10px 0"><b>Assegnazione missioni</b><p class="muted" style="margin:2px 0 6px;font-size:12px">Le missioni preparate prima delle iscrizioni vengono assegnate ai flight: l'app propone, tu cambi quello che vuoi. Gli scenari non assegnati restano nella libreria ma non entrano nei documenti.</p>
+  <div class="tgrid">${num('dur', 'Durata evento (min)')}${num('dep', 'Partenza (min)')}${num('tr', 'Trasferimento (min)')}${num('ret', 'Rientro (min)')}${num('land', 'Atterraggio e parcheggio (min)')}</div>
+  <div class="muted" style="font-size:12px;margin-top:4px">In area / sulla track: <b>H+${w.on0} → H+${w.on1}</b> (${Math.max(0, w.on1 - w.on0)} min)${w.on1 - w.on0 < 20 ? ' – <span style="color:#b45309">troppo poco tempo in area</span>' : ''}</div>`;
+  if (cas.length && S.cas) { const opts = (f, k) => { const rw = !!isHelo(f), cur = (f.casTasks || [])[k] || '';
+      const o = S.cas.jtacs.map(J => `<optgroup label="${esc(J.cs)}">${J.tasks.filter(T => !!T.rw === rw && !T.reOf || T.id === cur).map(T => { const by = t.flights.find(g => g !== f && (g.casTasks || []).includes(T.id)), tg = J.targets.find(x => x.id === T.target);
+        return `<option value="${T.id}" ${T.id === cur ? 'selected' : ''}>${T.id}${T.reOf ? ' (re-attack)' : ''} · ${esc(tg ? tg.desc.slice(0, 28) : T.target)}${by ? ' → ' + esc(by.cs) : ''}</option>`; }).join('')}</optgroup>`).join('');
+      return `<select data-asgt="${f.id}:${k}" style="max-width:260px">${o}${k ? `<option value="RE">↻ Re-attack: stesso bersaglio della passata ${k}</option>` : ''}</select>`; };
+    h += `<h3 style="margin:10px 0 4px">CAS</h3><table><tr><th>Flight</th><th>Passate</th><th>Scenari (in ordine) · TOT</th></tr>${cas.map(f => `<tr><td><b>${esc(f.cs)}</b><br><span class="muted" style="font-size:11px">${f.size} × ${esc(f.type)}</span></td>
+      <td style="width:70px"><input data-asgp="${f.id}" type="number" min="1" max="6" value="${f.passes || 1}"></td>
+      <td>${(f.casTasks || []).map((id, k) => { const h2 = casTaskById(id); return `<div style="display:flex;gap:6px;align-items:center;margin:2px 0"><span class="muted" style="font-size:11px">${k + 1}.</span>${opts(f, k)}<span style="font-size:12px">${h2 ? `${esc(h2[0].cs)} · TOT H+${h2[1].tot}` : ''}</span></div>`; }).join('')}</td></tr>`).join('')}</table>
+    ${S.cas.jtacs.filter(J => J.timeWarn).map(J => `<div class="warn" style="font-size:12px">${esc(J.timeWarn)}</div>`).join('')}
+    <div class="muted" style="font-size:12px">${S.cas.jtacs.map(J => `${esc(J.cs)}: ${J.tasks.filter(T => casFlight(T)).length} passate assegnate, ${J.tasks.filter(T => !casFlight(T) && !T.reOf).length} scenari di riserva`).join(' · ')}</div>`; }
+  return h + (typeof aarAsgHtml === 'function' ? aarAsgHtml(t) : '') + '</div>'; }
 function renderTailor() {
   if (!GEN()) return `<h2>Fase 3 · Adattamento</h2><div class="warn">Prima genera lo scenario generico (fase 1).</div>`;
   const t = S.t;
@@ -3504,10 +3569,11 @@ function renderTailor() {
   if (!t) return h;
   { const wantCas = reqTasks().includes('CAS') && !offT('CAS'), hasCas = t.flights.some(f => f.task === 'CAS');
     const asg = S.cas ? S.cas.jtacs.reduce((a, J) => a + J.tasks.filter(T => casFlight(T)).length, 0) : 0;
-    if (S.cas && hasCas && asg) h += `<div class="ok">CAS: ${asg} flight assegnati agli scenari dei JTAC. Le 9-line sono nella linguetta <button class="b sm" data-tab="cas">CAS / JTAC</button></div>`;
+    if (S.cas && hasCas && asg) h += `<div class="ok">CAS: ${t.flights.filter(f => f.task === 'CAS').length} flight, ${asg} passate assegnate agli scenari dei JTAC (vedi Assegnazione missioni qui sotto). Le 9-line sono nella linguetta <button class="b sm" data-tab="cas">CAS / JTAC</button></div>`;
     else if (hasCas) h += `<div class="warn">Ci sono flight CAS ma non sono ancora assegnati agli scenari: premi <b>Ri-adatta da zero</b>.</div>`;
     else if (wantCas) h += `<div class="warn">L'evento prevede CAS ma nessun flight ha il task CAS: assegnalo nella tabella dei flight (colonna Task) e poi premi "Rigenera minacce dai task".</div>`; }
   h += t.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join('') || '<div class="ok">Tutte le categorie hanno una risposta disponibile.</div>';
+  h += asgHtml(t);
   h += aspIssuesHtml();
   h += `<div class="card" style="font-size:12.5px"><b>Revisione:</b> ${esc(revLabel())}${curRev() ? ' del ' + esc(curRev().date) : ''}. Quando il tabellone è definitivo emetti una nuova revisione nella scheda Export: il masterplan riporterà lo storico.</div>`;
   h += `<h2>Flight BLUE (${t.flights.length})</h2><table><tr><th>Callsign</th><th>Tipo</th><th>#</th><th>Base</th><th>Task</th><th>Freq</th></tr>
@@ -3653,12 +3719,22 @@ document.addEventListener('change', e => {
     J[f] = f === 'night' ? t.checked : f === 'wheelR' ? Math.max(2, Math.min(15, +t.value || 5)) : t.value; if (f === 'wheelR') J.wheelRMan = true; if (['hold', 'ref'].includes(f)) J.holdMan = true; if (['hold', 'ref', 'wheelR'].includes(f)) casDeconf(J);
     if (['cs', 'freq', 'controller'].includes(f)) syncCasC2(S.t); save(); if (f !== 'cs' && f !== 'freq' && f !== 'controller') renderPanel(); drawMap(); return; }
   if (t.dataset.kh && S.cas) { const [jid, kid] = t.dataset.kh.split(':'), J = S.cas.jtacs.find(x => x.id === jid); if (!J) return; casNorm(J); (J.kh[kid] = J.kh[kid] || {}).rot = ((Math.round(+t.value) || 0) % 360 + 360) % 360; casDeconf(J); save(); renderPanel(); drawMap(); return; }
+  if (t.dataset.aartrk && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aartrk); if (f) { f.trkSel = t.value || ''; asgApply(); } return; }
+  if (t.dataset.aarwin && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarwin); if (f) { f.win = t.value === '' ? '' : Math.max(3, Math.min(30, Math.round(+t.value))); asgApply(); } return; }
+  if (t.dataset.aarrcv && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarrcv); if (f) { f.tanker = t.value; f.tankerMan = true; asgApply(); } return; }
+  if (t.dataset.tl && S.t) { S.meta.tl = Object.assign({}, S.meta.tl || {}, { [t.dataset.tl]: Math.max(0, Math.round(+t.value || 0)) }); asgApply(); return; }
+  if (t.dataset.asgp && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.asgp); if (f) { f.passes = Math.max(1, Math.min(6, Math.round(+t.value || 1))); asgApply(); } return; }
+  if (t.dataset.asgt && S.t) { const [fid, ks] = t.dataset.asgt.split(':'), k = +ks, f = S.t.flights.find(x => x.id === fid), v = t.value; if (!f) return; f.casTasks = f.casTasks || [];
+    if (v === 'RE') { const prev = casTaskById(f.casTasks[k - 1]); if (prev) { const base = prev[1].reOf ? casTaskById(prev[1].reOf) : prev; const T = casReattack(base[0], base[1]); f.casTasks[k] = T.id; } }
+    else { const other = S.t.flights.find(g => g !== f && (g.casTasks || []).includes(v)); if (other) { const i2 = other.casTasks.indexOf(v), mine = f.casTasks[k], hm = mine && casTaskById(mine); // swap with the flight that had it
+        if (hm && !!hm[1].rw === !!isHelo(other)) other.casTasks[i2] = mine; else other.casTasks.splice(i2, 1); } f.casTasks[k] = v; }
+    asgApply(); return; }
   if (t.dataset.casf && S.cas) { const [jid, fi] = t.dataset.casf.split(':'), J = S.cas.jtacs.find(x => x.id === jid), x = J && J.friendlies[+fi]; if (x) { x[t.dataset.cf] = t.value; save(); renderPanel(); } return; }
   if (t.dataset.cast && S.cas) { const [jid, tid] = t.dataset.cast.split(':'); const J = S.cas.jtacs.find(x => x.id === jid), x = J && J.targets.find(y => y.id === tid); if (x) { x[t.dataset.cf] = t.value; save(); } return; }
   if (t.dataset.cask && S.cas) { const [jid, i] = t.dataset.cask.split(':'); const J = S.cas.jtacs.find(x => x.id === jid), T = J && J.tasks[+i]; if (!T) return; const f = t.dataset.cf;
     if (/^egr/.test(f)) { const e = T.egr = T.egr || {}, v = t.value; if (f === 'egrTo') { e.to = v; if (v === 'PT' && !e.pt) e.pt = casEgress(J, T).pos; } if (f === 'egrTurn') e.turn = v; if (f === 'egrBlock') e.block = v.trim(); if (f === 'egrName') e.name = v.trim().toUpperCase();
       save(); if (f !== 'egrName' && f !== 'egrBlock') renderPanel(); drawMap(); return; }
-    T[f] = ['control', 'tot'].includes(f) ? +t.value : t.value; if (f === 'wpn') T.wpnMan = true; if (f === 'block') { T.blockMan = !!t.value; if (!t.value) { T.above = 'x'; casDeconf(J); } } if (f === 'method' && t.value === 'BOC') { T.control = Math.max(2, T.control); const fl = casFlight(T); if (fl) { const w = wpnOf(fl); T.wpn = w.find(x => GPS_WPN.test(x)) || T.wpn; } else if (!T.rw) T.wpn = 'GBU-38'; }
+    T[f] = ['control', 'tot'].includes(f) ? +t.value : t.value; if (f === 'wpn') T.wpnMan = true; if (f === 'tot') T.totMan = true; if (f === 'block') { T.blockMan = !!t.value; if (!t.value) { T.above = 'x'; casDeconf(J); } } if (f === 'method' && t.value === 'BOC') { T.control = Math.max(2, T.control); const fl = casFlight(T); if (fl) { const w = wpnOf(fl); T.wpn = w.find(x => GPS_WPN.test(x)) || T.wpn; } else if (!T.rw) T.wpn = 'GBU-38'; }
     save(); renderPanel(); drawMap(); return; }
   if (t.dataset.req) { const set = new Set(S.off || []); t.checked ? set.delete(t.dataset.req) : set.add(t.dataset.req); S.off = [...set]; S.c2sel = proposeC2(); save(); renderPanel(); return; }
   if (t.dataset.c2) { const r = c2Sel().find(x => x.id === t.dataset.c2); if (!r) return; const f = t.dataset.f;
@@ -4113,7 +4189,7 @@ async function deckBrief() {
     table(s, ['Scenario', 'CSAR RV', 'SARDOT', 'Assets'], S.pr.csar.map(c => [{ text: c.id, options: { bold: true, color: K.AMBER } }, prLoc(c.rv), `${c.sardot.name}\n${prLoc(c.sardot.pos)}`, [...c.rescort, ...c.rescue].map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join('\n') || '—']), { colW: [1.1, 2.6, 3.0, 2.3], fontSize: 9 }); }
   // CAS (pilot side)
   if (REL().cas && S.cas && mpOn('cas')) { s = slideT(p, 'Close air support – JTACs & control points', 'Check in at the CP; the 9-line comes from the JTAC on frequency');
-    table(s, ['JTAC', 'Freq', 'Control points', 'IP / BP', 'Flights (mission no. · laser codes)'], S.cas.jtacs.map(J => [{ text: J.cs, options: { bold: true, color: K.AMBER } }, J.freq || 'TBD', J.cps.map(c => c.name).join('\n'), J.ips.map(c => c.name).join('\n'),
+    table(s, ['JTAC', 'Freq', 'Control points', 'IP / BP', 'Flights (mission no. · laser codes)'], casDocJtacs().map(J => [{ text: J.cs, options: { bold: true, color: K.AMBER } }, J.freq || 'TBD', J.cps.map(c => c.name).join('\n'), J.ips.map(c => c.name).join('\n'),
       J.tasks.filter(T => T.flight).map(T => `${(t.flights.find(f => f.id === T.flight) || {}).cs} · ${T.missionNo} · ${T.codes.join('/')}`).join('\n') || '—']), { colW: [1.3, 0.9, 1.6, 1.6, 3.6], fontSize: 9 }); }
   // Task allocation (internally: serials)
   chunk(t.serials || [], 4).forEach((rows, i) => {
@@ -4541,7 +4617,8 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     h5(name);
     rich([{ t: 'ICAO: ', f: F.bold }, { t: icao }]);
     const chartUrl = mp.charts ? mp.charts.replace(/\{ICAO\}/g, icao) : '';
-    rich(chartUrl ? [{ t: 'Charts: ', f: F.bold }, { t: chartUrl, link: chartUrl }] : [{ t: 'Charts: ', f: F.bold }, { t: 'current AIP Italia (ENAV), AD 2 ' + icao }]);
+    // staff 20 Nov: ENAV charts exist only for civil / joint aerodromes; military ones -> IVAO Italy military vSOP only
+    if (chartUrl) rich([{ t: 'Charts: ', f: F.bold }, { t: chartUrl, link: chartUrl }]); else if (AIRPORTS[icao][3] !== 'MIL') rich([{ t: 'Charts: ', f: F.bold }, { t: 'current AIP Italia (ENAV), AD 2 ' + icao }]);
     if (AIRPORTS[icao][3] !== 'CIV') rich([{ t: 'SOP & charts: ', f: F.bold }, { t: MIL_SOP, link: MIL_SOP }]);
     if (rwyData[icao]) table([{ h: 'Runway', w: .16 }, { h: 'Length', w: .18 }, { h: 'ILS', w: .22 }, { h: 'CIRCUIT', w: .22 }, { h: 'HEIGHT', w: .22 }], rwyData[icao].map(r => [0, 1, 2, 3, 4].map(i => r[i] || '')), { after: 2 });
     else para('Runway data: see the current AIP charts.', { font: F.ital, size: 8, after: 2 });
@@ -4624,7 +4701,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   if (mpOn('serials') && t && (t.serials || []).length) { h6('Task allocation'); table([{ h: 'No.', w: .1 }, { h: 'Flights', w: .18 }, { h: 'Task', w: .44 }, { h: 'Success criteria', w: .28 }], t.serials.map(r => [{ t: r.id, bold: true }, r.flights.map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join(', '), r.title + ' - ' + r.text, r.success]), { size: 7.5 }); }
   if (mpOn('cas') && REL().cas && S.cas) { h6('Close air support – JTACs, control points and check-in');
     para('Contact the JTAC on its frequency at the control point. Check in with mission number, number and type of aircraft, position and block, ordnance and laser codes, playtime and abort code. The JTAC then passes situation update, game plan and the 9-line briefing; read back lines 4, 6, 8 and the restrictions.');
-    table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], S.cas.jtacs.map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
+    table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], casDocJtacs().map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
     if (t && S.cas.jtacs.some(J => J.tasks.some(T => T.flight))) table([{ h: 'Flight', w: .2 }, { h: 'Mission no.', w: .14 }, { h: 'JTAC', w: .18 }, { h: 'Laser codes', w: .24 }, { h: 'Block', w: .24 }], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [{ t: (t.flights.find(f => f.id === T.flight) || {}).cs || '', bold: true }, T.missionNo, J.cs, T.codes.join(' / '), T.block ? T.block + ' (x1000 ft)' : 'low level'])), { size: 7.5 }); }
   if (mpOn('aib') && REL().aib && S.aib) { const L2 = S.aib.list.filter(sc => sc.flights.length); h6('Aerial firefighting – procedure');
     bullets(['Flight plan VFR, item 18 STS/FFR and OPAREA/ (place of operations); civil-registered aircraft fly as BAT, military aircraft as OAT. Callsigns: CL-415 "CAN" + aircraft number; civil operators the registration + "BAT".', 'Drops only in VMC and daylight, only when cleared by the DOS on TBT. No TBT contact: stay outside the operations area, ask the ATS unit about other AIB traffic, try a radio relay.', 'Report the start of operations to the ATS unit, "operations normal" every 30 minutes, and re-contact it every time you leave the area (e.g. to scoop).']);
@@ -4642,7 +4719,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec('Resources');
   if (mpOn('resources')) {
   const res = ['Mission briefing deck (PowerPoint) – shared before the event'];
-  if (mp.charts) res.push('Charts: ' + mp.charts.replace(/\{ICAO\}/g, '<ICAO>')); else res.push('Charts: current AIP Italia (ENAV)');
+  if (mp.charts) res.push('Charts: ' + mp.charts.replace(/\{ICAO\}/g, '<ICAO>')); else if ([...new Set([...(t ? t.flights.map(f => f.base) : []), ...S.blueBases])].some(i => AIRPORTS[i] && AIRPORTS[i][3] !== 'MIL')) res.push('Charts (civil and joint aerodromes): current AIP Italia (ENAV)');
   res.push('Military vSOPs and airfield charts (vIPI IVAO Italy): ' + MIL_SOP);
   String(mp.resources || '').split('\n').map(s => s.trim()).filter(Boolean).forEach(r => res.push(r));
   for (const r of res) { const m = r.match(/https?:\/\/\S+/); if (m) { const pre = r.slice(0, m.index); rich([{ t: '- ' + pre }, { t: m[0], link: m[0] }]); } else rich([{ t: '- ' + r }]); }
@@ -4725,7 +4802,7 @@ async function exportPrPack(which, btn) {
 async function exportJtacPack(which, btn) {
   if (typeof PDFLib === 'undefined') return toast('Libreria PDF non caricata');
   if (!S.cas) return toast('Nessuno scenario CAS');
-  const jtacs = which === 'ALL' ? S.cas.jtacs : S.cas.jtacs.filter(J => J.id === which); if (!jtacs.length) return;
+  const jtacs = (which === 'ALL' ? casDocJtacs() : casDocJtacs().filter(J => J.id === which)); if (!jtacs.length) return toast('Nessuno scenario assegnato per questo JTAC');
   if (btn) btn.disabled = true; toast('Generazione JTAC pack…');
   try {
     const assets = await mpAssets(), maps = {};
@@ -5144,7 +5221,7 @@ initMap();
 route();
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
