@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **CAS points draggable on the map** (staff 20 Nov): in the CAS tab the IP / BP, CP, ECHO (sector centre), JTAC position, targets and friendly positions are fixed markers. Make them draggable like the other scenario points (existing `drag()` helper), "trascina per spostarlo" tooltip; after the drop: save, redraw the holding / keyhole / run-in / egress, and the texts (9-line, check-in, holding, JTAC pack) use the new positions and distances. Test: moving an IP changes the run-in and the keyhole ALPHA axis.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
