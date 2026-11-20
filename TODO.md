@@ -2,6 +2,7 @@
 
 ## Next build (start only when the staff says "fai la build")
 - [ ] **CAS holding shape not updated on the map** (staff 20 Nov): in the CAS tab, changing the JTAC holding (Racetrack / Figure 8 / Wheel) re-renders the panel but not the map (`data-cas` change handler calls `renderPanel()` without `drawMap()`), so the drawn holding stays the old one until another redraw. Fix: redraw the map after hold changes (and other CAS fields that move things on the map). Test: change J.hold → the holding polyline on the map changes shape.
+- [ ] **CAS holding: Wheel and Keyhole as two separate options** (staff 20 Nov): today "Wheel / keyhole" is one option that draws only the wheel. Split into: **Wheel** = circular orbit around the target area (as today) and **Keyhole** = keyhole template drawn on the map: centred on the target, attack axis from the IP to the target, points A–H clockwise from north around the target and distance rings; holding given as point + distance (e.g. "HOLD DELTA 8"). Update map drawing, holding text in the 9-line / check-in / game plan, JTAC pack, staff select labels (AA bassa for both). Test: both options draw different shapes and texts.
 - Still open with the staff: list of variants for the other event types (implemented: ID QRA/CAP + target FAST/SMI, AEW CAP/QRA, AAR RV types, HAAR RV types, CAS JTAC/FAC(A), CSAR land/sea + day/night, SEAD fixed/mobile + planned/dynamic).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
