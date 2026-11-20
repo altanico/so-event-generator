@@ -9,7 +9,7 @@ await page.click('#tabcas'); await page.waitForTimeout(300);
 const r=await page.evaluate(()=>{ const o={}; const rec=[]; const om=L.marker; L.marker=(p,opt)=>{ const m=om(p,opt); m._h={}; m.on=(ev,fn)=>{ m._h[ev]=fn; return m; }; rec.push({p,opt,m}); return m; };
   drawMap(); L.marker=om; const J=APP.S.cas.jtacs[0], T=J.tasks.find(x=>!x.rw), ip=J.ips.find(x=>x.name===T.ip);
   const find=pos=>rec.find(x=>x.p===pos); o.missing=[['ECHO',J.echo],['JTAC',J.jtacPos],['IP',ip.pos],['CP',J.cps[0].pos],['TGT',J.targets[0].pos],...J.friendlies.map(f=>['FR',f.pos])].filter(([n,p])=>{ const x=find(p); return !x||!x.opt.draggable||!x.m._h.dragend; }).map(x=>x[0]);
-  J.hold='WHEEL'; J.ref='KEYHOLE'; const h0=APP.casHold(J,T);
+  J.holdMan=true; J.hold='WHEEL'; J.ref='KEYHOLE'; const h0=APP.casHold(J,T);
   const mIp=find(ip.pos); const np=[ip.pos[0]+0.15, ip.pos[1]-0.2]; mIp.m._h.dragend({ target:{ getLatLng:()=>({lat:np[0],lng:np[1]}) } });
   const J2=APP.S.cas.jtacs[0], ip2=J2.ips.find(x=>x.name===T.ip); o.moved=Math.abs(ip2.pos[0]-np[0])<1e-4; o.h1=APP.casHold(J2,J2.tasks.find(x=>x.id===T.id)); o.h0=h0; o.man=!!ip2.man;
   return o; });

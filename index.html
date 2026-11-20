@@ -824,6 +824,7 @@ function containmentIssues() {
     S.t.objectives.filter(o => o.type !== 'ALIFT' && o.type !== 'WATER').forEach(o => chk(`${o.id} ${o.name}`, o.pos));
     S.t.airspace.filter(a => SNAP_AST.includes(a.type) && !a.pub).forEach(a => a.pts.forEach((p, i) => chk(`${a.name}${a.pts.length > 1 ? ' #' + (i + 1) : ''}`, p, a.alt)));
   }
+  if (S.cas && REL().cas) S.cas.jtacs.forEach(J => { if (J.tasks.some(T => !T.rw) && !holdInside(J)) out.push(`Holding ${J.cs}: fuori dalle zone riservate`); });
   return out;
 }
 function fitAirspace(t) { // CAP / tracks / orbits: keep them in a reserved area whose vertical limits contain their altitude
@@ -1625,9 +1626,10 @@ const CAS_FMARK = ['VS-17 orange panels', 'IR strobe', 'none', 'orange smoke on 
 const CAS_WPN = { // ordnance by aircraft type (first = default)
   'F-35A': ['GBU-12', 'GBU-31', 'GBU-32'], 'F-15C': ['20 mm gun'], 'F-22': ['GBU-32', '20 mm gun'], 'Gripen': ['GBU-12', '27 mm gun'], 'MB-339': ['gun pods', '2.75 in rockets'], 'F-104': ['20 mm gun'], 'F-35B': ['GBU-12', 'GBU-32'], 'EF-2000 Typhoon': ['GBU-16', 'Paveway IV'], 'Tornado IDS': ['GBU-16', 'GBU-32'], 'F-16': ['GBU-12', 'GBU-38'], 'F/A-18': ['GBU-12', 'GBU-38'], 'F-15E': ['GBU-12', 'GBU-38'], 'Rafale': ['GBU-12', 'AASM'],
   'AMX': ['GBU-12', 'Mk-82'], 'A-10': ['GBU-12', 'GBU-38', 'AGM-65 Maverick', '30 mm gun'], 'AV-8B Harrier': ['GBU-12', 'GBU-38'], 'M-346': ['GBU-12', 'Mk-82'],
-  'AH-129 Mangusta': ['Spike ER', '70 mm rockets', '20 mm gun'], 'AH-64 Apache': ['AGM-114 Hellfire', '70 mm rockets', '30 mm gun'],
+  'MQ-9 Reaper': ['GBU-12', 'AGM-114 Hellfire'], 'AH-129 Mangusta': ['Spike ER', '70 mm rockets', '20 mm gun'], 'AH-64 Apache': ['AGM-114 Hellfire', '70 mm rockets', '30 mm gun'],
 };
 const GPS_WPN = /GBU-3[128]|AASM|JDAM|Paveway IV/;
+const wpnChoices = T => { const f = casFlight(T); return f ? wpnOf(f) : [...new Set([...Object.entries(CAS_WPN).filter(([k]) => !!isHelo({ type: k }) === !!T.rw).flatMap(([, v]) => v), ...(T.rw ? ['70 mm rockets', 'gun'] : ['GBU-12', 'Mk-82'])])]; };
 const NATO = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO', 'FOXTROT', 'GOLF', 'HOTEL', 'INDIA', 'JULIETT', 'KILO', 'LIMA', 'MIKE', 'NOVEMBER', 'OSCAR', 'PAPA', 'QUEBEC', 'ROMEO', 'SIERRA', 'TANGO', 'UNIFORM', 'VICTOR', 'WHISKEY', 'XRAY', 'YANKEE', 'ZULU'];
 const CARD8 = ['NORTH', 'NORTH-EAST', 'EAST', 'SOUTH-EAST', 'SOUTH', 'SOUTH-WEST', 'WEST', 'NORTH-WEST'];
 const card8 = b => CARD8[Math.round(((b % 360) + 360) % 360 / 45) % 8];
@@ -1680,7 +1682,7 @@ function casSlot(J, k, rw, g, used, uniq) {
   J.ips.push(ip);
   const boc = !rw && k % 2 === 1, n = J.tasks.length;
   J.tasks.push({ id: `${J.id}S${n + 1}`, flight: null, rw, target: tgt.id, ip: ip.name, control: boc ? 2 : 1, method: boc ? 'BOC' : 'BOT', wpn: rw ? 'AGM-114 Hellfire' : boc ? 'GBU-38' : 'GBU-12',
-    fuze: 'INSTANTANEOUS', mark: J.night ? 'IR' : boc ? 'NONE' : 'LASER', seq: '', spacing: 30, tot: 18 + n * 8 + (+J.id.slice(1) - 1) * 2,
+    fuze: 'INSTANTANEOUS', mark: 'NONE', seq: '', spacing: 30, tot: 18 + n * 8 + (+J.id.slice(1) - 1) * 2,
     block: rw ? '' : `${10 + 3 * n}-${12 + 3 * n}`, missionNo: '', codes: [], playtime: 30, abort: abortTxt() });
 }
 function genCAS() {
@@ -1697,7 +1699,7 @@ function genCAS() {
       ips: [], targets: [], tasks: [], hold: threat === 'HIGH' ? 'RACETRACK' : 'WHEEL' };
     for (let k = 0; k < per; k++) casSlot(J, k, rwShare > 0 && (k + 1) % Math.round(100 / rwShare) === 0, g, used, uniq);
     const fr = shuffle(CAS_FRIEND);
-    J.friendlies = J.targets.slice(0, 3).map((tg, k) => ({ desc: fr[k % fr.length], mark: pick(CAS_FMARK), pos: snapRes(dest(tg.pos, g.dir + (Math.random() * 80 - 40), 0.4 + Math.random() * 1.1)) }));
+    J.friendlies = J.targets.slice(0, 3).map((tg, k) => ({ desc: fr[k % fr.length], mark: 'none', pos: snapRes(dest(tg.pos, g.dir + (Math.random() * 80 - 40), 0.4 + Math.random() * 1.1)) }));
     J.jtacPos = J.friendlies.length ? snapRes(dest(J.friendlies[0].pos, g.dir, 0.25)) : echo;
     jtacs.push(J);
   }
@@ -1724,8 +1726,7 @@ function assignCAS(t) {
   all().forEach(([J, T]) => { const f = casFlight(T); if (!f) return;
     const w = wpnOf(f), gps = w.find(x => GPS_WPN.test(x)), laser = w.find(x => /GBU-1[26]|Paveway|Hellfire|Spike/.test(x));
     if (T.method === 'BOC' && !gps) { T.method = 'BOT'; T.control = 1; }
-    T.wpn = T.method === 'BOC' ? gps : (laser || w[0]);
-    if (T.mark === 'LASER' && !laser) T.mark = J.night ? 'IR' : 'WP';
+    if (!(T.wpnMan && w.includes(T.wpn))) { T.wpnMan = false; T.wpn = T.method === 'BOC' ? gps : (laser || w[0]); }
     T.seq = f.size > 1 ? (T.seq || (laser ? 'SHOOTER-SPIKER' : 'SHOOTER-SHOOTER')) : '';
     const base = T.codes[0] ? T.codes[0].slice(0, 3) : '151'; T.codes = Array.from({ length: f.size }, (_, n) => `${base}${n + 1}`); });
 }
@@ -1792,14 +1793,15 @@ function casCheckIn(J, T) {
   return [`${J.cs}, THIS IS ${f ? f.cs : '[CALLSIGN]'}`, `MISSION NUMBER ${T.missionNo}`, `${nm} ${f ? f.type : (T.rw ? '[HELICOPTER TYPE]' : '[AIRCRAFT TYPE]')}, POSITION ${T.rw ? T.ip : cp.name}, ${T.block ? 'BLOCK ' + T.block : 'LOW LEVEL'}`,
     `WITH ${f ? wpnOf(f).slice(0, 2).join(' AND ') : '[ORDNANCE]'}, LASER CODE ${T.codes.join(' / ') || '[CODES]'}`, `${T.playtime} MINUTES PLAYTIME`, T.abort];
 }
+const patTxt = J => J.hold === 'FIGURE8' ? `FIGURE EIGHT, ${holdLeg(J)} MILE LEGS, ${axisTxt(J)}` : `RACETRACK, ${holdLeg(J)} MILE LEGS, ${axisTxt(J)}${J.hTurn === 'LEFT' ? ', LEFT TURNS' : ''}`;
 function casHold(J, T) { casNorm(J);
   if (T.rw) return `HOLD AT ${T.ip}, 200 FEET AGL, REMAIN BEHIND THE FRIENDLY LINE`;
   const ab = T.above ? `, ABOVE THE ${T.above.toUpperCase()} THREAT` : '', ip = casIP(J, T);
   if (J.ref === 'KEYHOLE') { const an = holdAnchor(J, T), k = an.k, kh = `KEYHOLE, ECHO IS ${casLoc(k.E)}${k.rot ? `, ALPHA AXIS ${magHdg(k.rot)}` : ''}`;
     return J.hold === 'WHEEL' ? `${kh}, WHEEL ORBIT ${wheelR(J)} MILES AROUND ECHO, IP ${khLabel(k, ip.pos)}, BLOCK ${T.block}${ab}`
-      : `${kh}, HOLD ${an.label}, ${J.hold === 'FIGURE8' ? 'FIGURE EIGHT' : 'RACETRACK'}, 10 MILE LEGS, BLOCK ${T.block}${ab}`; }
+      : `${kh}, HOLD ${an.label}, ${patTxt(J)}, BLOCK ${T.block}${ab}`; }
   if (J.hold === 'WHEEL') return `WHEEL ORBIT ${wheelR(J)} MILES AROUND ECHO POINT ${casLoc(J.echo)}, BLOCK ${T.block}${ab}`;
-  return `HOLD ${J.cps[0].name}, ${J.hold === 'FIGURE8' ? 'FIGURE EIGHT' : 'RACETRACK'}, 10 MILE LEGS, BLOCK ${T.block}${ab}`;
+  return `HOLD ${J.cps[0].name}, ${patTxt(J)}, BLOCK ${T.block}${ab}`;
 }
 function casSitUpdate(J, t) {
   const aa = casAA(J.echo, t);
@@ -1839,6 +1841,10 @@ const khPt = (k, L, nm) => dest(k.E, (k.rot + 90 * KH_L.indexOf(L)) % 360, nm * 
 function khLabel(k, pos) { const b = bearing(k.E, pos), d = Math.max(1, Math.round(dist(k.E, pos) / NMK)), rel = ((b - k.rot) % 360 + 360) % 360, i = Math.round(rel / 90) % 4, off = Math.abs(((rel - 90 * i) + 540) % 360 - 180);
   return off <= 20 ? `${KH_L[i]}${d}` : `${magHdg(b)}/${d}`; }
 const keyhole = J => khGroups(J)[0];
+// racetrack / figure 8 orientation (staff 20 Nov): J.hAxis = long axis (true, default parallel to the front), J.hMan = set by hand; J.hTurn RIGHT (standard) / LEFT; J.hLeg = leg length NM
+const holdAxis = J => J.hAxis != null && J.hAxis !== '' ? ((+J.hAxis % 360) + 360) % 360 : ((geom().dir + 90) % 360 + 360) % 360;
+const holdLeg = J => +J.hLeg || 10;
+const axisTxt = J => { const a = [magHdg(holdAxis(J)), magHdg(holdAxis(J) + 180)].sort(); return `AXIS ${a[0]}/${a[1]}`; };
 const wheelR = J => +J.wheelR || 5;
 function holdAnchor(J, T, hold = J.hold, ref = J.ref) { // where the holding of a fixed-wing task is
   if (ref === 'KEYHOLE') { const k = khOfTask(J, T); if (hold === 'WHEEL') return { pos: k.E, k };
@@ -1847,11 +1853,11 @@ function holdAnchor(J, T, hold = J.hold, ref = J.ref) { // where the holding of 
   return hold === 'WHEEL' ? { pos: J.echo } : { pos: J.cps[0].pos, label: J.cps[0].name }; }
 const casIP = (J, T) => J.ips.find(x => x.name === T.ip) || J.ips[0];
 function casHoldShape(J, hold = J.hold, ref = J.ref) { // closed polyline(s) of the holding patterns of the fixed-wing tasks
-  casNorm(J); const g = geom(), ax = g.dir + 90, out = [], seen = new Set(), loc = (c, x, y) => dest(dest(c, ax, x), ax + 90, y);
+  casNorm(J); const ax = holdAxis(J), leg = holdLeg(J), out = [], seen = new Set(), loc = (c, x, y) => dest(dest(c, ax, x), ax + 90, y);
   const fw = J.tasks.filter(T => !T.rw); (fw.length ? fw : [J.tasks[0] || {}]).forEach(T => { const an = holdAnchor(J, T, hold, ref), key = an.pos.map(v => v.toFixed(3)).join(); if (seen.has(key)) return; seen.add(key); const c = an.pos;
     if (hold === 'WHEEL') { const pts = []; for (let a = 0; a <= 360; a += 10) pts.push(dest(c, a, wheelR(J) * NMK)); out.push(pts); }
-    else if (hold === 'FIGURE8') { const a = 5 * NMK, pts = []; for (let k = 0; k <= 72; k++) { const t = k / 72 * 2 * Math.PI; pts.push(loc(c, a * Math.cos(t), a * Math.sin(t) * Math.cos(t))); } out.push(pts); }
-    else { const L = 5 * NMK, r = 3 * NMK, pts = []; // racetrack: 10 NM legs, 3 NM turn radius, legs parallel to the front
+    else if (hold === 'FIGURE8') { const a = leg / 2 * NMK, pts = []; for (let k = 0; k <= 72; k++) { const t = k / 72 * 2 * Math.PI; pts.push(loc(c, a * Math.cos(t), a * Math.sin(t) * Math.cos(t))); } out.push(pts); }
+    else { const L = leg / 2 * NMK, r = 3 * NMK, pts = []; // racetrack: legs of holdLeg NM (default 10), 3 NM turn radius, axis holdAxis (default parallel to the front)
       for (let a = -90; a <= 90; a += 10) pts.push(loc(c, L + r * Math.cos(a * Math.PI / 180), r * Math.sin(a * Math.PI / 180)));
       for (let a = 90; a <= 270; a += 10) pts.push(loc(c, -L + r * Math.cos(a * Math.PI / 180), r * Math.sin(a * Math.PI / 180)));
       pts.push(pts[0]); out.push(pts); } });
@@ -1888,11 +1894,50 @@ function casDeconf(J) { casNorm(J); J.holdWarn = ''; const chk = casHoldCheck(J,
     const was = `${HOLD_IT[J.hold]}${J.ref === 'KEYHOLE' ? ' (keyhole)' : ''}`;
     if (alt) { J.holdWarn = `${was} non proponibile: ${chk.reason} – holding passata a ${HOLD_IT[alt[1]].toLowerCase()}${alt[0] === 'KEYHOLE' ? ' (keyhole)' : ' sul CP'}`; [J.ref, J.hold] = alt; }
     else J.holdWarn = `${was}: ${chk.reason} – nessuna holding fuori dalla minaccia, controlla a mano`; }
-  casWheelIPs(J);
-  const c = casHoldCheck(J, J.hold); let i = 0;
-  J.tasks.forEach((T, n) => { if (T.rw) return; const k = i++;
-    if (c.ok && c.floor) { T.above = `${c.what} (${c.ceil} ft)`; if (!T.blockMan) T.block = `${c.floor + 3 * k}-${c.floor + 2 + 3 * k}`; }
-    else { if (T.above && !T.blockMan) T.block = `${10 + 3 * n}-${12 + 3 * n}`; T.above = ''; } }); }
+  casWheelIPs(J); casBlocks(J);
+  for (let k = 0; k < 3; k++) { casFit(J); casWheelIPs(J); casBlocks(J); if (J.fitWarn || holdInside(J)) break; } // the blocks depend on the threats under the holding: fit again if they changed
+  if (J.fitWarn && !J.holdMan) { const keep = { hold: J.hold, ref: J.ref, warn: J.fitWarn, cp: J.cps[0].pos, ax: J.hAxis, leg: J.hLeg, r: J.wheelR, res: S.reserved }; // holding chosen by the generator: try the other shapes before giving up
+    for (const [r, h] of [['CP', 'RACETRACK'], ['CP', 'FIGURE8'], [J.ref, 'RACETRACK'], [J.ref, 'FIGURE8']]) { if ((r === keep.ref && h === keep.hold) || !casHoldCheck(J, h, r).ok) continue;
+      J.ref = r; J.hold = h; casWheelIPs(J); casBlocks(J); casFit(J); casWheelIPs(J); casBlocks(J); if (!J.fitWarn && holdInside(J)) { J.holdWarn = `${HOLD_IT[keep.hold]} non entra nelle aree riservate – holding passata a ${HOLD_IT[h].toLowerCase()}`; break; } }
+    if (J.fitWarn || !holdInside(J)) { Object.assign(J, { hold: keep.hold, ref: keep.ref, hAxis: keep.ax, hLeg: keep.leg, wheelR: keep.r, holdWarn: '' }); S.reserved = keep.res;
+      casSetPt(J.cps[0], keep.cp, 'CP ' + J.cps[0].name); casWheelIPs(J); casBlocks(J); J.fitWarn = holdInside(J) ? '' : keep.warn; } }
+  if (!J.fitWarn && !holdInside(J)) { const b = holdBand(J); J.fitWarn = `Holding ${J.cs}: non entra nelle aree riservate${b ? ` con i blocchi FL${b[0]}–FL${b[1]}` : ''} – sistemala a mano o riserva un'area che copra quelle quote vicino al CP`; } }
+// blocks: 2000 ft thick, 1000 ft apart, from 10000 ft or from the threat ceiling + 2000 ft; only flights holding at the same time are stacked
+// (TOTs less than 25 min apart), so a long sequence reuses the lower blocks instead of climbing forever
+function casBlocks(J) { const c = casHoldCheck(J, J.hold), base = c.ok && c.floor ? c.floor : 10, fw = J.tasks.filter(T => !T.rw).sort((a, b) => a.tot - b.tot), used = [];
+  fw.forEach(T => { T.above = c.ok && c.floor ? `${c.what} (${c.ceil} ft)` : '';
+    const busy = new Set(used.filter(u => Math.abs(u.tot - T.tot) < 25).map(u => u.k)); let k = 0; while (busy.has(k)) k++;
+    if (!T.blockMan) T.block = `${base + 3 * k}-${base + 2 + 3 * k}`; used.push({ tot: T.tot, k: T.blockMan ? -1 : k }); }); }
+// holdings inside the reserved areas (staff 20 Nov): whole pattern inside areas whose vertical limits contain the blocks;
+// fit order: 1) rotate the axis (15° steps), 2) move the CP anchor, 3) shorter legs 10 -> 8 -> 6 -> 5 NM / wheel radius down to 3 NM; else warning. Hand-set items are never changed.
+function holdBand(J) { const v = J.tasks.filter(T => !T.rw).flatMap(T => String(T.block || '').split('-').map(Number)).filter(x => x > 0); return v.length ? [Math.min(...v) * 10, Math.max(...v) * 10] : null; }
+// vertical coverage by the union of the areas over the point (stacked areas, e.g. FL130-195 + FL195-370, together contain FL140-220)
+function vCovered(zs, a) { const iv = zs.flatMap(z => (z.blocks && z.blocks.length ? z.blocks : [[z.lower, z.upper]]).map(([lo, up]) => [zLo(lo), zLimit(up)])).sort((x, y) => x[0] - y[0]);
+  let top = a[0]; for (const [lo, hi] of iv) { if (lo > top) break; top = Math.max(top, hi); if (top >= a[1]) return true; } return top >= a[1]; }
+function holdInside(J, R = RES()) { if (!R.length) return true; const a = holdBand(J), ok = p => { const zs = R.filter(z => pip(p, z.poly)); return zs.length && (!a || vCovered(zs, a)); };
+  return casHoldShape(J).every(l => l.every(ok)); }
+const CAS_FAIL = new WeakMap();
+function casFit(J) { J.fitWarn = ''; const R = RES(); if (!R.length || !J.tasks.some(T => !T.rw) || holdInside(J, R)) return;
+  const key = JSON.stringify([J.hold, J.ref, J.cps[0].pos, J.hMan ? J.hAxis : 0, J.wheelRMan ? J.wheelR : 0, holdBand(J), S.reserved, J.kh, J.tasks.map(T => T.target), J.targets.map(x => x.pos)]); // a search that already failed is not repeated (drags stay fast)
+  if ((CAS_FAIL.get(J) || new Set()).has(key)) { const b = holdBand(J); J.fitWarn = `Holding ${J.cs}: non entra nelle aree riservate${b ? ` con i blocchi FL${b[0]}–FL${b[1]}` : ''} – sistemala a mano o riserva un'area che copra quelle quote vicino al CP`; return; }
+  const axes = J.hMan || J.hold === 'WHEEL' ? [J.hAxis] : [null, ...Array.from({ length: 11 }, (_, k) => (((geom().dir + 90) + 15 * (k + 1)) % 360 + 360) % 360)];
+  const cpMov = J.ref !== 'KEYHOLE' && J.hold !== 'WHEEL' && !J.cps[0].man, cp = J.cps[0], p0 = cp.pos;
+  const legs = J.hold === 'WHEEL' ? (J.wheelRMan ? [wheelR(J)] : [wheelR(J), 4, 3].filter((v, k, a) => v <= a[0] && a.indexOf(v) === k)) : [10, 8, 6, 5];
+  const ring = c => [c, ...[5, 10, 15, 20, 25].flatMap(r => Array.from({ length: 12 }, (_, k) => dest(c, k * 30, r)))];
+  const search = (R, cands) => { for (const lg of legs) { if (J.hold === 'WHEEL') J.wheelR = lg; else J.hLeg = lg === 10 ? undefined : lg;
+      for (const c of cands) { cp.pos = c; for (const ax of axes) { J.hAxis = ax; if (holdInside(J, R)) { if (c !== p0) casSetPt(cp, [+c[0].toFixed(5), +c[1].toFixed(5)], 'CP ' + cp.name); return true; } } } } cp.pos = p0; return false; };
+  const near60 = c => dist(c, J.echo) <= 60, band0 = holdBand(J); // a CP stays within 60 km of the sector
+  const resRings = () => band0 ? RES().filter(q => q.poly && vCovered([q], band0) && dist(p0, centroid(q.poly)) < 90).flatMap(q => ring(centroid(q.poly))) : [];
+  if (search(R, cpMov ? [...ring(p0), ...resRings()].filter((c, k) => k === 0 || near60(c)) : [p0])) return;
+  // automatic reservation only: add the nearest area that covers the holding blocks (as fitAirspace does for CAPs / orbits)
+  const band = holdBand(J), anc = J.tasks.filter(T => !T.rw).map(T => holdAnchor(J, T).pos)[0] || p0;
+  if (band && !cusLocked() && !manualRes()) { const cand = LIB().filter(q => q.poly && q.type !== 'P' && q.type !== 'COR' && q.type !== 'IND' && lvOk(q) && !(S.reserved || []).includes(q.id) && vCovered([q], band))
+      .map(q => [q, dist(anc, centroid(q.poly))]).filter(x => x[1] < 90).sort((x, y) => x[1] - y[1]).slice(0, 6);
+    for (const [q] of cand) { const before = S.reserved || [], next = fixConfigs([...new Set([...before, q.id])]); if (before.some(id => !next.includes(id))) continue; // never drop an area already reserved
+      S.reserved = next; const R2 = RES();
+      if (search(R2, cpMov ? [...ring(p0), ...ring(centroid(q.poly))].filter((c, k) => k === 0 || near60(c)) : [p0])) return; S.reserved = before; } }
+  cp.pos = p0; J.hAxis = axes[0]; if (J.hold === 'WHEEL') J.wheelR = legs[0]; else J.hLeg = undefined; CAS_FAIL.set(J, (CAS_FAIL.get(J) || new Set()).add(key));
+  const b = holdBand(J); J.fitWarn = `Holding ${J.cs}: non entra nelle aree riservate${b ? ` con i blocchi FL${b[0]}–FL${b[1]}` : ''} – sistemala a mano o riserva un'area che copra quelle quote vicino al CP`; }
 // offset (IVAO CAS manual): side of the IP/BP–target line where the aircraft may manoeuvre (LEFT / RIGHT seen from the IP towards the target)
 function offsetSuggest(J, T) { const tgt = J.targets.find(x => x.id === T.target) || J.targets[0], ip = casIP(J, T), h = bearing(ip.pos, tgt.pos);
   const pts = [...J.friendlies.map(x => x.pos), ...casAA(tgt.pos).map(x => x.pos)].filter(p => dist(p, tgt.pos) < 15).sort((a, b) => dist(a, tgt.pos) - dist(b, tgt.pos));
@@ -2706,7 +2751,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -2715,7 +2760,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t);
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); applyAAR(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -2877,6 +2922,8 @@ function drawMap(fit) {
         drag(add(L.marker(k.E, { draggable: true, icon: icon('#0e7490', 'E', `E ${k.tg.join('/')}`, 'circle', 13) })), p => { meta().pos = p; }).bindTooltip(`Keyhole ${k.tg.join('/')} – punto E, trascina per spostarlo`);
         KH_L.forEach(L0 => { const m = add(L.marker(khPt(k, L0, 12), { draggable: L0 === 'A', icon: icon('#0891b2', L0, L0 === 'A' ? 'A (ruota)' : L0, 'circle', 12) }));
           if (L0 === 'A') drag(m, p => { meta().rot = Math.round(bearing(k.E, p)) % 360; }).bindTooltip('Keyhole – trascina A per ruotare lo schema'); else m.bindTooltip(`Keyhole ${KH_N[L0]}`); }); });
+      if (J.hold !== 'WHEEL' && J.tasks.some(T => !T.rw)) { const an = holdAnchor(J, J.tasks.find(T => !T.rw)).pos;
+        drag(add(L.marker(dest(an, holdAxis(J), (holdLeg(J) / 2 + 3) * NMK), { draggable: true, icon: icon('#0891b2', '↻', '', 'circle', 11) })), p => { J.hAxis = Math.round(bearing(an, p)) % 360; J.hMan = true; }).bindTooltip(`${J.cs} – trascina per ruotare la holding`); }
       J.tasks.forEach(T => { const e = T.egr; if (e && e.to === 'PT' && e.pt) drag(add(L.marker(e.pt, { draggable: true, icon: icon('#16a34a', '⇢', e.name || `EGRESS ${T.id}`, 'circle', 12) })), p => { e.pt = p; }).bindTooltip(`${T.id} punto di egress – trascina per spostarlo`); });
       J.tasks.forEach(T => { const ob = offsetBand(J, T); if (ob) add(L.polygon(ob, { color: '#7c3aed', weight: 1, dashArray: '3 4', fillColor: '#a78bfa', fillOpacity: .18 })).bindTooltip(`${T.id} offset ${T.offset.toLowerCase()} – lato di manovra consentito`); });
       J.tasks.forEach(T => { const a = casAttackGeom(J, T);
@@ -3322,7 +3369,7 @@ function renderCas() {
   const cfg = casCfg(), t = S.t, o = (v, list) => list.map(([k, l]) => `<option value="${k}" ${String(v) === String(k) ? 'selected' : ''}>${esc(l)}</option>`).join('');
   const nT = S.cas.jtacs.reduce((a, J) => a + J.tasks.length, 0), nA = S.cas.jtacs.reduce((a, J) => a + J.tasks.filter(T => casFlight(T)).length, 0);
   return `<h2 id="cas9">CAS / JTAC</h2>
-  <div class="intro">Scenari CAS preparati in anticipo: ogni JTAC ha settore, CP/IP, bersagli e una 9-line pronta per ogni scenario. Il JTAC pack si può dare ai controllori prima dell'evento per fare pratica. Quando arrivano gli iscritti, l'<b>Adattamento</b> assegna i flight CAS agli scenari e completa callsign, armamento e laser code. Le 9-line non compaiono mai nei documenti per i piloti.</div>
+  <div class="intro">Scenari CAS preparati in anticipo: ogni JTAC ha settore, CP/IP, bersagli e una 9-line pronta per ogni scenario. Il JTAC pack si scarica a scenario completato (dopo l'adattamento). Quando arrivano gli iscritti, l'<b>Adattamento</b> assegna i flight CAS agli scenari e completa callsign, armamento e laser code. Le 9-line non compaiono mai nei documenti per i piloti.</div>
   <div class="${nA ? 'ok' : 'muted'}" style="margin:8px 0">${S.cas.jtacs.length} JTAC · ${nT} scenari${t ? ` · ${nA} assegnati a flight` : ' · nessun flight ancora (prima degli iscritti)'}</div>
   <div class="row"><div><label>Numero JTAC</label><input data-casg="nJtac" type="number" min="1" max="8" value="${cfg.nJtac || S.cas.jtacs.length}"></div><div><label>Scenari per JTAC</label><input data-casg="perJ" type="number" min="1" max="8" value="${cfg.perJ}"></div>
   <div><label>Elicotteri</label><select data-casg="rw">${o(cfg.rw, [[0, 'nessuno'], [25, '1 su 4'], [50, '1 su 2'], [100, 'tutti']])}</select></div></div>
@@ -3332,22 +3379,25 @@ function renderCas() {
   ${S.cas.jtacs.map(J => `<div class="card" style="margin-bottom:10px"><div class="row">
     <div><label>JTAC (settore ${J.id.slice(1)})</label><input data-cas="${J.id}" data-cf="cs" value="${esc(J.cs)}"></div><div style="max-width:110px"><label>Freq.</label><input data-cas="${J.id}" data-cf="freq" value="${esc(J.freq)}" placeholder="DB"></div>
     <div><label>Controllore</label><input data-cas="${J.id}" data-cf="controller" value="${esc(J.controller)}"></div></div>
-    <div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:4px">${casNorm(J) && ''}<div><label>Holding</label><select data-cas="${J.id}" data-cf="hold">${[['RACETRACK', 'Racetrack'], ['FIGURE8', 'Figure 8'], ['WHEEL', 'Wheel']].map(([k, l]) => { const c = casHoldCheck(J, k); return `<option value="${k}" ${J.hold === k ? 'selected' : ''} ${c.ok ? '' : 'disabled'}>${l}${c.ok ? '' : ' (no)'}</option>`; }).join('')}</select></div>
+    <div class="tgrid" style="margin-top:4px;align-items:end">${casNorm(J) && ''}<div><label>Holding</label><select data-cas="${J.id}" data-cf="hold">${[['RACETRACK', 'Racetrack'], ['FIGURE8', 'Figure 8'], ['WHEEL', 'Wheel']].map(([k, l]) => { const c = casHoldCheck(J, k); return `<option value="${k}" ${J.hold === k ? 'selected' : ''} ${c.ok ? '' : 'disabled'}>${l}${c.ok ? '' : ' (no)'}</option>`; }).join('')}</select></div>
     <div><label>Riferimento</label><select data-cas="${J.id}" data-cf="ref">${o(J.ref, [['CP', 'CP'], ['KEYHOLE', 'Keyhole']])}</select></div>
-    ${J.hold === 'WHEEL' ? `<div style="max-width:90px"><label>Raggio NM</label><input data-cas="${J.id}" data-cf="wheelR" type="number" min="2" max="15" value="${wheelR(J)}"></div>` : ''}${J.holdWarn ? `<div class="muted" style="font-size:12px;color:#b45309;align-self:center">⚠ ${esc(J.holdWarn)}</div>` : ''}
+    ${J.hold === 'WHEEL' ? `<div style="max-width:90px"><label>Raggio NM</label><input data-cas="${J.id}" data-cf="wheelR" type="number" min="2" max="15" value="${wheelR(J)}"></div>` : `<div style="max-width:120px"><label>Orientamento (°)</label><input data-cas="${J.id}" data-cf="hAxis" type="number" min="0" max="359" value="${J.hMan ? Math.round(holdAxis(J)) : ''}" placeholder="auto ${Math.round(holdAxis(J))}"></div>${J.hold === 'RACETRACK' ? `<div style="max-width:110px"><label>Virate</label><select data-cas="${J.id}" data-cf="hTurn">${o(J.hTurn || 'RIGHT', [['RIGHT', 'Destra'], ['LEFT', 'Sinistra']])}</select></div>` : ''}`}${J.holdWarn ? `<div class="muted" style="font-size:12px;color:#b45309;align-self:center">⚠ ${esc(J.holdWarn)}</div>` : ''}
     <label class="chip shrink"><input type="checkbox" data-cas="${J.id}" data-cf="night" ${J.night ? 'checked' : ''}>Notte (IR)</label>
     ${casDone().ok ? `<button class="b sm shrink" data-jpack="${J.id}">JTAC pack</button>` : ''}</div>
     ${J.ref === 'KEYHOLE' ? khGroups(J).map(k => `<div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:4px"><div class="muted" style="font-size:12px;align-self:center">Keyhole <b>${k.tg.join(' / ')}</b> · E ${esc(casLoc(k.E))}</div>
       <div style="max-width:120px"><label>Orientamento A (°)</label><input data-kh="${J.id}:${k.id}" data-cf="rot" type="number" min="0" max="359" value="${k.rot}"></div>${k.moved ? `<button class="b sm shrink" data-khreset="${J.id}:${k.id}">Riporta E sul bersaglio</button>` : ''}</div>`).join('') : ''}
     ${(() => { const notes = [['RACETRACK', 'Racetrack'], ['FIGURE8', 'Figure 8'], ['WHEEL', 'Wheel']].map(([k, l]) => { const c = casHoldCheck(J, k); return !c.ok ? `${l}: non disponibile – ${c.reason}` : c.floor ? `${l}: blocchi da ${c.floor * 1000} ft (sopra ${c.what})` : ''; }).filter(Boolean);
       return notes.length ? `<div class="muted" style="font-size:12px;margin-top:4px">${notes.map(esc).join('<br>')}</div>` : ''; })()}
+    ${J.fitWarn ? `<div style="font-size:12px;color:#b45309;margin-top:4px">⚠ ${esc(J.fitWarn)}</div>` : ''}
     <div class="muted" style="font-size:12px;margin:4px 0">Minaccia AA: <b>${J.threat === 'HIGH' ? 'alta' : 'bassa'}</b> · laser JTAC ${esc(J.laser)} · CP ${J.cps.map(c => esc(c.name)).join(', ')} · ECHO ${esc(casLoc(J.echo))}</div>
     <table><tr><th>Bersaglio</th><th>Descrizione</th><th style="width:80px">Quota ft</th><th>Posizione</th></tr>${J.targets.map(x => `<tr><td>${x.id}</td><td><input data-cast="${J.id}:${x.id}" data-cf="desc" value="${esc(x.desc)}"></td><td><input data-cast="${J.id}:${x.id}" data-cf="elev" value="${esc(x.elev)}" placeholder="sim"></td><td style="font-size:11px">${esc(casLoc(x.pos))}</td></tr>`).join('')}</table>
+    ${J.friendlies.length ? `<table style="margin-top:4px"><tr><th>Amici</th><th>Mark (riga 8)</th></tr>${J.friendlies.map((x, fi) => `<tr><td style="font-size:12px">${esc(x.desc)}</td><td><select data-casf="${J.id}:${fi}" data-cf="mark">${o(x.mark || 'none', [['none', 'Nessuno'], ...CAS_FMARK.filter(m => m !== 'none').map(m => [m, m])])}</select></td></tr>`).join('')}</table>` : ''}
     ${J.tasks.map((T, i) => { const f = casFlight(T), k = `${J.id}:${i}`, E = casEgress(J, T), fl = (lab, ctl) => `<div><label>${lab}</label>${ctl}</div>`;
       return `<div class="tcard"><div><b>${T.id}</b> ${T.rw ? '(elicotteri)' : ''} <span class="muted" style="font-size:11px">${esc(T.ip)} · #${T.missionNo} · ${f ? '<b>' + esc(f.cs) + '</b> ' + esc(f.type) : 'nessun flight'}</span></div>
       <div class="tgrid">${fl('Bersaglio', `<select data-cask="${k}" data-cf="target">${o(T.target, J.targets.map(x => [x.id, x.id]))}</select>`)}${fl('Tipo', `<select data-cask="${k}" data-cf="control">${o(T.control, [[1, '1'], [2, '2'], [3, '3']])}</select>`)}
         ${fl('Metodo', `<select data-cask="${k}" data-cf="method">${o(T.method, [['BOT', 'BOT'], ['BOC', 'BOC'], ['SHOF', 'SHOF']])}</select>`)}${fl('Mark', `<select data-cask="${k}" data-cf="mark">${o(T.mark, [['LASER', 'Laser'], ['IR', 'IR'], ['WP', 'WP smoke'], ['NONE', 'Nessuno']])}</select>`)}
-        ${fl('TOT (H+)', `<input data-cask="${k}" data-cf="tot" type="number" value="${T.tot}">`)}</div>
+        ${fl('Arma', `<select data-cask="${k}" data-cf="wpn">${o(T.wpn, [...new Set([T.wpn, ...wpnChoices(T)])].map(w => [w, w]))}</select>`)}${fl('TOT (H+)', `<input data-cask="${k}" data-cf="tot" type="number" value="${T.tot}">`)}</div>
+      ${T.method === 'BOC' && !GPS_WPN.test(T.wpn) ? '<div class="muted" style="font-size:11px;color:#b45309">⚠ BOC richiede un\'arma a guida GPS</div>' : ''}
       <div class="tgrid">${T.rw ? '' : fl('Blocco (k ft)', `<input data-cask="${k}" data-cf="block" value="${esc(T.block)}" placeholder="auto" title="${T.above ? 'Sopra la minaccia ' + esc(T.above) + '. ' : ''}Vuoto = automatico">`)}
         ${fl('Offset', `<select data-cask="${k}" data-cf="offset">${o(T.offset || '', [['', 'Nessuno'], ['LEFT', 'Left'], ['RIGHT', 'Right']])}</select>`)}<div style="align-self:end"><button class="b sm" data-offsug="${k}" title="Offset sul lato lontano da amici / minaccia più vicini">Suggerisci</button></div>
         ${fl('Egress', `<select data-cask="${k}" data-cf="egrTo">${o(E.to, egrOpts(J, T))}</select>`)}${fl('Virata', `<select data-cask="${k}" data-cf="egrTurn">${o(E.turn, [['LEFT', 'Sinistra'], ['RIGHT', 'Destra']])}</select>`)}
@@ -3513,14 +3563,16 @@ document.addEventListener('change', e => {
   if (t.dataset.prm && S.pr) { const m = S.pr.med.find(x => x.id === t.dataset.prm); if (!m) return; m[t.dataset.cf] = t.value; save(); if (!['unit', 'freq'].includes(t.dataset.cf)) renderPanel(); return; }
   if (t.dataset.casg) { const c = casCfg(); c[t.dataset.casg] = t.dataset.casg === 'fmt' ? t.value : (+t.value || 0); save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cas && S.cas) { const J = S.cas.jtacs.find(x => x.id === t.dataset.cas); if (!J) return; const f = t.dataset.cf;
-    J[f] = f === 'night' ? t.checked : f === 'wheelR' ? Math.max(2, Math.min(15, +t.value || 5)) : t.value; if (['hold', 'ref', 'wheelR'].includes(f)) casDeconf(J); if (f === 'night') J.tasks.forEach(T => { if (t.checked && T.mark !== 'NONE') T.mark = 'IR'; if (!t.checked && T.mark === 'IR') T.mark = /GBU-1[26]|Paveway|Hellfire|Spike/.test(T.wpn) ? 'LASER' : 'WP'; });
+    if (f === 'hAxis') { if (t.value === '') { J.hAxis = null; J.hMan = false; } else { J.hAxis = ((Math.round(+t.value) || 0) % 360 + 360) % 360; J.hMan = true; } casDeconf(J); save(); renderPanel(); drawMap(); return; }
+    J[f] = f === 'night' ? t.checked : f === 'wheelR' ? Math.max(2, Math.min(15, +t.value || 5)) : t.value; if (f === 'wheelR') J.wheelRMan = true; if (['hold', 'ref'].includes(f)) J.holdMan = true; if (['hold', 'ref', 'wheelR'].includes(f)) casDeconf(J);
     if (['cs', 'freq', 'controller'].includes(f)) syncCasC2(S.t); save(); if (f !== 'cs' && f !== 'freq' && f !== 'controller') renderPanel(); drawMap(); return; }
   if (t.dataset.kh && S.cas) { const [jid, kid] = t.dataset.kh.split(':'), J = S.cas.jtacs.find(x => x.id === jid); if (!J) return; casNorm(J); (J.kh[kid] = J.kh[kid] || {}).rot = ((Math.round(+t.value) || 0) % 360 + 360) % 360; casDeconf(J); save(); renderPanel(); drawMap(); return; }
+  if (t.dataset.casf && S.cas) { const [jid, fi] = t.dataset.casf.split(':'), J = S.cas.jtacs.find(x => x.id === jid), x = J && J.friendlies[+fi]; if (x) { x[t.dataset.cf] = t.value; save(); renderPanel(); } return; }
   if (t.dataset.cast && S.cas) { const [jid, tid] = t.dataset.cast.split(':'); const J = S.cas.jtacs.find(x => x.id === jid), x = J && J.targets.find(y => y.id === tid); if (x) { x[t.dataset.cf] = t.value; save(); } return; }
   if (t.dataset.cask && S.cas) { const [jid, i] = t.dataset.cask.split(':'); const J = S.cas.jtacs.find(x => x.id === jid), T = J && J.tasks[+i]; if (!T) return; const f = t.dataset.cf;
     if (/^egr/.test(f)) { const e = T.egr = T.egr || {}, v = t.value; if (f === 'egrTo') { e.to = v; if (v === 'PT' && !e.pt) e.pt = casEgress(J, T).pos; } if (f === 'egrTurn') e.turn = v; if (f === 'egrBlock') e.block = v.trim(); if (f === 'egrName') e.name = v.trim().toUpperCase();
       save(); if (f !== 'egrName' && f !== 'egrBlock') renderPanel(); drawMap(); return; }
-    T[f] = ['control', 'tot'].includes(f) ? +t.value : t.value; if (f === 'block') { T.blockMan = !!t.value; if (!t.value) { T.above = 'x'; casDeconf(J); } } if (f === 'method' && t.value === 'BOC') { T.control = Math.max(2, T.control); T.mark = 'NONE'; const fl = casFlight(T); if (fl) { const w = wpnOf(fl); T.wpn = w.find(x => GPS_WPN.test(x)) || T.wpn; } else if (!T.rw) T.wpn = 'GBU-38'; }
+    T[f] = ['control', 'tot'].includes(f) ? +t.value : t.value; if (f === 'wpn') T.wpnMan = true; if (f === 'block') { T.blockMan = !!t.value; if (!t.value) { T.above = 'x'; casDeconf(J); } } if (f === 'method' && t.value === 'BOC') { T.control = Math.max(2, T.control); const fl = casFlight(T); if (fl) { const w = wpnOf(fl); T.wpn = w.find(x => GPS_WPN.test(x)) || T.wpn; } else if (!T.rw) T.wpn = 'GBU-38'; }
     save(); renderPanel(); drawMap(); return; }
   if (t.dataset.req) { const set = new Set(S.off || []); t.checked ? set.delete(t.dataset.req) : set.add(t.dataset.req); S.off = [...set]; S.c2sel = proposeC2(); save(); renderPanel(); return; }
   if (t.dataset.c2) { const r = c2Sel().find(x => x.id === t.dataset.c2); if (!r) return; const f = t.dataset.f;
@@ -4960,7 +5012,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

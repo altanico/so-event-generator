@@ -6,7 +6,7 @@ await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.mi
 await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500); const fail=[];
 const r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('PU'); APP.S.resMode='auto'; APP.S.casCfg={nJtac:1,perJ:3,rw:0}; APP.setEvents(['CAS']); APP.generateGeneric(); APP.renderAll();
   APP.S.zones=APP.S.zones.filter(z=>!/SHORAD|IADS/.test(z.cat)); const J=APP.S.cas.jtacs[0], T=J.tasks.find(x=>!x.rw);
-  for (const [h,ref] of [['RACETRACK','CP'],['FIGURE8','CP'],['WHEEL','CP'],['WHEEL','KEYHOLE'],['RACETRACK','KEYHOLE']]) { J.hold=h; J.ref=ref; APP.casDeconf(J); o[h+ref]={ n:APP.casHoldShape(J).length, txt:APP.casHold(J,T), first:JSON.stringify(APP.casHoldShape(J)[0][1]) }; }
+  for (const [h,ref] of [['RACETRACK','CP'],['FIGURE8','CP'],['WHEEL','CP'],['WHEEL','KEYHOLE'],['RACETRACK','KEYHOLE']]) { J.holdMan=true; J.hold=h; J.ref=ref; APP.casDeconf(J); o[h+ref]={ n:APP.casHoldShape(J).length, txt:APP.casHold(J,T), first:JSON.stringify(APP.casHoldShape(J)[0][1]) }; }
   const k=APP.khGroups(J)[0]; o.rot=k.rot; o.eOnTgt=JSON.stringify(k.E)===JSON.stringify(J.targets.find(x=>x.id===k.tg[0]).pos)||k.tg.length>1;
   o.a7=APP.khLabel(k, dest(k.E,0,7*1.852)); o.c5=APP.khLabel(k, dest(k.E,185,5*1.852)); o.rad=APP.khLabel(k, dest(k.E,150,7*1.852)); return o; });
 if(!/^WHEEL ORBIT 5 MILES/.test(r.WHEELCP.txt)) fail.push('wheel text '+r.WHEELCP.txt);

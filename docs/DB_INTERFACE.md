@@ -204,3 +204,8 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.18.6 additions
 
 * CAS task `T.offset`: '' | 'LEFT' | 'RIGHT' (side of the IP/BP–target line where the aircraft may manoeuvre): 9-line line 2 "…, OFFSET LEFT", restriction line, shaded band on the staff map and in the JTAC pack map.
+
+## v1.18.7 additions
+
+* CAS sector: `J.hAxis` (true bearing of the racetrack / figure 8 long axis; null = parallel to the front), `J.hMan` (orientation set by the staff), `J.hTurn` ('RIGHT' | 'LEFT'), `J.hLeg` (leg NM, default 10, shortened by the fit), `J.wheelRMan`, `J.holdMan` (holding chosen by the staff), `J.fitWarn` (holding outside the reserved areas).
+* Task: `T.wpnMan` (weapon chosen by the staff, kept if the aircraft carries it). Marks: `T.mark` default 'NONE', friendlies `mark` default 'none' – never set automatically.
