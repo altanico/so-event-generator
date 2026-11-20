@@ -13,7 +13,7 @@ Staff workflow, four tabs:
 
 1. **Scenario** – event type (combinable: combat, training, civil), required roles, theatre and reserved airspace, threats (combat only), ATC/C2 positions → generic scenario used to announce the event.
 2. **Participants** – pilots and controllers (manual, quantities, paste, CSV/JSON).
-3. **Tailoring** – flights, tasks, serials, routes, frequencies built from who signed up.
+3. **Tailoring** – flights, tasks, task allocation, routes, frequencies built from who signed up.
 4. **Export** – revisions (Rev.0, Rev.1…), masterplan section mask (NIL for empty sections), PDF, decks, public page.
 
 Events are saved in the artifact's shared store (staff only) or in the browser, and can be exported/imported as JSON.

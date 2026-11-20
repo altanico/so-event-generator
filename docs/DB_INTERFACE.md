@@ -89,7 +89,7 @@ The same JSON accepts two more optional arrays. If they are missing, the app use
 
 **Eventi** (`scenario.meta.events`, combinabili): `MIX, AAR, ID, CAS, SEAD, CSAR, AIRMOB, MAR, NAVI, NAVL, SAR, HEMS, MEDEVAC, HOSPITAL, HUMAN, AIB`.
 Se nessun evento è di tipo "combat" (MIX/CAS/SEAD/CSAR/AIRMOB/MAR) il briefing è sobrio: niente fazioni RED né uso di armi.
-Il risultato della fase 3 contiene `t.serials[]` (`id, kind, title, flights[], text, success`) e le rotte come elementi `airspace` di tipo `ROUTE` (`names[]`, `pts[]`, `alt`, `kind: IFR|LOW`).
+Il risultato della fase 3 contiene `t.serials[]` (nei documenti: "Task allocation") (`id, kind, title, flights[], text, success`) e le rotte come elementi `airspace` di tipo `ROUTE` (`names[]`, `pts[]`, `alt`, `kind: IFR|LOW`).
 
 **Punti** (sectorfile o API): accettati
 - sectorfile `.sct` con sezioni `[VOR] [NDB] [AIRPORT] [FIXES] [VFR…]` (coordinate `N043.20.10.000`);
@@ -209,3 +209,8 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 
 * CAS sector: `J.hAxis` (true bearing of the racetrack / figure 8 long axis; null = parallel to the front), `J.hMan` (orientation set by the staff), `J.hTurn` ('RIGHT' | 'LEFT'), `J.hLeg` (leg NM, default 10, shortened by the fit), `J.wheelRMan`, `J.holdMan` (holding chosen by the staff), `J.fitWarn` (holding outside the reserved areas).
 * Task: `T.wpnMan` (weapon chosen by the staff, kept if the aircraft carries it). Marks: `T.mark` default 'NONE', friendlies `mark` default 'none' – never set automatically.
+
+## v1.18.8 additions
+
+* `S.casView = { hide: { <task id>: true }, noThr }`: CAS scenarios hidden on the staff map and RED threats / objectives switched off in the CAS tab (staff map only, documents unchanged).
+* The serials are titled "Task allocation" in the masterplan, mission deck and public page (column "No."); the data stay in `t.serials`.
