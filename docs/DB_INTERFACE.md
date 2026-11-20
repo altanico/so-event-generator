@@ -182,3 +182,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 
 * `S.meta.auth` (true / false / null = default: on, off for civil events) and `S.meta.ramrod` (10-letter word, letter n = digit n). Phase 3 adds `S.t.auth = { on, ramrod, table: { lines }, examples }` and an "Authentication:" SPINS line; CAS tasks carry `abort: 'ABORT CODE XY (nn)'` when authentication is on.
 * The public payload drops `meta.auth`, `meta.ramrod`, `t.auth`, `t.gci.auth`; the public SPINS line only says that the material is given at the briefing.
+
+## v1.18.2 additions
+
+* CAS `J.hold` can be `RACETRACK`, `FIGURE8`, `WHEEL` (orbit 5 NM around ECHO) or `KEYHOLE` (template: ECHO centre, ALPHA towards the IP, B/C/D clockwise; holding point + distance per fixed-wing task).

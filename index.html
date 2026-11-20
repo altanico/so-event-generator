@@ -1791,8 +1791,9 @@ function casCheckIn(J, T) {
 }
 function casHold(J, T) {
   if (T.rw) return `HOLD AT ${T.ip}, 200 FEET AGL, REMAIN BEHIND THE FRIENDLY LINE`;
-  if (J.hold === 'WHEEL') { const ip = J.ips.find(x => x.name === T.ip) || J.ips[0], b = bearing(J.echo, ip.pos);
-    return `ECHO POINT IS ${casLoc(J.echo)}, HOLD ${['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA'][Math.round(b / 90) % 4]} ${Math.max(5, Math.round(dist(J.echo, ip.pos) / 1.852))}, BLOCK ${T.block}`; }
+  if (J.hold === 'WHEEL') return `WHEEL ORBIT 5 MILES AROUND ECHO POINT ${casLoc(J.echo)}, BLOCK ${T.block}`;
+  if (J.hold === 'KEYHOLE') { const k = keyhole(J), h = keyHold(J, T);
+    return `KEYHOLE, ECHO POINT IS ${casLoc(J.echo)}, ALPHA AXIS ${String(Math.round(k.axis) % 360 || 360).padStart(3, '0')} DEGREES (TOWARDS ${k.ip.name}), HOLD ${h.pt} ${h.d}, BLOCK ${T.block}`; }
   return `HOLD ${J.cps[0].name}, ${J.hold === 'FIGURE8' ? 'FIGURE EIGHT' : 'RACETRACK'}, 10 MILE LEGS, BLOCK ${T.block}`;
 }
 function casSitUpdate(J, t) {
@@ -1818,10 +1819,18 @@ function casPublic(cas) {
 
 // --- CAS geometry for the maps: holding patterns, run-in with final attack heading sector, egress ---
 const NMK = 1.852;
+// keyhole template (JP 3-09.3): ECHO = centre (target area), ALPHA towards the IP, BRAVO / CHARLIE / DELTA clockwise every 90 degrees; holding = point + distance in NM
+function keyhole(J) { const ip = J.ips.find(x => !x.heli) || J.ips[0] || { name: 'IP', pos: dest(J.echo, geom().dir + 180, 15) }, axis = bearing(J.echo, ip.pos);
+  return { ip, axis, pts: ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA'].map((n, k) => ({ n, brg: (axis + 90 * k) % 360 })) }; }
+function keyHold(J, T) { const fw = J.tasks.filter(x => !x.rw), i = Math.max(0, fw.indexOf(T)), k = keyhole(J), p = k.pts[i % 2 ? 3 : 1], d = 8 + 2 * Math.floor(i / 2);
+  return { pt: p.n, d, pos: dest(J.echo, p.brg, d * 1.852) }; }
 function casHoldShape(J) { // closed polyline(s) of the JTAC's holding pattern
   const g = geom(), ax = g.dir + 90, cp = J.cps[0].pos, out = [];
   const loc = (c, x, y) => dest(dest(c, ax, x), ax + 90, y); // x along the front, y across (km)
   if (J.hold === 'WHEEL') { const r = 5 * NMK, pts = []; for (let a = 0; a <= 360; a += 10) pts.push(dest(J.echo, a, r)); out.push(pts); }
+  else if (J.hold === 'KEYHOLE') { const k = keyhole(J); k.pts.forEach(p => out.push([J.echo, dest(J.echo, p.brg, 12 * NMK)])); // axes
+    [5, 10].forEach(r => { const pts = []; for (let a = 0; a <= 360; a += 10) pts.push(dest(J.echo, a, r * NMK)); out.push(pts); }); // distance rings
+    J.tasks.filter(T => !T.rw).forEach(T => { const h = keyHold(J, T), pts = []; for (let a = 0; a <= 360; a += 20) pts.push(dest(h.pos, a, 1.5 * NMK)); out.push(pts); }); } // holding orbits
   else if (J.hold === 'FIGURE8') { const a = 5 * NMK, pts = []; for (let k = 0; k <= 72; k++) { const t = k / 72 * 2 * Math.PI; pts.push(loc(cp, a * Math.cos(t), a * Math.sin(t) * Math.cos(t))); } out.push(pts); }
   else { const L = 5 * NMK, r = 3 * NMK, pts = []; // racetrack: 10 NM legs, 3 NM turn radius, legs parallel to the front
     for (let a = -90; a <= 90; a += 10) pts.push(loc(cp, L + r * Math.cos(a * Math.PI / 180), r * Math.sin(a * Math.PI / 180)));
@@ -2776,7 +2785,8 @@ function drawMap(fit) {
     add(L.marker(J.jtacPos, { icon: icon('#16a34a', 'J', J.cs, 'circle', 14) })).bindTooltip(`JTAC ${J.cs}`);
     J.friendlies.forEach(x => add(L.circleMarker(x.pos, { radius: 6, color: '#1d4ed8', weight: 2, fillColor: '#93c5fd', fillOpacity: 1 })).bindTooltip(x.desc));
     J.targets.forEach(x => add(L.marker(x.pos, { icon: icon('#b91c1c', '✕', x.id, 'circle', 14) })).bindTooltip(`${x.id} ${x.desc}`));
-    if (TAB === 'cas') { if (J.tasks.some(T => !T.rw)) casHoldShape(J).forEach(l => add(L.polyline(l, { color: '#0891b2', weight: 2, dashArray: '4 4' })).bindTooltip(`${J.cs} holding – ${J.hold === 'WHEEL' ? 'wheel orbit 5 NM' : J.hold === 'FIGURE8' ? 'figure eight' : 'racetrack 10 NM legs'}`));
+    if (TAB === 'cas') { if (J.tasks.some(T => !T.rw)) casHoldShape(J).forEach(l => add(L.polyline(l, { color: '#0891b2', weight: 2, dashArray: '4 4' })).bindTooltip(`${J.cs} holding – ${J.hold === 'WHEEL' ? 'wheel orbit 5 NM' : J.hold === 'KEYHOLE' ? 'keyhole template' : J.hold === 'FIGURE8' ? 'figure eight' : 'racetrack 10 NM legs'}`));
+      if (J.hold === 'KEYHOLE' && J.tasks.some(T => !T.rw)) keyhole(J).pts.forEach(p => add(L.marker(dest(J.echo, p.brg, 12 * NMK), { icon: icon('#0891b2', p.n[0], p.n, 'circle', 12) })).bindTooltip(`${J.cs} keyhole ${p.n}`));
       J.tasks.forEach(T => { const a = casAttackGeom(J, T);
         add(L.polygon(a.wedge, { color: '#d97706', weight: 1, fillColor: '#f59e0b', fillOpacity: .15 })).bindTooltip(`${T.id} final attack heading sector`);
         add(L.polyline(a.runin, { color: '#d97706', weight: 3 })).bindTooltip(`${T.id} run-in ${a.ip.name} → ${a.tgt.id}`); add(L.polyline(a.runArrow, { color: '#d97706', weight: 3 }));
@@ -3229,7 +3239,7 @@ function renderCas() {
   ${S.cas.jtacs.map(J => `<div class="card" style="margin-bottom:10px"><div class="row">
     <div><label>JTAC (settore ${J.id.slice(1)})</label><input data-cas="${J.id}" data-cf="cs" value="${esc(J.cs)}"></div><div style="max-width:110px"><label>Freq.</label><input data-cas="${J.id}" data-cf="freq" value="${esc(J.freq)}" placeholder="DB"></div>
     <div><label>Controllore</label><input data-cas="${J.id}" data-cf="controller" value="${esc(J.controller)}"></div></div>
-    <div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:4px"><div><label>Holding</label><select data-cas="${J.id}" data-cf="hold">${o(J.hold, [['RACETRACK', 'Racetrack (AA alta)'], ['FIGURE8', 'Figure 8 (AA alta)'], ['WHEEL', 'Wheel / keyhole (AA bassa)']])}</select></div>
+    <div class="row" style="align-items:flex-end;flex-wrap:wrap;margin-top:4px"><div><label>Holding</label><select data-cas="${J.id}" data-cf="hold">${o(J.hold, [['RACETRACK', 'Racetrack (AA alta)'], ['FIGURE8', 'Figure 8 (AA alta)'], ['WHEEL', 'Wheel (AA bassa)'], ['KEYHOLE', 'Keyhole (AA bassa)']])}</select></div>
     <label class="chip shrink"><input type="checkbox" data-cas="${J.id}" data-cf="night" ${J.night ? 'checked' : ''}>Notte (IR)</label>
     <button class="b sm shrink" data-jpack="${J.id}">JTAC pack</button></div>
     <div class="muted" style="font-size:12px;margin:4px 0">Minaccia AA: <b>${J.threat === 'HIGH' ? 'alta' : 'bassa'}</b> · laser JTAC ${esc(J.laser)} · CP ${J.cps.map(c => esc(c.name)).join(', ')} · ECHO ${esc(casLoc(J.echo))}</div>
@@ -3400,11 +3410,11 @@ document.addEventListener('change', e => {
   if (t.dataset.casg) { const c = casCfg(); c[t.dataset.casg] = t.dataset.casg === 'fmt' ? t.value : (+t.value || 0); save(); renderPanel(); drawMap(); return; }
   if (t.dataset.cas && S.cas) { const J = S.cas.jtacs.find(x => x.id === t.dataset.cas); if (!J) return; const f = t.dataset.cf;
     J[f] = f === 'night' ? t.checked : t.value; if (f === 'night') J.tasks.forEach(T => { if (t.checked && T.mark !== 'NONE') T.mark = 'IR'; if (!t.checked && T.mark === 'IR') T.mark = /GBU-1[26]|Paveway|Hellfire|Spike/.test(T.wpn) ? 'LASER' : 'WP'; });
-    if (['cs', 'freq', 'controller'].includes(f)) syncCasC2(S.t); save(); if (f !== 'cs' && f !== 'freq' && f !== 'controller') renderPanel(); return; }
+    if (['cs', 'freq', 'controller'].includes(f)) syncCasC2(S.t); save(); if (f !== 'cs' && f !== 'freq' && f !== 'controller') renderPanel(); drawMap(); return; }
   if (t.dataset.cast && S.cas) { const [jid, tid] = t.dataset.cast.split(':'); const J = S.cas.jtacs.find(x => x.id === jid), x = J && J.targets.find(y => y.id === tid); if (x) { x[t.dataset.cf] = t.value; save(); } return; }
   if (t.dataset.cask && S.cas) { const [jid, i] = t.dataset.cask.split(':'); const J = S.cas.jtacs.find(x => x.id === jid), T = J && J.tasks[+i]; if (!T) return; const f = t.dataset.cf;
     T[f] = ['control', 'tot'].includes(f) ? +t.value : t.value; if (f === 'method' && t.value === 'BOC') { T.control = Math.max(2, T.control); T.mark = 'NONE'; const fl = casFlight(T); if (fl) { const w = wpnOf(fl); T.wpn = w.find(x => GPS_WPN.test(x)) || T.wpn; } else if (!T.rw) T.wpn = 'GBU-38'; }
-    save(); renderPanel(); return; }
+    save(); renderPanel(); drawMap(); return; }
   if (t.dataset.req) { const set = new Set(S.off || []); t.checked ? set.delete(t.dataset.req) : set.add(t.dataset.req); S.off = [...set]; S.c2sel = proposeC2(); save(); renderPanel(); return; }
   if (t.dataset.c2) { const r = c2Sel().find(x => x.id === t.dataset.c2); if (!r) return; const f = t.dataset.f;
     if (f === 'on') r.on = t.checked; else if (f === 'pos') { const q = POS().find(x => x.cs === t.value); r.cs = t.value; if (q && q.freq) r.freq = q.freq; renderPanel(); } else r[f] = t.value; save(); return; }
@@ -4198,7 +4208,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
       ['TEN SECONDS', 'Laser on in about ten seconds'], ['LASER ON', 'Start designation'], ['SPOT', 'Aircraft has the laser spot'], ['CEASE LASER', 'Stop designation'], ['SPARKLE / SNAKE / STEADY', 'IR pointer marking calls (night)'], ['VISUAL / TALLY / CONTACT', 'Friendly in sight / target in sight / reference in sight']];
     for (const J of jsel.jtacs) {
       newPage(); h1(`JTAC ${J.cs}`);
-      para(`CAS sector ${J.id.slice(1)} · frequency ${J.freq || 'TBD'} · controller ${J.controller || 'not staffed'} · JTAC laser code ${J.laser} · AA threat ${J.threat.toLowerCase()} · holding ${J.hold === 'WHEEL' ? 'wheel / keyhole' : J.hold === 'FIGURE8' ? 'figure eight' : 'racetrack'}${J.night ? ' · night (IR)' : ''}.`);
+      para(`CAS sector ${J.id.slice(1)} · frequency ${J.freq || 'TBD'} · controller ${J.controller || 'not staffed'} · JTAC laser code ${J.laser} · AA threat ${J.threat.toLowerCase()} · holding ${J.hold === 'WHEEL' ? 'wheel' : J.hold === 'KEYHOLE' ? 'keyhole template' : J.hold === 'FIGURE8' ? 'figure eight' : 'racetrack'}${J.night ? ' · night (IR)' : ''}.`);
       para(`ECHO point ${casLoc(J.echo)} · JTAC position ${casLoc(J.jtacPos)} · line 6 format: ${CAS_FMT_LBL[casCfg().fmt]} · magnetic variation ${casCfg().magvar}° E.`);
       const png = jsel.maps[J.id]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, h = w * img.height / img.width; ensure(h + 8); page.drawImage(img, { x: ML, y: PH - y - h, width: w, height: h }); y += h + 8; } catch (e) { } }
       h6('Control points and initial points'); table([{ h: 'Name', w: .22 }, { h: 'Type', w: .18 }, { h: 'Location', w: .6 }], [...J.cps.map(c => [{ t: c.name, bold: true }, 'Control point', `${casLoc(c.pos)}   ${fmtLL(c.pos)}`]), ...J.ips.map(c => [{ t: c.name, bold: true }, c.heli ? 'Battle position' : 'Initial point', `${casLoc(c.pos)}   ${fmtLL(c.pos)}`])], { size: 7.5 });
@@ -4838,7 +4848,7 @@ initMap();
 route();
 loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
