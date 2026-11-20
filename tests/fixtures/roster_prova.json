@@ -1,0 +1,242 @@
+{
+ "pilots": [
+  {
+   "vid": "700100",
+   "name": "Marco Ferri",
+   "typeRaw": "EF-2000",
+   "callsign": "DARDO"
+  },
+  {
+   "vid": "700137",
+   "name": "Luca Bassi",
+   "typeRaw": "EF-2000",
+   "callsign": "DARDO"
+  },
+  {
+   "vid": "700174",
+   "name": "Andrea Conti",
+   "typeRaw": "EF-2000"
+  },
+  {
+   "vid": "700211",
+   "name": "Paolo Rinaldi",
+   "typeRaw": "EF-2000"
+  },
+  {
+   "vid": "700248",
+   "name": "Stefano Gallo",
+   "typeRaw": "F-35A",
+   "callsign": "FALCO"
+  },
+  {
+   "vid": "700285",
+   "name": "Davide Moretti",
+   "typeRaw": "F-35A",
+   "callsign": "FALCO"
+  },
+  {
+   "vid": "700322",
+   "name": "Matteo Colombo",
+   "typeRaw": "F-35A"
+  },
+  {
+   "vid": "700359",
+   "name": "Simone Fabbri",
+   "typeRaw": "F-35B"
+  },
+  {
+   "vid": "700396",
+   "name": "Fabio Marchi",
+   "typeRaw": "AMX"
+  },
+  {
+   "vid": "700433",
+   "name": "Giorgio Testa",
+   "typeRaw": "AMX"
+  },
+  {
+   "vid": "700470",
+   "name": "Alessio Barbieri",
+   "typeRaw": "Tornado IDS"
+  },
+  {
+   "vid": "700507",
+   "name": "Riccardo Leone",
+   "typeRaw": "Tornado ECR"
+  },
+  {
+   "vid": "700544",
+   "name": "Nicola Sala",
+   "typeRaw": "M-346"
+  },
+  {
+   "vid": "700581",
+   "name": "Enrico Pellegrini",
+   "typeRaw": "M-346"
+  },
+  {
+   "vid": "700618",
+   "name": "Lorenzo Villa",
+   "typeRaw": "MB-339"
+  },
+  {
+   "vid": "700655",
+   "name": "Federico Monti",
+   "typeRaw": "KC-767A"
+  },
+  {
+   "vid": "700692",
+   "name": "Emanuele Ricci",
+   "typeRaw": "C-130J"
+  },
+  {
+   "vid": "700729",
+   "name": "Daniele Fontana",
+   "typeRaw": "C-27J"
+  },
+  {
+   "vid": "700766",
+   "name": "Valerio Serra",
+   "typeRaw": "A400M"
+  },
+  {
+   "vid": "700803",
+   "name": "Tommaso Greco",
+   "typeRaw": "HH-139A"
+  },
+  {
+   "vid": "700840",
+   "name": "Claudio Neri",
+   "typeRaw": "HH-139A"
+  },
+  {
+   "vid": "700877",
+   "name": "Roberto Longo",
+   "typeRaw": "HH-101A"
+  },
+  {
+   "vid": "700914",
+   "name": "Pietro Valenti",
+   "typeRaw": "NH-90"
+  },
+  {
+   "vid": "700951",
+   "name": "Sara Benedetti",
+   "typeRaw": "AW169"
+  },
+  {
+   "vid": "700988",
+   "name": "Chiara Orlando",
+   "typeRaw": "E-550 CAEW"
+  },
+  {
+   "vid": "701025",
+   "name": "Elena Mariani",
+   "typeRaw": "P-72A"
+  },
+  {
+   "vid": "701062",
+   "name": "Giulia Santoro",
+   "typeRaw": "CL-415"
+  },
+  {
+   "vid": "701099",
+   "name": "Francesca Lombardi",
+   "typeRaw": "CL-415"
+  },
+  {
+   "vid": "701136",
+   "name": "Alberto Cattaneo",
+   "typeRaw": "C208"
+  },
+  {
+   "vid": "701173",
+   "name": "Massimo De Santis",
+   "typeRaw": "C172"
+  },
+  {
+   "vid": "701210",
+   "name": "Ivan Bellini",
+   "typeRaw": "P.180 Avanti"
+  },
+  {
+   "vid": "701247",
+   "name": "Carlo Guidi",
+   "typeRaw": "LJ45"
+  }
+ ],
+ "controllers": [
+  {
+   "vid": "800200",
+   "name": "Marta Esposito",
+   "rating": "S3",
+   "pref": "GCI"
+  },
+  {
+   "vid": "800241",
+   "name": "Antonio Ruggiero",
+   "rating": "C1",
+   "pref": "GCI2"
+  },
+  {
+   "vid": "800282",
+   "name": "Silvia Caruso",
+   "rating": "S3",
+   "pref": "AEW"
+  },
+  {
+   "vid": "800323",
+   "name": "Gianluca Palumbo",
+   "rating": "S2",
+   "pref": "APP"
+  },
+  {
+   "vid": "800364",
+   "name": "Beatrice Riva",
+   "rating": "C1",
+   "pref": "CTR"
+  },
+  {
+   "vid": "800405",
+   "name": "Michele Ferrara",
+   "rating": "S3",
+   "pref": "JTAC"
+  },
+  {
+   "vid": "800446",
+   "name": "Alessandro Bruno",
+   "rating": "S2",
+   "pref": "JTAC"
+  },
+  {
+   "vid": "800487",
+   "name": "Laura Gentile",
+   "rating": "S3",
+   "pref": "RCC"
+  },
+  {
+   "vid": "800528",
+   "name": "Vincenzo Amato",
+   "rating": "S2",
+   "pref": "RCCS"
+  },
+  {
+   "vid": "800569",
+   "name": "Irene Costa",
+   "rating": "S2",
+   "pref": "EMS"
+  },
+  {
+   "vid": "800610",
+   "name": "Franco Martini",
+   "rating": "S3",
+   "pref": "DOS"
+  },
+  {
+   "vid": "800651",
+   "name": "Ugo Parisi",
+   "rating": "S2",
+   "pref": "TWR2"
+  }
+ ]
+}
