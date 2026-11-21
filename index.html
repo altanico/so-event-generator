@@ -65,6 +65,7 @@ main{display:grid;grid-template-columns:minmax(380px,530px) 1fr;flex:1 1 auto;mi
 #panel{overflow:auto;padding:16px 18px;border-right:1px solid var(--line);background:var(--panel)}
 #mapwrap{position:relative}
 #map{position:absolute;inset:0;background:#D9E4F5}
+.navsym{background:none;border:0}.navsym svg{display:block}.navlbl{position:absolute;left:17px;top:1px;font:600 10.5px/1 system-ui,sans-serif;color:#0f172a;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff;pointer-events:none}
 #maptools{position:absolute;top:10px;right:10px;z-index:1000;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:440px;box-shadow:0 2px 8px rgba(13,44,153,.12)}
 #nomap{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:40px}
 h2{font-size:15px;margin:20px 0 8px;color:var(--ivao);font-weight:800}
@@ -3216,7 +3217,8 @@ function renderMapTools() {
     opts += '<optgroup label="Aggiungi obiettivo BLUE">' + Object.entries(OBJT).map(([k, v]) => `<option value="obj:${k}">${esc(v.label)}</option>`).join('') + '</optgroup>';
   }
   el.innerHTML = `<select id="addmode" style="width:280px">${opts}</select><select id="mapstyle" title="Sfondo della mappa (vale anche per le mappe di PDF e slide)" style="width:150px">${MSTYLES.map(([k, l]) => `<option value="${k}" ${mapStyle() === k ? 'selected' : ''} ${k !== 'clean' && k !== 'dark' && !DEM.on ? 'disabled' : ''}>${l}</option>`).join('')}</select><span class="muted" style="font-size:11px">Trascina i marker per spostarli · clic per modificarli</span>`;
-  el.insertAdjacentHTML('beforeend', `<label class="chip" title="VOR / NDB, fix (FRA), VRP, punti e gate militari, aerovie basse – compaiono zoomando" style="margin-left:6px"><input type="checkbox" id="navon" ${S && S.navOn ? 'checked' : ''}> Navigazione</label>`);
+  el.insertAdjacentHTML('beforeend', `<button class="b sm" id="navbtn" title="Dati di navigazione sulla mappa: scegli cosa vedere" style="margin-left:4px">🧭 Navigazione ${NAVPANEL ? '▴' : '▾'}</button>${NAVPANEL ? navPanelHtml() : ''}`);
+  $('#navbtn').onclick = () => { NAVPANEL = !NAVPANEL; renderMapTools(); drawNav(); };
   $('#mapstyle').onchange = e => { S.mapStyle = e.target.value; save(); applyMapStyle(); };
   $('#addmode').value = ADDMODE;
   $('#addmode').onchange = e => ADDMODE = e.target.value;
@@ -3699,7 +3701,7 @@ function renderExport() {
    ===================================================================== */
 let NAV = null, NAVG = null, NAVL = null; // navigation database (data/navdb.json), airway graph, map layer
 async function navInit() { try { const r = await fetch('data/navdb.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json();
-  const pts = j.pts.map(([id, la, lo, k, x]) => ({ id, pos: [la, lo], k, x: x || '' })), by = {};
+  const pts = j.pts.map(([id, la, lo, k, x], i) => ({ id, pos: [la, lo], k, x: x || '', i })), by = {};
   pts.forEach(p => (by[p.id] = by[p.id] || []).push(p));
   NAV = { pts, by, awy: j.awy || {}, manual: j.manual || [], airac: j.airac || '', src: j.src || '' }; NAVG = null; } catch (e) { } }
 const NAVK = { V: 'VOR / TACAN', N: 'NDB', F: 'fix', A: 'fix', R: 'VRP (AIP)', M: 'military procedure point (unpublished)', G: 'military gate (unpublished)' };
@@ -3893,7 +3895,7 @@ function renderFpl() {
       <div class="row"><button class="b sm shrink" data-fplcopy="${f.id}">Copia testo ICAO</button><button class="b sm shrink" data-fplreset="${f.id}" ${p.man ? '' : 'disabled'}>Ripristina suggerito</button><span class="muted" style="font-size:12px;flex:1">Sulla mappa: trascina un punto (si aggancia a fix / VOR / VRP / punti militari vicini), clic su una tratta per aggiungere un punto, doppio clic su un punto per toglierlo.</span></div>
       <table style="font-size:12px;margin-top:6px"><tr><th>Da</th><th>A</th><th>Rotta °M</th><th>NM</th><th>Min</th></tr>${p.legs.map(l => `<tr><td>${esc(l.from)}</td><td>${esc(l.to)}</td><td>${String(l.trk).padStart(3, '0')}</td><td>${l.nm}</td><td>${l.min}</td></tr>`).join('')}
       <tr><td colspan="3"><b>Totale</b> (con ${p.s.stay} min in area)</td><td>${p.legs.reduce((a, l) => a + l.nm, 0)}</td><td>${Math.round(p.eet)}</td></tr></table>
-      <p class="muted" style="font-size:11.5px;margin:4px 0">Rotta magnetica con declinazione ${casCfg().magvar}° E (impostazione CAS). Punti: ${p.pts.map(x => `${esc(x.name)}${x.k ? ' – ' + esc(NAVK[x.k]) : ' – coordinate'}`).join(' · ') || '—'}</p>`; }
+      <p class="muted" style="font-size:11.5px;margin:4px 0">Rotta magnetica con declinazione ${casCfg().magvar}° E (impostazione CAS).</p>` + fplEditorHtml(f, p); }
     h += '</div>'; });
   h += `<div class="row" style="margin-top:10px"><button class="b primary" data-tab="export">Avanti: Export →</button></div>`;
   return h; }
@@ -3910,13 +3912,82 @@ function drawFplRoute(add) { const f = S.t && S.t.flights.find(x => x.id === S.f
   p.pts.forEach((x, i) => { const m = add(L.marker(x.pos, { draggable: true, icon: icon(x.k && navPub(x) ? '#7c3aed' : '#a855f7', String(i + 1), x.name, 'circle', 14) })).bindTooltip(`${x.name}${x.k ? ' – ' + NAVK[x.k] : ' – coordinate'} · trascina per spostarlo, doppio clic per toglierlo`);
     m.on('dragend', e => { const ll = e.target.getLatLng(), P = fplPts(f), sn = fplSnap([+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); sn.role = P[i].role; P[i] = sn; if (P[i + 1]) delete P[i + 1].aw; save(); renderPanel(); drawMap(); });
     m.on('dblclick', () => { const P = fplPts(f); P.splice(i, 1); if (P[i]) delete P[i].aw; save(); renderPanel(); drawMap(); }); }); }
-// map layer "Navigazione": navaids, fixes (FRA marked), VRP, military points and gates, lower airways – shown by zoom
-function drawNav() { if (!MAP || typeof L === 'undefined') return; if (!NAVL) NAVL = L.layerGroup().addTo(MAP); NAVL.clearLayers(); if (!S || !S.navOn || !NAV || MODE !== 'staff') return;
-  const z = MAP.getZoom ? MAP.getZoom() : 8, bb = MAP.getBounds ? MAP.getBounds() : null, inB = p => !bb || bb.contains(p), add = l => l.addTo(NAVL);
-  if (z >= 7) { const G = navGraph(); if (G) for (const [aw, segs] of Object.entries(NAV.awy)) for (const sg of segs) { const ll = sg.map(id => G.pos[id]).filter(Boolean); if (ll.length > 1 && ll.some(inB)) add(L.polyline(ll, { color: '#64748b', weight: 1, opacity: .55, interactive: z >= 9 })).bindTooltip(aw, { sticky: true }); } }
-  const col = { V: '#0f766e', N: '#9333ea', F: '#334155', A: '#334155', R: '#15803d', M: '#b45309', G: '#b45309' }, minZ = { V: 6, N: 7, F: 9, A: 9, R: 9, M: 9, G: 9 };
-  for (const p of NAV.pts) { if (z < minZ[p.k] || (p.k === 'F' && p.x[0] === 'H') || !inB(p.pos)) continue; if (p.k === 'F' && z < 10 && !navFra(p) && p.x[0] !== 'E' && p.x[0] !== 'B') continue;
-    add(L.circleMarker(p.pos, { radius: p.k === 'V' ? 5 : 3, color: col[p.k], weight: navFra(p) ? 2 : 1, fillColor: p.k === 'V' ? '#fff' : col[p.k], fillOpacity: .9 })).bindTooltip(`${navName(p)} – ${NAVK[p.k]}${navFra(p) ? ' · FRA' : ''}${p.k === 'V' ? ' · ' + p.x : ''}${p.k === 'M' ? ' · ' + p.x : ''}`); } }
+// ---------- v1.23: navigation layer with ICAO chart symbols, layer panel, route editor ----------
+// ICAO Annex 4 symbols (SVG): VOR hexagon, VOR-DME hexagon in a square, VORTAC hexagon with three blocks, TACAN blocks, DME square, NDB stippled circle,
+// significant point / fix triangle (open: the sector file has no compulsory flag), FRA point triangle in a circle, VRP flag; military points / gates are not ICAO (unpublished)
+const NAVC = { VOR: ['vor', 'VOR', '#0f5fa8'], VORDME: ['vor', 'VOR-DME', '#0f5fa8'], VORTAC: ['vortac', 'VORTAC', '#0f5fa8'], TACAN: ['tacan', 'TACAN', '#0f5fa8'], DME: ['tacan', 'DME', '#0f5fa8'],
+  NDB: ['ndb', 'NDB', '#7e22ce'], FE: ['fe', 'Fix en-route', '#1e293b'], FT: ['ft', 'Fix terminale', '#64748b'], FRA: ['fra', 'Punto FRA', '#0f766e'], VRP: ['vrp', 'VRP (AIP)', '#15803d'],
+  MIL: ['mil', 'Punto militare (non pubblicato)', '#b45309'], GATE: ['gate', 'Gate militare (non pubblicato)', '#b45309'] };
+const NAVL_KEYS = [['vor', 'VOR / VOR-DME', 'VOR'], ['vortac', 'VORTAC', 'VORTAC'], ['tacan', 'TACAN / DME', 'TACAN'], ['ndb', 'NDB', 'NDB'], ['fe', 'Fix en-route', 'FE'], ['ft', 'Fix terminali', 'FT'], ['fra', 'Punti FRA', 'FRA'],
+  ['vrp', 'VRP (AIP)', 'VRP'], ['mil', 'Punti militari', 'MIL'], ['gate', 'Gate militari', 'GATE'], ['awy', 'Aerovie basse', null], ['lbl', 'Nomi dei punti', null]];
+const NAVL_DEF = { vor: 1, vortac: 1, tacan: 1, ndb: 1, fe: 1, ft: 0, fra: 1, vrp: 1, mil: 1, gate: 1, awy: 1, lbl: 1 };
+const navLay = () => { if (!S.navL) S.navL = { ...NAVL_DEF }; return S.navL; };
+function navCls(p) { if (p.k === 'V') { const x = p.x.toUpperCase(); return /VORTAC/.test(x) ? 'VORTAC' : /TACAN/.test(x) ? 'TACAN' : /VOR.?DME/.test(x) ? 'VORDME' : /\bDME\b/.test(x) ? 'DME' : 'VOR'; }
+  if (p.k === 'N') return 'NDB'; if (p.k === 'R') return 'VRP'; if (p.k === 'M') return 'MIL'; if (p.k === 'G') return 'GATE';
+  if (p.k === 'F' && p.x[0] === 'H') return null; if (navFra(p)) return 'FRA'; return p.k === 'F' && p.x[0] === 'T' ? 'FT' : 'FE'; }
+const NAVMINZ = { VOR: 6, VORDME: 6, VORTAC: 6, TACAN: 6, DME: 7, NDB: 7, FRA: 7, FE: 8, FT: 9, VRP: 9, MIL: 9, GATE: 9 };
+function navSvg(c, sz = 18) { const col = (NAVC[c] || NAVC.FE)[2], h = (r, rot = 0) => [0, 1, 2, 3, 4, 5].map(i => { const a = Math.PI / 3 * i + rot; return [9 + r * Math.cos(a), 9 + r * Math.sin(a)]; });
+  const P = a => a.map(v => v.map(n => n.toFixed(1)).join(',')).join(' '), hx = h(5.2), dot = `<circle cx="9" cy="9" r="1.1" fill="${col}"/>`;
+  const blocks = [0, 2, 4].map(i => { const a = hx[i], b = hx[(i + 1) % 6], mx = (a[0] + b[0]) / 2 - 9, my = (a[1] + b[1]) / 2 - 9, l = Math.hypot(mx, my), ox = mx / l * 3, oy = my / l * 3; return `<polygon points="${P([a, b, [b[0] + ox, b[1] + oy], [a[0] + ox, a[1] + oy]])}" fill="${col}"/>`; }).join('');
+  let g = '';
+  if (c === 'VOR') g = `<polygon points="${P(hx)}" fill="none" stroke="${col}" stroke-width="1.3"/>${dot}`;
+  else if (c === 'VORDME') g = `<rect x="2.5" y="2.5" width="13" height="13" fill="none" stroke="${col}" stroke-width="1.2"/><polygon points="${P(hx)}" fill="none" stroke="${col}" stroke-width="1.1"/>${dot}`;
+  else if (c === 'VORTAC') g = `<polygon points="${P(hx)}" fill="none" stroke="${col}" stroke-width="1.2"/>${blocks}${dot}`;
+  else if (c === 'TACAN') g = `${[1, 3, 5].map(i => `<line x1="${hx[i][0]}" y1="${hx[i][1]}" x2="${hx[(i + 1) % 6][0]}" y2="${hx[(i + 1) % 6][1]}" stroke="${col}" stroke-width="1.2"/>`).join('')}${blocks}`;
+  else if (c === 'DME') g = `<rect x="4" y="4" width="10" height="10" fill="none" stroke="${col}" stroke-width="1.3"/>${dot}`;
+  else if (c === 'NDB') g = `<circle cx="9" cy="9" r="1.6" fill="${col}"/>${[[3.8, 8], [6.4, 12]].map(([r, n]) => Array.from({ length: n }, (_, i) => `<circle cx="${(9 + r * Math.cos(i / n * 6.283)).toFixed(1)}" cy="${(9 + r * Math.sin(i / n * 6.283)).toFixed(1)}" r=".75" fill="${col}"/>`).join('')).join('')}`;
+  else if (c === 'FE') g = `<polygon points="9,3.5 14.5,13.5 3.5,13.5" fill="#fff" stroke="${col}" stroke-width="1.4"/>`;
+  else if (c === 'FT') g = `<polygon points="9,5.5 12.8,12.5 5.2,12.5" fill="#fff" stroke="${col}" stroke-width="1.2"/>`;
+  else if (c === 'FRA') g = `<circle cx="9" cy="9.3" r="7.2" fill="none" stroke="${col}" stroke-width="1.1"/><polygon points="9,4.5 13.4,12.6 4.6,12.6" fill="#fff" stroke="${col}" stroke-width="1.3"/>`;
+  else if (c === 'VRP') g = `<line x1="5" y1="2.5" x2="5" y2="16" stroke="${col}" stroke-width="1.4"/><polygon points="5.6,3 15,6.4 5.6,9.8" fill="${col}"/>`;
+  else if (c === 'MIL') g = `<polygon points="9,3 15,9 9,15 3,9" fill="#fff" stroke="${col}" stroke-width="1.4"/><circle cx="9" cy="9" r="1.2" fill="${col}"/>`;
+  else if (c === 'GATE') g = `<polygon points="9,3 15,9 9,15 3,9" fill="${col}" stroke="${col}" stroke-width="1"/><rect x="7.6" y="7.6" width="2.8" height="2.8" fill="#fff"/>`;
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 18 18" style="vertical-align:middle;overflow:visible">${g}</svg>`; }
+const navTypeTxt = p => { const c = navCls(p); return c ? NAVC[c][1] + (c === 'FRA' && p.k === 'F' ? '' : '') : 'fix'; };
+let NAVPANEL = false;
+function navPanelHtml() { const L0 = navLay(), on = !!(S && S.navOn);
+  return `<div id="navpanel" style="flex-basis:100%;border-top:1px solid var(--line);padding-top:6px;margin-top:2px;font-size:12.5px">
+    <label style="display:flex;gap:6px;align-items:center;margin:0 0 4px;font-weight:700"><input type="checkbox" id="navon" style="width:auto" ${on ? 'checked' : ''}> Mostra i dati di navigazione</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;${on ? '' : 'opacity:.45'}">${NAVL_KEYS.map(([k, l, c]) => `<label style="display:flex;gap:5px;align-items:center;margin:0;font-weight:400;white-space:nowrap"><input type="checkbox" data-navl="${k}" style="width:auto" ${L0[k] ? 'checked' : ''} ${on ? '' : 'disabled'}>${c ? navSvg(c, 16) : k === 'awy' ? '<svg width="16" height="16"><line x1="1" y1="12" x2="15" y2="4" stroke="#64748b" stroke-width="1.5"/></svg>' : '<b style="width:16px;text-align:center">Aa</b>'}${l}</label>`).join('')}</div>
+    <div class="muted" id="navcount" style="font-size:11.5px;margin-top:4px">${on ? '' : 'Spento.'}</div>
+    <div class="muted" style="font-size:11px">Simboli ICAO (Annesso 4). Zoomando compaiono più punti: VOR / TACAN subito, NDB e FRA, poi fix, VRP e punti militari. Con un piano di volo aperto, clic su un punto → "Aggiungi alla rotta".</div></div>`; }
+function drawNav() { if (!MAP || typeof L === 'undefined') return; if (!NAVL) NAVL = L.layerGroup().addTo(MAP); NAVL.clearLayers(); const cnt = document.getElementById('navcount');
+  if (!S || !S.navOn || !NAV || MODE !== 'staff') { if (cnt && S && S.navOn && !NAV) cnt.textContent = 'Dati di navigazione in caricamento…'; return; }
+  const L0 = navLay(), z = MAP.getZoom ? MAP.getZoom() : 8, bb = MAP.getBounds ? MAP.getBounds() : null, inB = p => !bb || bb.contains(p), add = l => l.addTo(NAVL);
+  if (L0.awy && z >= 7) { const G = navGraph(); if (G) for (const [aw, segs] of Object.entries(NAV.awy)) for (const sg of segs) { const ll = sg.map(id => G.pos[id]).filter(Boolean); if (ll.length > 1 && ll.some(inB)) add(L.polyline(ll, { color: '#64748b', weight: 1.2, opacity: .6, interactive: z >= 8 })).bindTooltip(`Aerovia ${aw}`, { sticky: true }); } }
+  let shown = 0, zoomHid = 0; const fs = S.t && TAB === 'fpl' && S.t.flights.find(x => x.id === S.fplSel);
+  for (const p of NAV.pts) { const c = navCls(p); if (!c || !L0[NAVC[c][0]] || !inB(p.pos)) continue; if (z < NAVMINZ[c]) { zoomHid++; continue; } if (shown > 1500) { zoomHid++; continue; } shown++;
+    const lbl = L0.lbl && (z >= 9 || (z >= 8 && ['VOR', 'VORDME', 'VORTAC', 'TACAN', 'NDB'].includes(c))) ? `<span class="navlbl">${esc(p.k === 'R' || p.k === 'G' ? navName(p) : p.id)}</span>` : '';
+    const m = add(L.marker(p.pos, { icon: L.divIcon({ className: 'navsym', html: navSvg(c) + lbl, iconSize: [18, 18], iconAnchor: [9, 9] }), keyboard: false, zIndexOffset: -500 }));
+    m.bindTooltip(`${esc(navName(p))} – ${NAVC[c][1]}${p.k === 'V' ? ' · ' + esc(p.x) : ''}${p.k === 'M' ? ' · ' + esc(p.x) : ''} · ${icaoLL(p.pos)}`);
+    if (fs) m.bindPopup(() => navPopup(p, fs)); }
+  if (cnt) cnt.textContent = `${shown} punti visibili${zoomHid ? ` · altri ${zoomHid} compaiono zoomando` : ''}${fs ? ` · rotta aperta: ${fs.cs}` : ''}.`; }
+function navPopup(p, f) { const pts = fplBuild(f).pts, def = fplInsAt(pts);
+  return `<div style="font-size:12.5px;min-width:200px"><b>${esc(navName(p))}</b> <span class="muted">${navTypeTxt(p)}</span><br>
+    <button class="b sm" style="margin:6px 0 4px" data-navadd="${p.i}" data-navat="${def}">Aggiungi alla rotta di ${esc(f.cs)}</button><br>
+    ${pts.length ? `<span>Sostituisci il punto </span><select data-navrepsel style="width:auto">${pts.map((x, i) => `<option value="${i}">${i + 1} · ${esc(x.name)}</option>`).join('')}</select> <button class="b sm" data-navrep="${p.i}">OK</button>` : ''}</div>`; }
+// where a new point goes by default: before the arrival procedure point, otherwise at the end
+const fplInsAt = pts => { const a = pts.findIndex(x => x.role === 'arr'); return a >= 0 ? a : pts.length; };
+function fplInsert(f, pt, at) { const P = fplPts(f); at = Math.max(0, Math.min(P.length, at)); pt.role = (P[at] || {}).role === 'gat' && (P[at - 1] || {}).role === 'gat' ? 'gat' : 'en'; P.splice(at, 0, pt); if (P[at + 1]) delete P[at + 1].aw; save(); renderPanel(); drawMap(); }
+// search box of the route editor: ident prefix, VRP code / name, gate name, coordinates (4530N01230E, 453012N0123045E, 45.5 12.3)
+function navSearch(q, near) { q = String(q || '').trim().toUpperCase(); if (q.length < 2) return []; const out = [];
+  let m = q.match(/^(\d{2})(\d{2})(\d{2})?([NS])\s*(\d{3})(\d{2})(\d{2})?([EW])$/); if (m) { const la = (+m[1] + +m[2] / 60 + (+m[3] || 0) / 3600) * (m[4] === 'S' ? -1 : 1), lo = (+m[5] + +m[6] / 60 + (+m[7] || 0) / 3600) * (m[8] === 'W' ? -1 : 1); out.push({ coord: [+la.toFixed(5), +lo.toFixed(5)] }); }
+  m = q.match(/^(-?\d{1,2}\.\d+)[\s,;]+(-?\d{1,3}\.\d+)$/); if (m) out.push({ coord: [+(+m[1]).toFixed(5), +(+m[2]).toFixed(5)] });
+  if (NAV) { const hits = NAV.pts.filter(p => navCls(p) && (p.id.startsWith(q) || ((p.k === 'R' || p.k === 'G') && navName(p).toUpperCase().includes(q))));
+    hits.sort((a, b) => (b.id === q) - (a.id === q) || (b.id.startsWith(q)) - (a.id.startsWith(q)) || (near ? dist(a.pos, near) - dist(b.pos, near) : 0)); out.push(...hits.slice(0, 8).map(p => ({ p }))); }
+  return out.slice(0, 9); }
+function fplEditorHtml(f, p) { const P = p.pts, ins = fplInsAt(P);
+  const row = (x, i) => { const c = x.k ? navCls(x) : null; return `<tr><td>${i + 1}</td><td>${c ? navSvg(c, 16) : '<span title="coordinate">⌖</span>'}</td><td><b>${esc(x.name)}</b>${x.k === 'M' || x.k === 'G' ? ' <span class="muted" style="font-size:11px">unpublished</span>' : ''}</td>
+    <td class="muted">${c ? NAVC[c][1] : 'coordinate'}</td><td style="font-family:monospace;font-size:11.5px">${icaoLL(x.pos)}</td><td>${x.aw ? esc(x.aw) : (i ? 'DCT' : '')}</td>
+    <td style="white-space:nowrap"><button class="b sm" title="Su" data-fplmv="${f.id}|${i}|-1" ${i ? '' : 'disabled'}>▲</button><button class="b sm" title="Giù" data-fplmv="${f.id}|${i}|1" ${i < P.length - 1 ? '' : 'disabled'}>▼</button><button class="b sm" title="Togli" data-fpldel="${f.id}|${i}">✕</button></td></tr>`; };
+  return `<label style="margin-top:8px">Rotta – punti</label><table style="font-size:12px"><tr><th>#</th><th></th><th>Punto</th><th>Tipo</th><th>Coordinate</th><th>Via</th><th></th></tr>
+    <tr class="muted"><td></td><td>✈</td><td>${esc(p.s.dep)}</td><td>partenza</td><td colspan="3"></td></tr>${P.map(row).join('')}<tr class="muted"><td></td><td>✈</td><td>${esc(p.s.dest)}</td><td>arrivo</td><td colspan="3"></td></tr></table>
+    <div class="row" style="align-items:flex-end;margin-top:4px"><div style="flex:2"><label>Aggiungi punto</label><input data-fplq="${f.id}" placeholder="Nome o codice (RISOM, PES, RVN1, FALCO) o coordinate (4530N01230E)" autocomplete="off"></div>
+    <div style="max-width:170px"><label>Posizione</label><select data-fplpos="${f.id}">${Array.from({ length: P.length + 1 }, (_, i) => `<option value="${i}" ${i === ins ? 'selected' : ''}>${i === 0 ? 'all\'inizio' : 'dopo ' + i + ' · ' + esc(P[i - 1].name)}</option>`).join('')}</select></div></div>
+    <div id="fplres-${f.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>`; }
+function fplResHtml(f, q) { const P = fplBuild(f).pts, near = P.length ? P[Math.floor(P.length / 2)].pos : null, r = navSearch(q, near);
+  if (!r.length) return String(q || '').trim().length >= 2 ? '<span class="muted" style="font-size:12px">Nessun punto trovato.</span>' : '';
+  return r.map(x => x.coord ? `<button class="b sm" data-fpladd="${f.id}|c|${x.coord.join(',')}">⌖ ${icaoLL(x.coord)}</button>` : `<button class="b sm" data-fpladd="${f.id}|p|${x.p.i}" title="${esc(NAVC[navCls(x.p)][1])} · ${icaoLL(x.p.pos)}">${navSvg(navCls(x.p), 14)} ${esc(navName(x.p))}</button>`).join(''); }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop, wy = window.scrollY, keep = {}; p.querySelectorAll('[data-keep]').forEach(el => keep[el.dataset.keep] = el.scrollTop);
   p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, fpl: renderFpl, export: renderExport }[TAB] || renderScenario)() +
@@ -3950,6 +4021,16 @@ function facEdit(t, end) {
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 // flight plans tab (v1.22)
+document.addEventListener('click', e => { const t = e.target.closest('[data-navadd],[data-navrep],[data-fplmv],[data-fpldel],[data-fpladd]'); if (!t || !S || !S.t) return;
+  const fp = id => S.t.flights.find(x => x.id === id), sel = fp(S.fplSel);
+  if (t.dataset.navadd) { if (!sel) return; MAP && MAP.closePopup && MAP.closePopup(); fplInsert(sel, fplPt(NAV.pts[+t.dataset.navadd], 'en'), +t.dataset.navat); toast('Punto aggiunto alla rotta'); return; }
+  if (t.dataset.navrep) { if (!sel) return; const sl = t.parentElement.querySelector('[data-navrepsel]'), k = +(sl ? sl.value : 0), P = fplPts(sel), np = fplPt(NAV.pts[+t.dataset.navrep], P[k] ? P[k].role : 'en'); P[k] = np; if (P[k + 1]) delete P[k + 1].aw; MAP && MAP.closePopup && MAP.closePopup(); save(); renderPanel(); drawMap(); toast('Punto sostituito'); return; }
+  if (t.dataset.fplmv) { const [id, i, d] = t.dataset.fplmv.split('|'), f = fp(id); if (!f) return; const P = fplPts(f), a = +i, b = a + +d; if (b < 0 || b >= P.length) return; [P[a], P[b]] = [P[b], P[a]]; [a, b, Math.max(a, b) + 1].forEach(k => { if (P[k]) delete P[k].aw; }); save(); renderPanel(); drawMap(); return; }
+  if (t.dataset.fpldel) { const [id, i] = t.dataset.fpldel.split('|'), f = fp(id); if (!f) return; const P = fplPts(f); P.splice(+i, 1); if (P[+i]) delete P[+i].aw; save(); renderPanel(); drawMap(); return; }
+  if (t.dataset.fpladd) { const [id, k, v] = t.dataset.fpladd.split('|'), f = fp(id); if (!f) return; const ps = document.querySelector(`[data-fplpos="${id}"]`), at = ps ? +ps.value : fplInsAt(fplBuild(f).pts);
+    const pt = k === 'c' ? fplCoord(v.split(',').map(Number), 'en') : fplPt(NAV.pts[+v], 'en'); fplInsert(f, pt, at); toast(`${pt.name} aggiunto alla rotta`); } });
+document.addEventListener('input', e => { const id = e.target.dataset && e.target.dataset.fplq; if (!id || !S.t) return; const f = S.t.flights.find(x => x.id === id), r = document.getElementById('fplres-' + id); if (f && r) r.innerHTML = fplResHtml(f, e.target.value); });
+document.addEventListener('keydown', e => { if (e.key !== 'Enter' || !(e.target.dataset && e.target.dataset.fplq)) return; const b = document.querySelector(`#fplres-${e.target.dataset.fplq} [data-fpladd]`); if (b) { e.preventDefault(); b.click(); } });
 document.addEventListener('click', e => { const t = e.target.closest('[data-fplsel],[data-fplcopy],[data-fplreset],#fpldl,#fplresetall'); if (!t || !S.t) return;
   if (t.dataset.fplsel) { S.fplSel = S.fplSel === t.dataset.fplsel ? null : t.dataset.fplsel; save(); renderPanel(); drawMap(); return; }
   if (t.dataset.fplcopy) { const f = S.t.flights.find(x => x.id === t.dataset.fplcopy); if (!f) return; const txt = fplBuild(f).icaoTxt;
@@ -3958,7 +4039,7 @@ document.addEventListener('click', e => { const t = e.target.closest('[data-fpls
   if (t.id === 'fplresetall') { fplStore().man = {}; save(); renderPanel(); drawMap(); toast('Tutti i piani suggeriti ripristinati'); return; }
   if (t.id === 'fpldl') download(`${String(S.meta.op || 'event').replace(/[^A-Za-z0-9]+/g, '_')}_flight_plans.txt`, new Blob([fplTextFile()], { type: 'text/plain' })); });
 document.addEventListener('input', e => { const d = e.target.dataset && e.target.dataset.fpl; if (!d) return; const [id, k] = d.split(':'); fplSet(id, k, e.target.value); fplRefresh(id); });
-document.addEventListener('change', e => { if (e.target.id === 'fploat') { fplStore().icao = e.target.checked; save(); renderPanel(); return; } if (e.target.id === 'navon') { S.navOn = e.target.checked; save(); drawNav(); return; }
+document.addEventListener('change', e => { if (e.target.id === 'fploat') { fplStore().icao = e.target.checked; save(); renderPanel(); return; } if (e.target.id === 'navon') { S.navOn = e.target.checked; save(); renderMapTools(); drawNav(); return; } if (e.target.dataset && e.target.dataset.navl) { navLay()[e.target.dataset.navl] = e.target.checked ? 1 : 0; save(); drawNav(); return; }
   if (e.target.dataset && e.target.dataset.fpl) { renderPanel(); drawMap(); } });
 document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); zfMapLater(); } if (e.target.id === 'zlvlo' || e.target.id === 'zlvhi') lvInput(e.target); });
 document.addEventListener('change', e => {
@@ -5526,7 +5607,7 @@ route();
 navInit().then(() => { NAVG = null; if (MAP && S && S.navOn) drawNav(); if (TAB === 'fpl' && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get NAVPANEL() { return NAVPANEL; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

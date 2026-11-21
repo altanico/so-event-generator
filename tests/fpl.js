@@ -51,6 +51,30 @@ const cor=await page.evaluate(()=>{ const p=APP.navRes('RISOM'); return { a:APP.
 if(cor.a!=='RISOM'||cor.b!==' (corresponds to RISOM)'||cor.c) fail.push('pubRef '+JSON.stringify(cor));
 await page.evaluate(id=>{APP.S.fplSel=id;APP.renderAll();},fid); await page.waitForTimeout(200); await page.screenshot({path:'fpl_tab.png',fullPage:false});
 // navigation layer toggle
-await page.check('#navon'); await page.waitForTimeout(200); if(!(await page.evaluate(()=>APP.S.navOn))) fail.push('nav layer toggle');
+await page.click('#navbtn'); await page.waitForTimeout(150); await page.check('#navon'); await page.waitForTimeout(200); if(!(await page.evaluate(()=>APP.S.navOn))) fail.push('nav layer toggle');
+if((await page.$$('[data-navl]')).length!==12) fail.push('layer panel switches');
+await page.uncheck('[data-navl="vrp"]'); await page.waitForTimeout(100); if(await page.evaluate(()=>APP.S.navL.vrp)) fail.push('layer switch not saved');
+if(!/punti visibili|caricamento/.test(await page.textContent('#navcount'))) fail.push('nav counter '+await page.textContent('#navcount'));
+const cls=await page.evaluate(()=>{ const c={}; APP.NAV.pts.forEach(p=>{const k=APP.navCls(p)||'-'; c[k]=(c[k]||0)+1;}); return c; });
+['VOR','VORTAC','TACAN','NDB','FE','FRA','VRP','MIL','GATE'].forEach(k=>{ if(!cls[k]) fail.push('no points of class '+k); });
+const svgs=await page.evaluate(()=>['VOR','VORDME','VORTAC','TACAN','DME','NDB','FE','FT','FRA','VRP','MIL','GATE'].map(c=>APP.navSvg(c)));
+if(new Set(svgs).size!==12||svgs.some(x=>!/^<svg/.test(x))) fail.push('symbols not distinct');
+// route editor: search, add, move, delete, coordinates
+await page.evaluate(id=>{APP.S.fplSel=id;APP.renderAll();},fid); await page.waitForTimeout(150);
+await page.fill(`[data-fplq="${fid}"]`,'RISO'); await page.waitForTimeout(150);
+const resB=await page.$(`#fplres-${fid} [data-fpladd]`); if(!resB) fail.push('search no result'); else { await resB.click(); await page.waitForTimeout(200); }
+let r15=await page.evaluate(id=>APP.fplBuild(APP.S.t.flights.find(x=>x.id===id)).out.f15,fid); if(!/ RISOM( |$)/.test(r15)) fail.push('point from search not in route '+r15);
+const n1=await page.evaluate(id=>APP.fplBuild(APP.S.t.flights.find(x=>x.id===id)).pts.length,fid);
+await page.fill(`[data-fplq="${fid}"]`,'4530N01230E'); await page.waitForTimeout(150); await page.click(`#fplres-${fid} [data-fpladd]`); await page.waitForTimeout(200);
+r15=await page.evaluate(id=>APP.fplBuild(APP.S.t.flights.find(x=>x.id===id)).out.f15,fid); if(!/4530N01230E/.test(r15)) fail.push('coordinate point '+r15);
+const rows=await page.$$(`[data-fpldel^="${fid}|"]`); if(rows.length!==n1+1) fail.push('editor rows '+rows.length+' vs '+(n1+1));
+const before=await page.evaluate(id=>APP.fplBuild(APP.S.t.flights.find(x=>x.id===id)).pts.map(x=>x.name),fid);
+await page.click(`[data-fplmv="${fid}|1|-1"]`); await page.waitForTimeout(150);
+const after=await page.evaluate(id=>APP.fplBuild(APP.S.t.flights.find(x=>x.id===id)).pts.map(x=>x.name),fid); if(after[0]!==before[1]||after[1]!==before[0]) fail.push('move up');
+await page.click(`[data-fpldel="${fid}|0"]`); await page.waitForTimeout(150); if((await page.evaluate(id=>APP.fplBuild(APP.S.t.flights.find(x=>x.id===id)).pts.length,fid))!==before.length-1) fail.push('delete');
+// map popup "add to route" path
+const pop=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id), p=APP.navRes('PES'); const n=APP.fplBuild(f).pts.length; APP.fplInsert(f,{id:p.id,name:p.id,pos:p.pos,k:p.k,x:p.x},APP.fplInsAt(APP.fplBuild(f).pts)); return [n, APP.fplBuild(f).pts.length, APP.fplBuild(f).out.f15]; },fid);
+if(pop[1]!==pop[0]+1||!/ PES /.test(pop[2])) fail.push('insert from map '+JSON.stringify(pop));
+await page.screenshot({path:'fpl_editor.png'}); await page.fill('[data-fplq]','PE'); await page.waitForTimeout(150); await page.screenshot({path:'fpl_editor2.png',fullPage:true});
 console.log(JSON.stringify(r.map(x=>[x.cs,x.type,x.o.f8,x.o.f15,x.o.f18,x.warn]),null,0).slice(0,3000));
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
