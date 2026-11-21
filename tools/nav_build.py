@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Navigation database for the SO event generator from the IVAO Italy sector files (data/nav_src: *.vor, *.ndb, *.fix).
 Formats (semicolon separated, // = comment):
-  VOR: ident;freq MHz;lat;lon;[flag a];[flag b];[TACAN channel];[HLD-…]
+  VOR (IVAO sector file spec): ident;freq;lat;lon;[visibility 0 show / 1 hide];[type 0 VOR, 1 VORDME, 2 VORTACAN, 3 TACAN, 4 DME];[TACAN channel];[HLD-…]
   NDB: ident;freq kHz;lat;lon;[1 = outside Italy]
   FIX: ident;lat;lon;flag a;flag b;[HLD-…]
 Coordinates: N045.55.27.600 = 45°55'27.6". Output: data/nav.json {airac, vor[], ndb[], fix[]} with [ident, lat, lon, ...]. Usage: python3 tools/nav_build.py 2612"""
@@ -28,8 +28,9 @@ def main():
     for r, ext in rows('.vor'):
         la, lo = coord(r[2]), coord(r[3]) if len(r) > 3 else None
         if la is None or lo is None: bad.append(('VOR', r[0])); continue
-        a = r[4] if len(r) > 4 else ''; b = r[5] if len(r) > 5 else ''; ch = r[6] if len(r) > 6 and re.match(r'^\d+[XY]$', r[6]) else ''
-        out['vor'].append([r[0], la, lo, r[1], a, b, ch, 1 if (a == '1' or ext) else 0])
+        hide = r[4] if len(r) > 4 else ''; ty = r[5] if len(r) > 5 else ''; ch = r[6] if len(r) > 6 and re.match(r'^(CH\s*)?\d+[XY]$', r[6], re.I) else ''
+        typ = {'0': 'VOR', '1': 'VOR/DME', '2': 'VORTAC', '3': 'TACAN', '4': 'DME'}.get(ty, 'VOR')  # type not given in the file: VOR
+        out['vor'].append([r[0], la, lo, r[1], typ, re.sub(r'^CH\s*', '', ch, flags=re.I), 1 if hide == '1' else 0, 1 if ext else 0])  # ident, lat, lon, freq, type, TACAN channel, hidden, outside Italy
     for r, ext in rows('.ndb'):
         la, lo = coord(r[2]), coord(r[3])
         if la is None or lo is None: bad.append(('NDB', r[0])); continue
