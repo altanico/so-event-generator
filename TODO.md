@@ -70,7 +70,8 @@
 ## Proposal: official vs unofficial events (staff 21 Nov evening – to discuss)
 - First screen with 3 choices: "Evento ufficiale della divisione" (staff, today's flow), "Evento tra amici" (same engine: BLUE / RED scenario, roster, tailoring, CAS / AAR / CSAR…), "Missione libera" (short flow).
 - Evento tra amici differs only in what leaves the app: no "Pubblica" on the division page (share the event file and the downloads); documents titled "Mission pack" instead of "Masterplan", without the official division parts (division contacts / forum / Discord, official NOTAM numbering, "IVAO Italy Special Operations" as organiser), with a notice "Unofficial community event – not organised by IVAO Italy"; area booking = the same 48 h reminder e-mail as the missione libera; ATC positions: friends as controllers or none (no official positions); IVAO R&R notice (interceptions, consent) in the briefing.
-- Open points: may unofficial events use the IVAO / SO branding? Should "ufficiale" be reserved to the staff (staff profile check) or just a choice?
+- Official events behind a login (staff 21 Nov): on the Claude artifact the login is the viewer's claude.ai identity (capability "user", already declared): "Evento ufficiale" (and "Pubblica") only for viewers the owner made editors of the artifact (user.canEdit()) – optionally an extra staff list kept in the db (admin only); everybody else (no identity, guests, people outside the organisation) sees only "Evento tra amici" and "Missione libera". On the future division website the same check would use the IVAO login (SSO) with the SO staff role.
+- Open point: may unofficial events use the IVAO / SO branding?
 
 ## Proposal: "missione libera" (not an event) – staff 21 Nov evening, refines the three kinds of use
 - First screen: "È un evento della divisione?" Yes -> today's flow (phases 1-5). No -> a separate short flow (4 steps), reusing areas, CAS geometry, nav database, FPL:
