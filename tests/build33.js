@@ -17,7 +17,7 @@ const civRoles=await page.$$eval('[data-brole^="LIPZ:roles:"]',x=>x.map(e=>e.dat
 if(/FTR|ATK|CAS|TKR/.test(civRoles)) fail.push('military roles offered on a civil airfield '+civRoles);
 const st=await page.evaluate(()=>({ bases:APP.S.blueBases.join(), lipa:APP.S.bases.LIPA.roles.join(), lips:APP.S.bases.LIPS.roles.join() }));
 if(st.lipa!=='TKR') fail.push('LIPA roles '+st.lipa); if(!/FTR/.test(st.lips)||/ALL/.test(st.lips)) fail.push('LIPS roles '+st.lips);
-const r=await page.evaluate(()=>{ APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x AMX\n2x HH-139A\n2x F-35A'); APP.tailor(); const t=APP.S.t;
+const r=await page.evaluate(()=>{ APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x Tornado IDS\n2x HH-139A\n2x F-35A'); APP.tailor(); const t=APP.S.t;
   return { fl:t.flights.map(f=>[f.cs,f.task,f.base]), warn:t.warnings.filter(w=>/^Basi:/.test(w)) }; });
 const by=task=>r.fl.filter(f=>f[1]===task);
 if(by('AAR').some(f=>f[2]!=='LIPA')) fail.push('tanker base '+JSON.stringify(by('AAR')));

@@ -5,7 +5,7 @@ const { chromium } = require(ENV.PW);
 await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
 await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500); const fail=[];
 let r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('NE'); APP.S.resMode='auto'; APP.setEvents(['AAR']); APP.generateGeneric();
-  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x F-35A\n2x AMX\n2x M-346'); APP.tailor(); const t=APP.S.t, c=t.aar.cards[0];
+  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x F-35A\n2x Tornado IDS\n2x M-346'); APP.tailor(); const t=APP.S.t, c=t.aar.cards[0];
   o.rcv=c.rcv; o.win=c.win; const w=APP.tl(); o.w=[w.on0,w.on1]; o.spins=t.spins.filter(x=>/AAR card/.test(x)).length; asgApply(); asgApply(); o.spins2=APP.S.t.spins.filter(x=>/AAR card/.test(x)).length; o.card=c.card.filter(x=>x[0]==='RECEIVERS C/S').map(x=>x[1]);
   // short window: 5 min floor and warning
   APP.S.meta.tl={dur:90,dep:15,tr:20,ret:20,land:15}; asgApply(); o.short=APP.S.t.aar.cards[0].win; o.warn=(APP.S.t.aarWarn||[]).length; APP.S.meta.tl=null;
@@ -15,7 +15,7 @@ if(r.win<5||r.win>15) fail.push('window '+r.win); if(ar[0]<r.w[0]) fail.push('AR
 if(r.spins2!==r.spins) fail.push(`SPINS duplicated ${r.spins}->${r.spins2}`); if(!r.card.every(x=>/ARCT .+, window \d+ min/.test(x))) fail.push('AAR card without ARCT '+r.card[0]);
 if(!(r.short<=5&&r.warn)) fail.push(`short window ${r.short} warn ${r.warn}`);
 // two tankers: put both on the same track -> 5000 ft apart; a narrow band -> warning
-r=await page.evaluate(()=>{ const o={}; APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n1x KC-767A\n2x EF-2000\n2x F-35A\n2x AMX\n2x M-346'); APP.tailor(); const t=APP.S.t, tks=t.flights.filter(f=>f.task==='AAR');
+r=await page.evaluate(()=>{ const o={}; APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n1x KC-767A\n2x EF-2000\n2x F-35A\n2x Tornado IDS\n2x M-346'); APP.tailor(); const t=APP.S.t, tks=t.flights.filter(f=>f.task==='AAR');
   o.n=tks.length; const trk=TRK().filter(x=>x.kind==='AAR').sort((a,b)=>(b.hi-b.lo)-(a.hi-a.lo)); tks.forEach(tk=>tk.trkSel=trk[0].id); asgApply();
   o.alts=APP.S.t.aar.cards.map(c=>+c.alt.replace('FL','')); o.band=[trk[0].lo,trk[0].hi]; o.w1=(APP.S.t.aarWarn||[]).filter(x=>/5000 ft/.test(x)).length;
   const narrow=trk[trk.length-1]; tks.forEach(tk=>tk.trkSel=narrow.id); asgApply(); o.nb=[narrow.lo,narrow.hi]; o.w2=(APP.S.t.aarWarn||[]).filter(x=>/5000 ft/.test(x)).length;

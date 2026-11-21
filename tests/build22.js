@@ -15,7 +15,7 @@ let r=await page.evaluate(()=>{ const f=[];
 fail.push(...r);
 if(!(await page.evaluate(()=>{ const p=document.querySelector('.leaflet-bulls-pane'); return !p || +getComputedStyle(p).zIndex>400 || +p.style.zIndex>400; }))) fail.push('bullseye pane below the areas');
 // tailored CAS + GCI event with authentication on, then off
-r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('PU'); APP.S.resMode='auto'; APP.setEvents(['CAS','ID']); APP.S.meta.auth=null; APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[{id:'c1',name:'M',pref:'GCI'},{id:'c2',name:'N',pref:'JTAC'}]}; APP.parseLines('2x EF-2000\n2x AMX\n1x C-27J'); APP.tailor();
+r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('PU'); APP.S.resMode='auto'; APP.setEvents(['CAS','ID']); APP.S.meta.auth=null; APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[{id:'c1',name:'M',pref:'GCI'},{id:'c2',name:'N',pref:'JTAC'}]}; APP.parseLines('2x EF-2000\n2x Tornado IDS\n1x C-27J'); APP.tailor();
   const t=APP.S.t; o.spin=(t.spins||[]).filter(x=>/^Authentication: /.test(x)); o.auth=t.auth; o.abort=APP.S.cas?APP.S.cas.jtacs.flatMap(J=>J.tasks.map(T=>T.abort)):[];
   APP.S.meta.auth=false; APP.applyAuth(APP.S.t); o.spinOff=(APP.S.t.spins||[]).filter(x=>/^Authentication: /.test(x)); o.abortOff=APP.S.cas?APP.S.cas.jtacs.flatMap(J=>J.tasks.map(T=>T.abort)):[]; APP.S.meta.auth=true; APP.applyAuth(APP.S.t); return o; });
 if(r.spin.length!==1||!/REQUIRED\. .*RAMROD/.test(r.spin[0])) fail.push('auth SPINS '+r.spin); if(!r.auth||!r.auth.on||!r.auth.table.lines.length) fail.push('auth object');

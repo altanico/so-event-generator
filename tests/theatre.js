@@ -15,7 +15,7 @@ r=await page.evaluate(()=>{const t=APP.theatre(); return {id:t.id, fir:t.fir, bl
 if(r.id!=='CUSTOM'||!r.fir||!r.blue.length||r.draw) fail.push('custom theatre '+JSON.stringify(r));
 await page.fill('#thname','MARCHE'); await page.dispatchEvent('#thname','change'); await page.waitForTimeout(80);
 if(await page.evaluate(()=>APP.theatre().name)!=='MARCHE') fail.push('theatre name');
-for (const ev of [['MIX'],['AAR'],['CAS']]) { r=await page.evaluate(([ev,pipS])=>{ const pip=eval(pipS); APP.S.custom=[]; APP.S.resMode='auto'; APP.setEvents(ev); APP.generateGeneric(); APP.parseLines('4x F-35A\n2x AMX\n1x KC-767\n1x E-3'); APP.tailor();
+for (const ev of [['MIX'],['AAR'],['CAS']]) { r=await page.evaluate(([ev,pipS])=>{ const pip=eval(pipS); APP.S.custom=[]; APP.S.resMode='auto'; APP.setEvents(ev); APP.generateGeneric(); APP.parseLines('4x F-35A\n2x Tornado IDS\n1x KC-767\n1x E-3'); APP.tailor();
   const poly=APP.theatre().poly, touch=z=>z.poly.some(p=>pip(p,poly))||poly.some(p=>pip(p,z.poly));
   return {th:APP.theatre().id, n:APP.RES().length, out:APP.RES().filter(z=>!touch(z)&&!(APP.S.t.airspace||[]).some(a=>a.name&&a.name.includes(z.name))).map(z=>z.id), thr:APP.S.t.threats.filter(t=>!pip(t.pos,poly)).length, all:APP.S.t.threats.length, iss:(APP.containmentIssues()||[]).length}; },[ev,pip]);
   if(r.th!=='CUSTOM') fail.push(ev+' theatre lost'); if(!r.n) fail.push(ev+' no reserved area'); if(r.iss) fail.push(ev+' '+r.iss+' containment issues');

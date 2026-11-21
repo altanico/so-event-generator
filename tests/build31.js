@@ -5,7 +5,7 @@ const { chromium } = require(ENV.PW); const { execSync } = require('child_proces
 await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.includes('pdf-lib.min.js'))return r.fulfill({path:ENV.PDFLIB}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
 await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500); const fail=[];
 let r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('PU'); APP.S.resMode='auto'; APP.S.casCfg={nJtac:2,perJ:4,rw:0}; APP.setEvents(['CAS']); APP.generateGeneric();
-  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x AMX\n2x F-35A\n2x M-346\n2x EF-2000'); APP.tailor(); o.tasks=APP.S.t.flights.map(f=>f.type+':'+f.task).join(); const t=APP.S.t, cas=t.flights.filter(f=>f.task==='CAS');
+  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x Tornado IDS\n2x F-35A\n2x M-346\n2x EF-2000'); APP.tailor(); o.tasks=APP.S.t.flights.map(f=>f.type+':'+f.task).join(); const t=APP.S.t, cas=t.flights.filter(f=>f.task==='CAS');
   o.n=cas.length; o.one=cas.every(f=>(f.casTasks||[]).length===1); const ids=cas.flatMap(f=>f.casTasks); o.uniq=new Set(ids).size===ids.length;
   const w=APP.tl(); o.win=[w.on0,w.on1]; o.tots=cas.map(f=>APP.casTaskById(f.casTasks[0])[1].tot); o.docTasks=APP.casDocJtacs().reduce((a,J)=>a+J.tasks.length,0); o.lib=APP.S.cas.jtacs.reduce((a,J)=>a+J.tasks.length,0); return o; });
 if(r.n<2) fail.push('need 2 CAS flights '+r.tasks); if(!r.n||!r.one||!r.uniq) fail.push('automatic proposal '+JSON.stringify(r)); if(r.win.join()!=='35,115') fail.push('window '+r.win); if(r.tots.some(x=>x<r.win[0]||x>r.win[1])) fail.push('TOT outside the window '+r.tots);

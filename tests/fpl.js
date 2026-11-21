@@ -11,7 +11,7 @@ if(nav.n<2000||nav.aw<200||!nav.risom||!nav.gate) fail.push('navdb '+JSON.string
 const aw=await page.evaluate(()=>{ const p=APP.awyPath([45.5,12.35],[44.53,11.29]); return p?p.map(x=>x.id+(x.aw?'/'+x.aw:'')).join(' '):null; }); if(!aw||!/\//.test(aw)) fail.push('no airway path '+aw);
 // scenario: NE theatre, mixed event, roster with fighters, tankers, helos, a civil helo from a civil base
 await page.evaluate(()=>{ APP.S.custom=[]; APP.setTheatre('NE'); APP.S.resMode='auto'; APP.setEvents(['MIX']); APP.generateGeneric(); APP.S.meta.hHour='19:00Z'; APP.S.meta.date='12 DEC 2026';
-  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x AMX\n1x HH-139A\n2x F-35A\n1x AW109'); APP.tailor(); APP.TAB='fpl'; APP.renderAll(); });
+  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x Tornado IDS\n1x HH-139A\n2x F-35A\n1x AW109'); APP.tailor(); APP.TAB='fpl'; APP.renderAll(); });
 await page.click('[data-tab="fpl"]'); await page.waitForTimeout(300);
 const tabTxt=await page.textContent('#panel'); if(!/Piani di volo/.test(tabTxt)||!/OAT ICAO Format/.test(tabTxt)) fail.push('tab content');
 if(!(await page.$('[data-tab="export"]'))||!/5 · Export/.test(await page.textContent('#tabs'))) fail.push('export tab renamed');
@@ -51,12 +51,19 @@ const cor=await page.evaluate(()=>{ const p=APP.navRes('RISOM'); return { a:APP.
 if(cor.a!=='RISOM'||cor.b!==' (corresponds to RISOM)'||cor.c) fail.push('pubRef '+JSON.stringify(cor));
 await page.evaluate(id=>{APP.S.fplSel=id;APP.renderAll();},fid); await page.waitForTimeout(200); await page.screenshot({path:'fpl_tab.png',fullPage:false});
 // navigation layer toggle
-await page.click('#navbtn'); await page.waitForTimeout(150); await page.check('#navon'); await page.waitForTimeout(200); if(!(await page.evaluate(()=>APP.S.navOn))) fail.push('nav layer toggle');
+if(await page.evaluate(()=>APP.MAPWIN)!=='nav') fail.push('navigation window not open by itself in the flight plan tab '+await page.evaluate(()=>APP.MAPWIN));
+await page.check('#navon'); await page.waitForTimeout(200); if(!(await page.evaluate(()=>APP.S.navOn))) fail.push('nav layer toggle');
 if((await page.$$('[data-navl]')).length!==12) fail.push('layer panel switches');
 await page.uncheck('[data-navl="vrp"]'); await page.waitForTimeout(100); if(await page.evaluate(()=>APP.S.navL.vrp)) fail.push('layer switch not saved');
 if(!/punti visibili|caricamento/.test(await page.textContent('#navcount'))) fail.push('nav counter '+await page.textContent('#navcount'));
 const cls=await page.evaluate(()=>{ const c={}; APP.NAV.pts.forEach(p=>{const k=APP.navCls(p)||'-'; c[k]=(c[k]||0)+1;}); return c; });
-['VOR','VORTAC','TACAN','NDB','FE','FRA','VRP','MIL','GATE'].forEach(k=>{ if(!cls[k]) fail.push('no points of class '+k); });
+['VOR','VORTAC','TACAN','NDB','FE','VRP','MIL','GATE'].forEach(k=>{ if(!cls[k]) fail.push('no points of class '+k); }); if(cls.FRA) fail.push('FRA must be an attribute, not a class');
+const fra=await page.evaluate(()=>{ const p=APP.NAV.pts.find(x=>x.k==='F'&&x.x.includes('*')&&x.x[0]==='E'); APP.S.navL.fra=1; const a=APP.navSvgP(p); APP.S.navL.fra=0; const b=APP.navSvgP(p); APP.S.navL.fra=1; return { cls:APP.navCls(p), filled:/fill="#1e293b"/.test(a), open:/fill="#fff"/.test(b), type:APP.navTypeTxt(p) }; });
+if(fra.cls!=='FE'||!fra.filled||!fra.open||!/FRA/.test(fra.type)) fail.push('FRA attribute symbol '+JSON.stringify(fra));
+if(!/#9333ea/.test(await page.evaluate(()=>APP.navSvg('VRP')))) fail.push('VRP not purple');
+if(await page.evaluate(()=>{ const d=JSON.parse(JSON.stringify(APP.S.navL)); return d.awy; })) {} // user state may differ
+if(await page.evaluate(()=>APP.NAVL_DEF.awy)) fail.push('airways must be off by default');
+
 const svgs=await page.evaluate(()=>['VOR','VORDME','VORTAC','TACAN','DME','NDB','FE','FT','FRA','VRP','MIL','GATE'].map(c=>APP.navSvg(c)));
 if(new Set(svgs).size!==12||svgs.some(x=>!/^<svg/.test(x))) fail.push('symbols not distinct');
 // route editor: search, add, move, delete, coordinates
@@ -76,5 +83,20 @@ await page.click(`[data-fpldel="${fid}|0"]`); await page.waitForTimeout(150); if
 const pop=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id), p=APP.navRes('PES'); const n=APP.fplBuild(f).pts.length; APP.fplInsert(f,{id:p.id,name:p.id,pos:p.pos,k:p.k,x:p.x},APP.fplInsAt(APP.fplBuild(f).pts)); return [n, APP.fplBuild(f).pts.length, APP.fplBuild(f).out.f15]; },fid);
 if(pop[1]!==pop[0]+1||!/ PES /.test(pop[2])) fail.push('insert from map '+JSON.stringify(pop));
 await page.screenshot({path:'fpl_editor.png'}); await page.fill('[data-fplq]','PE'); await page.waitForTimeout(150); await page.screenshot({path:'fpl_editor2.png',fullPage:true});
+// map tools: 3 icons, auto windows per tab, one window at a time, style radio, threats list
+const mt=await page.evaluate(async()=>{ const o={}; const btns=[...document.querySelectorAll('#maptools .mtbtn')].map(b=>b.dataset.mapwin).join(); o.btns=btns;
+  document.querySelector('[data-tab="scenario"]').click(); await new Promise(r=>setTimeout(r,150)); o.scen=APP.MAPWIN; o.items=document.querySelectorAll('#maptools [data-addmode^="zone:"]').length;
+  document.querySelector('#maptools [data-addmode^="zone:"]').click(); await new Promise(r=>setTimeout(r,50)); o.mode=APP.ADDMODE;
+  document.querySelector('[data-mapwin="style"]').click(); await new Promise(r=>setTimeout(r,50)); o.style=APP.MAPWIN; o.nwin=document.querySelectorAll('#maptools .mtwin').length;
+  document.querySelector('#maptools .mtclose').click(); await new Promise(r=>setTimeout(r,50)); o.closed=APP.MAPWIN; o.nwin2=document.querySelectorAll('#maptools .mtwin').length;
+  document.querySelector('[data-tab="tailor"]').click(); await new Promise(r=>setTimeout(r,150)); o.tailor=APP.MAPWIN;
+  document.querySelector('[data-mapwin="thr"]').click(); await new Promise(r=>setTimeout(r,50)); o.thr=document.querySelectorAll('#maptools [data-addmode^="threat:"]').length+'/'+document.querySelectorAll('#maptools [data-addmode^="obj:"]').length;
+  document.querySelector('[data-tab="fpl"]').click(); await new Promise(r=>setTimeout(r,150)); o.fpl=APP.MAPWIN; return o; });
+if(mt.btns!=='style,nav,thr'||mt.scen!=='thr'||!(mt.items>5)||!/^zone:/.test(mt.mode||'')||mt.style!=='style'||mt.nwin!==1||mt.closed!==null||mt.nwin2!==0||mt.tailor!==null||!/^\d+\/\d+$/.test(mt.thr)||mt.thr.startsWith('0')||mt.fpl!=='nav') fail.push('map tools '+JSON.stringify(mt));
+// low-level navigation: tactical areas switched on (auto and manual)
+const at=await page.evaluate(()=>{ const S=APP.S; S.custom=[]; APP.setTheatre('CT'); S.resMode='auto'; APP.setEvents(['NAVL']); APP.generateGeneric(); const auto=APP.RES().map(z=>z.id).filter(id=>/^LI-AT/.test(id));
+  S.resMode='manual'; S.reserved=S.reserved.filter(id=>!/^LI-AT/.test(id)); S.atSig=''; APP.aspCard(); const man=(S.reserved||[]).filter(id=>/^LI-AT/.test(id));
+  APP.setEvents(['CAS']); S.resMode='auto'; APP.generateGeneric(); const none=APP.RES().map(z=>z.id).filter(id=>/^LI-AT/.test(id)); return {auto,man,none}; });
+if(!at.auto.length||!at.man.length||at.none.length) fail.push('AT areas '+JSON.stringify(at));
 console.log(JSON.stringify(r.map(x=>[x.cs,x.type,x.o.f8,x.o.f15,x.o.f18,x.warn]),null,0).slice(0,3000));
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();

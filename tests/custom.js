@@ -5,7 +5,7 @@ const { chromium } = require(ENV.PW); const { execSync } = require('child_proces
 await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.includes('pdf-lib.min.js'))return r.fulfill({path:ENV.PDFLIB}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
 await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500);
 const fail=await page.evaluate(()=>{const f=[]; const pip=(p,poly)=>{let ins=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const[yi,xi]=poly[i],[yj,xj]=poly[j];if(((yi>p[0])!==(yj>p[0]))&&(p[1]<(xj-xi)*(p[0]-yi)/(yj-yi)+xi))ins=!ins;}return ins;};
- APP.S.custom=[]; APP.S.meta.theatre='NE'; APP.S.meta.date='12 DEC 2026'; APP.S.meta.hHour='19:00Z'; APP.setEvents(['MIX']); APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('4x F-35A\n2x AMX\n1x E-3'); APP.tailor();
+ APP.S.custom=[]; APP.S.meta.theatre='NE'; APP.S.meta.date='12 DEC 2026'; APP.S.meta.hHour='19:00Z'; APP.setEvents(['MIX']); APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('4x F-35A\n2x Tornado IDS\n1x E-3'); APP.tailor();
  const c1=APP.cusFromParts(['LI-R49A','LI-R49B','LI-R49C','LI-R49D'],'FL100','FL240'); if(!c1||!c1.joined) f.push('combined area');
  const c2=APP.cusFromScenario(); if(!c2) f.push('scenario area'); else { if(c2.poly.length>10) f.push('threat area: too many vertices'); for (const t of APP.S.t.threats) if(!pip(t.pos,c2.poly)) f.push('threat outside '+t.id); }
  APP.S.cusDraft=[[45.9,12.2],[45.9,12.6],[45.6,12.6],[45.6,12.2]]; const c3=APP.cusFinishDraw(); if(!c3||c3.poly.length!==4) f.push('drawn area');
@@ -21,7 +21,7 @@ const fail=await page.evaluate(()=>{const f=[]; const pip=(p,poly)=>{let ins=fal
  // area created BEFORE generation: the whole exercise inside it
  APP.S.custom=[]; APP.S.cusLock=false; APP.S.gen=false; APP.S.zones=[]; APP.S.t=null; APP.S.meta.theatre='CT'; APP.setEvents(['MIX']);
  APP.S.cusDraft=[[42.75,11.6],[42.75,12.5],[42.15,12.5],[42.15,11.6]]; const cl=APP.cusFinishDraw(); cl.upper='FL300'; if(!APP.S.cusLock) f.push('lock not set before generation');
- APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('4x F-35A\n2x AMX\n1x KC-767\n1x E-3'); APP.tailor();
+ APP.generateGeneric(); APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('4x F-35A\n2x Tornado IDS\n1x KC-767\n1x E-3'); APP.tailor();
  if(APP.RES().length!==1) f.push('locked: other areas reserved'); const L=APP.S.t; const P=[...L.threats.map(x=>x.pos),...L.objectives.filter(x=>!['WATER','ALIFT'].includes(x.type)).map(x=>x.pos),...L.airspace.filter(a=>!a.pub&&!['BULLSEYE','FLOT'].includes(a.type)).flatMap(a=>a.pts||[])];
  if(P.some(p=>!pip(p,cl.poly))) f.push('locked: element outside the custom area'); if((APP.containmentIssues()||[]).length) f.push('locked: containment');
  return f;});

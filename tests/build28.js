@@ -8,7 +8,7 @@ const r=await page.evaluate(()=>{ const o={}; APP.S.custom=[]; APP.setTheatre('N
   const Js=APP.S.cas.jtacs; o.marks=Js.flatMap(J=>J.tasks.map(T=>T.mark)); o.fmarks=Js.flatMap(J=>J.friendlies.map(x=>x.mark));
   o.inside=Js.map(J=>APP.holdInside(J)||!!J.fitWarn); o.res=(APP.S.reserved||[]).length;
   // tailoring with participants: weapons from the aircraft list, staff choice kept, MQ-9
-  APP.S.roster={pilots:[],controllers:[{id:'c1',name:'J',pref:'JTAC'}]}; APP.parseLines('2x AMX\n1x MQ-9\n2x F-35A'); APP.tailor();
+  APP.S.roster={pilots:[],controllers:[{id:'c1',name:'J',pref:'JTAC'}]}; APP.parseLines('2x Tornado IDS\n1x MQ-9\n2x F-35A'); APP.tailor();
   const all=APP.S.cas.jtacs.flatMap(J=>J.tasks.map(T=>({J,T}))).filter(x=>x.T.flight); o.marks2=all.map(x=>x.T.mark);
   const mq=all.find(x=>/MQ-9/.test((APP.S.t.flights.find(f=>f.id===x.T.flight)||{}).type)); o.mq=mq?APP.wpnChoices(mq.T):null;
   const amx=all.find(x=>/F-35A/.test((APP.S.t.flights.find(f=>f.id===x.T.flight)||{}).type)); if(amx){ amx.T.wpn='GBU-31'; amx.T.wpnMan=true; } APP.tailor();

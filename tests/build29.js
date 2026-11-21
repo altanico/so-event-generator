@@ -15,7 +15,7 @@ if(all.wedges!==6) fail.push('wedges with all visible '+all.wedges); if(solo.wed
 await page.click('[data-casall="J2:show"]'); await page.waitForTimeout(200); await page.evaluate(()=>{ window.__rec=[]; drawMap(); }); const j2=await count(); if(j2.wedges!==4) fail.push('J2 show all '+j2.wedges);
 await page.click('[data-casvis="J1S2"]'); await page.waitForTimeout(200); await page.evaluate(()=>{ window.__rec=[]; drawMap(); }); const h=await count(); if(h.wedges!==3) fail.push('eye toggle '+h.wedges);
 // threats toggle (phase 3 threats)
-await page.evaluate(()=>{ APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x AMX\n2x F-35A'); APP.tailor(); TAB='cas'; APP.renderAll(); });
+await page.evaluate(()=>{ APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('2x Tornado IDS\n2x F-35A'); APP.tailor(); TAB='cas'; APP.renderAll(); });
 await page.evaluate(()=>{ window.__rec=[]; drawMap(); }); const t1=await count(); await page.click('#casnothr'); await page.waitForTimeout(200); await page.evaluate(()=>{ window.__rec=[]; drawMap(); }); const t2=await count();
 if(!(t1.thr>0&&t2.thr===0)) fail.push(`threats toggle ${t1.thr} -> ${t2.thr}`);
 // documents unaffected by the hidden scenarios + Task allocation name

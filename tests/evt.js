@@ -20,7 +20,7 @@ const R={
  HOSPITAL:'2x H145\n1x PC-12',
  HUMAN:'2x C-130J\n2x CH-47',
  AIB:'2x CL-415\n3x AW139\n1x AT-802',
- CAS:'4x AMX\n2x A-129',
+ CAS:'4x Tornado IDS\n2x A-129',
  MIX:'4x F-35A\n2x Eurofighter\n2x KC-767A\n2x AW139\n1x E-3A',
  COMBO:'4x F-35A\n2x KC-767A\n3x AW139\n2x H145',
 };

@@ -243,3 +243,7 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.23 additions
 
 * `S.navL = { vor, vortac, tacan, ndb, fe, ft, fra, vrp, mil, gate, awy, lbl }` (1 / 0) – switches of the map layer "Navigazione" (staff only, saved with the event).
+
+## v1.24 additions
+
+* `S.atSig` – theatre + events for which the tactical areas (AT …) were ticked automatically for low-level navigation in manual mode (so the staff can untick them). `S.navL.awy` default 0. Aircraft type AMX removed: a saved roster line "AMX" now resolves as unknown type.

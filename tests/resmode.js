@@ -14,7 +14,7 @@ await page.evaluate(()=>{ APP.S.reserved=APP.RES().length?APP.S.reserved:['LI-R4
 if(await page.$('#resnone')){ await page.click('#resnone'); await page.waitForTimeout(100); } else fail.push('no deselect-all button');
 let r=await page.evaluate(()=>({n:APP.RES().length,m:APP.S.resMode})); if(r.n||r.m!=='manual') fail.push('deselect all: '+JSON.stringify(r));
 // manual: pick two areas and generate; the generator must keep them and stay inside
-r=await page.evaluate(()=>{ const pick=['LI-R49A','LI-R49B']; APP.S.reserved=pick.slice(); APP.S.resMode='manual'; APP.generateGeneric(); APP.parseLines('4x F-35A\n2x AMX\n1x E-3\n1x KC-767'); APP.tailor();
+r=await page.evaluate(()=>{ const pick=['LI-R49A','LI-R49B']; APP.S.reserved=pick.slice(); APP.S.resMode='manual'; APP.generateGeneric(); APP.parseLines('4x F-35A\n2x Tornado IDS\n1x E-3\n1x KC-767'); APP.tailor();
   return {res:(APP.S.reserved||[]).slice().sort().join(','), iss:(APP.containmentIssues()||[]).length, ast:APP.S.t.airspace.length}; });
 if(r.res!=='LI-R49A,LI-R49B') fail.push('manual selection changed: '+r.res); if(r.iss) fail.push('manual: '+r.iss+' containment issues');
 // union of the ticked areas
@@ -23,7 +23,7 @@ await page.evaluate(()=>{ APP.WOPEN='asp'; APP.renderAll(); }); if(!(await page.
  r=await page.evaluate(()=>{const cs=APP.S.custom||[], c=cs.find(x=>x.kind==='combo'&&x.lower==='FL100')||cs.slice(-1)[0]; return c?{lo:c.lower,up:c.upper,res:APP.RES().some(z=>z.id===c.id)}:null;});
  if(!r||r.lo!=='FL100'||r.up!=='FL240'||!r.res) fail.push('union: '+JSON.stringify(r)); }
 // auto mode proposes again
-r=await page.evaluate(()=>{ APP.S.custom=[]; APP.S.reserved=[]; APP.S.resMode='auto'; APP.generateGeneric(); APP.parseLines('4x F-35A\n2x AMX'); APP.tailor(); return APP.RES().length; });
+r=await page.evaluate(()=>{ APP.S.custom=[]; APP.S.reserved=[]; APP.S.resMode='auto'; APP.generateGeneric(); APP.parseLines('4x F-35A\n2x Tornado IDS'); APP.tailor(); return APP.RES().length; });
 if(!r) fail.push('auto mode reserved nothing');
 
 // overlapping areas on the map: every area under the click is listed, none is toggled blindly

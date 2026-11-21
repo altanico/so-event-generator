@@ -22,7 +22,7 @@ const [d0]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page
 const jp=execSync('pdftotext cas_jtac_pre.pdf -').toString();
 if(!/FINAL ATTACK HEADING/.test(jp)||!/\[CALLSIGN\]/.test(jp)) fail.push('pre-signup JTAC pack incomplete');
 // 2) after sign-ups
-const info=await page.evaluate(()=>{ APP.parseLines('4x AMX\n2x F-16\n2x AH-64 Apache\n1x JTAC Mario Rossi\n1x JTAC Luigi Bianchi'); APP.tailor(); APP.renderAll();
+const info=await page.evaluate(()=>{ APP.parseLines('4x Tornado IDS\n2x F-16\n2x AH-64 Apache\n1x JTAC Mario Rossi\n1x JTAC Luigi Bianchi'); APP.tailor(); APP.renderAll();
   const t=APP.S.t; return { asg:APP.S.cas.jtacs.flatMap(J=>J.tasks.filter(T=>T.flight)).length, cas:t.flights.filter(f=>f.task==='CAS').length, cp:t.airspace.filter(a=>a.type==='CP').length,
     pub:JSON.stringify(APP.buildPayload(true).scenario) }; });
 console.log(JSON.stringify({pre, asg:info.asg, cas:info.cas, cp:info.cp}));

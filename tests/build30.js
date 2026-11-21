@@ -30,6 +30,6 @@ if(r.ov!==1) fail.push('overlap not detected'); if(r.g.some(g=>!/^(FL\d{3}|SFC|G
 // CAS tab: run-in terrain line, style selector; PDF map with relief
 await page.click('#tabcas'); await page.waitForTimeout(400); const txt=await page.evaluate(()=>document.getElementById('panel').textContent);
 if(!/Run-in .* bersaglio \d+ ft · rilievo max \d+ ft/.test(txt)) fail.push('run-in terrain line missing');
-const st=await page.$$eval('#mapstyle option',os=>os.map(o=>o.value).join()); if(st!=='clean,relief,tint,dark') fail.push('style selector '+st);
+await page.click('[data-mapwin="style"]'); await page.waitForTimeout(150); const st=await page.$$eval('[data-mstyle]',os=>os.map(o=>o.dataset.mstyle).join()); if(st!=='clean,relief,tint,dark') fail.push('style selector '+st);
 const img=await page.evaluate(async()=>{ APP.S.mapStyle='tint'; const m=await renderMap('brief',{light:true,w:600,h:400}); return typeof m==='string'?m.length:0; }); if(img<10000) fail.push('PDF map with relief');
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();

@@ -66,7 +66,20 @@ main{display:grid;grid-template-columns:minmax(380px,530px) 1fr;flex:1 1 auto;mi
 #mapwrap{position:relative}
 #map{position:absolute;inset:0;background:#D9E4F5}
 .navsym{background:none;border:0}.navsym svg{display:block}.navlbl{position:absolute;left:17px;top:1px;font:600 10.5px/1 system-ui,sans-serif;color:#0f172a;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff;pointer-events:none}
-#maptools{position:absolute;top:10px;right:10px;z-index:1000;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:440px;box-shadow:0 2px 8px rgba(13,44,153,.12)}
+#maptools{position:absolute;top:10px;right:4px;z-index:1000;pointer-events:none}#maptools>*{pointer-events:auto}
+.mtrail{position:absolute;top:0;right:0;width:74px;display:flex;flex-direction:column;gap:8px;align-items:center}.mtcol{display:flex;flex-direction:column;align-items:center;gap:2px}
+.mtbtn{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;background:#fff;color:var(--ivao);box-shadow:0 2px 8px rgba(13,44,153,.18);cursor:pointer;padding:0}
+.mtbtn.on{background:var(--ivao);color:#fff;border-color:var(--ivao)}.mtlab{font:600 10px Poppins,sans-serif;color:#334155;background:rgba(255,255,255,.9);padding:1px 5px;border-radius:4px}.mtlab.on{color:var(--ivao)}
+.mtwin{position:absolute;top:0;right:80px;width:330px;max-height:calc(100vh - 220px);overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.22)}
+.mtwhead{display:flex;align-items:center;gap:8px;padding:9px 10px 9px 12px;background:#eef2fb;border-bottom:1px solid #dbe3ef;color:var(--ivao);position:sticky;top:0}.mtwhead b{font-size:14px}
+.mtclose{width:32px;height:32px;border:0;background:transparent;color:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.mtclose:hover{background:#dbe3ef}
+.mtwbody{padding:10px 12px;display:flex;flex-direction:column;gap:6px}.mtwbody #navpanel{border-top:0;margin-top:0;padding-top:0}
+.mtopt{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;border:1px solid #e2e8f0;margin:0;cursor:pointer;font-weight:400}.mtopt.on{border-color:var(--ivao);background:#eef2fb}.mtopt.dis{opacity:.5;cursor:default}
+.mtsw{width:54px;height:38px;border-radius:6px;flex:none;border:1px solid #cbd5e1}
+.mtgrp{font-size:11.5px;font-weight:700;color:#475569;margin-top:4px;text-transform:uppercase;letter-spacing:.03em}
+.mtitem{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font-size:12.5px;padding:6px 9px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#0f172a;cursor:pointer}.mtitem span{width:11px;height:11px;border-radius:50%;flex:none}.mtitem.on{border-color:var(--ivao);background:#eef2fb}
+.mthint{padding:7px 9px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;font-size:12px;color:#7c2d12}
+.mtpill{position:absolute;top:0;right:80px;width:260px;box-sizing:border-box;background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:12px;padding:6px 10px;border-radius:8px}
 #nomap{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:40px}
 h2{font-size:15px;margin:20px 0 8px;color:var(--ivao);font-weight:800}
 h2:first-child{margin-top:0}
@@ -279,7 +292,6 @@ const AC = [
   ['Gripen','FIGHTER',['STRIKE','ANTISHIP','DCA','OCA','ESCORT','QRA','LOWSLOW','CAS'],['JAS39','GRIPEN']],
   ['Tornado ECR','FIGHTER',['SEAD','RECCE'],['TORNADOECR','ECR','EA200']],
   ['Tornado IDS','FIGHTER',['STRIKE','ANTISHIP','RECCE','CAS'],['TORNADO','TORNADOIDS','PA200','A200','IDS']],
-  ['AMX','ATTACK',['CAS','STRIKE','RECCE'],['AMX','A11','GHIBLI']],
   ['A-10','ATTACK',['CAS','RESCORT'],['A10','A10C','WARTHOG','THUNDERBOLT']],
   ['AV-8B Harrier','ATTACK',['CAS','STRIKE'],['AV8B','AV8','HARRIER']],
   ['M-346','ATTACK',['LOWSLOW','CAS'],['M346','T346','MASTER']],
@@ -331,7 +343,7 @@ const AC = [
 // air refuelling systems: tankers BOOM / DROGUE / BOTH; receivers BOOM (receptacle) or PROBE
 const AAR_SYS = { 'KC-767': 'BOTH', 'A330 MRTT': 'BOTH', 'KC-46': 'BOTH', 'KC-135': 'BOOM', 'KC-130J': 'DROGUE', 'HC-130J Combat King II': 'DROGUE', 'MC-130J Commando II': 'DROGUE',
   'F-35A': 'BOOM', 'F-16': 'BOOM', 'F-15E': 'BOOM', 'F-15C': 'BOOM', 'F-22': 'BOOM', 'A-10': 'BOOM', 'C-17': 'BOOM', 'E-3 Sentry': 'BOOM', 'P-8 Poseidon': 'BOOM', 'KC-46': 'BOTH',
-  'F-35B': 'PROBE', 'EF-2000 Typhoon': 'PROBE', 'Tornado ECR': 'PROBE', 'Tornado IDS': 'PROBE', 'AMX': 'PROBE', 'F/A-18': 'PROBE', 'EA-18G Growler': 'PROBE', 'Rafale': 'PROBE', 'Gripen': 'PROBE',
+  'F-35B': 'PROBE', 'EF-2000 Typhoon': 'PROBE', 'Tornado ECR': 'PROBE', 'Tornado IDS': 'PROBE', 'F/A-18': 'PROBE', 'EA-18G Growler': 'PROBE', 'Rafale': 'PROBE', 'Gripen': 'PROBE',
   'AV-8B Harrier': 'PROBE', 'A400M': 'PROBE', 'E-2 Hawkeye': 'PROBE' };
 const aarSys = type => AAR_SYS[type] || (AC.find(a => a.type === type && a.cat === 'HELO' && a.roles.includes('HAARRCV')) ? 'PROBE' : '');
 const aarFits = (tk, rc) => { const t = aarSys(tk), r = aarSys(rc); if (!t || !r) return true; return t === 'BOTH' || (t === 'BOOM' && r === 'BOOM') || (t === 'DROGUE' && r === 'PROBE'); };
@@ -827,7 +839,11 @@ function autoReserve() { if (!thChosen()) return []; if (cusLocked()) return cus
 const TASK_FL = { AAR: [150, 280], RECEIVER: [150, 280], DCA: [100, 350], OCA: [100, 350], ESCORT: [100, 350], QRA: [100, 350], SEAD: [100, 300], STRIKE: [50, 300], CAS: [50, 200], ANTISHIP: [50, 250], MPA: [50, 250], RECCE: [50, 250] };
 const haarArea = z => /HAAR/i.test(z.name || '') || /HAAR/i.test(z.activity || ''); // AIP ENR 5.1.3 D266A/B/C "Haar – Mar Adriatico"
 const zBandOk = (z, b) => !/TBC|TBD/i.test(String(z.upper)) && zLo(z.lower) <= b[1] - 50 && zLimit(z.upper) >= b[0] + 50; // unknown upper limit: not proposed for a level band
-function autoReserve0() { const g = geom(), real = S.asp && S.asp.source !== 'demo', P = PROF(), LIB = () => LIBF().filter(z => z.type !== 'COR');
+// tactical areas (AIP ENR 5.2.2.6, use LOWLEVEL, "AT ...") of the chosen theatre: switched on automatically when the event has low-level navigation (staff 21 Nov)
+const atAreas = () => { const thp = theatre().poly, g = geom(); return LIBF().filter(z => /^AT\s/i.test(z.name || '') && (z.use || []).includes('LOWLEVEL') && (thp ? polyTouch(z.poly, thp) : dist(g.front, centroid(z.poly)) < 200)); };
+const lowNav = () => reqTasks().some(t => t === 'LOWNAV' && !offT(t));
+function autoReserve0() { const out0 = autoReserve00(); return lowNav() ? [...new Set(out0.concat(atAreas().map(z => z.id)))] : out0; }
+function autoReserve00() { const g = geom(), real = S.asp && S.asp.source !== 'demo', P = PROF(), LIB = () => LIBF().filter(z => z.type !== 'COR');
   if (real && S.asp.source === 'aip' && P.civil) return []; // AIP layer = military areas only: civil events do not use them
   const T = new Set(reqTasks().filter(t => !offT(t))), want = new Set([...(T.has('CAS') || T.has('STRIKE') || T.has('SEAD') ? ['FIRING', 'A2G'] : []), ...(T.has('AIRDROP') || T.has('INSERT') ? ['PARA'] : []), ...(T.has('CSAR') || T.has('MEDEVAC') ? ['HELO'] : []), ...(T.has('LOWNAV') ? ['LOWLEVEL'] : [])]);
   const bands = [...T].map(t => TASK_FL[t]).filter(Boolean), tagged = z => (z.use || []).some(u => want.has(u));
@@ -1719,7 +1735,7 @@ const CAS_FRIEND = ['Platoon on the high ground', 'Company in a blocking positio
 const CAS_FMARK = ['VS-17 orange panels', 'IR strobe', 'none', 'orange smoke on request'];
 const CAS_WPN = { // ordnance by aircraft type (first = default)
   'F-35A': ['GBU-12', 'GBU-31', 'GBU-32'], 'F-15C': ['20 mm gun'], 'F-22': ['GBU-32', '20 mm gun'], 'Gripen': ['GBU-12', '27 mm gun'], 'MB-339': ['gun pods', '2.75 in rockets'], 'F-104': ['20 mm gun'], 'F-35B': ['GBU-12', 'GBU-32'], 'EF-2000 Typhoon': ['GBU-16', 'Paveway IV'], 'Tornado IDS': ['GBU-16', 'GBU-32'], 'F-16': ['GBU-12', 'GBU-38'], 'F/A-18': ['GBU-12', 'GBU-38'], 'F-15E': ['GBU-12', 'GBU-38'], 'Rafale': ['GBU-12', 'AASM'],
-  'AMX': ['GBU-12', 'Mk-82'], 'A-10': ['GBU-12', 'GBU-38', 'AGM-65 Maverick', '30 mm gun'], 'AV-8B Harrier': ['GBU-12', 'GBU-38'], 'M-346': ['GBU-12', 'Mk-82'],
+  'A-10': ['GBU-12', 'GBU-38', 'AGM-65 Maverick', '30 mm gun'], 'AV-8B Harrier': ['GBU-12', 'GBU-38'], 'M-346': ['GBU-12', 'Mk-82'],
   'MQ-9 Reaper': ['GBU-12', 'AGM-114 Hellfire'], 'AH-129 Mangusta': ['Spike ER', '70 mm rockets', '20 mm gun'], 'AH-64 Apache': ['AGM-114 Hellfire', '70 mm rockets', '30 mm gun'],
 };
 const GPS_WPN = /GBU-3[128]|AASM|JDAM|Paveway IV/;
@@ -2108,7 +2124,7 @@ function casAttackGeom(J, T) {
    survivor positions and the 9-line MEDEVAC stay with staff, AMC and OSC.
    ===================================================================== */
 const PR_SURV = ['BAT', 'HAWK', 'RIDER', 'SABRE', 'DAGGER', 'LANCE', 'TORCH', 'FALCON'];
-const PR_AC = ['AMX', 'F-35A', 'EF-2000 Typhoon', 'Tornado IDS', 'F-16'];
+const PR_AC = ['F-35A', 'EF-2000 Typhoon', 'Tornado IDS', 'F-16'];
 const PR_CAUSE = ['SAM hit', 'AAA hit', 'engine fire', 'bird strike, double engine failure'];
 const PR_INJ = ['uninjured', 'minor injuries (sprained ankle), mobile', 'injured, cannot move far', 'back injury, immobile'];
 const PR_TERRAIN = ['woodlands to the south and east, a village to the north', 'open fields, powerlines to the west', 'hilly terrain with olive groves', 'river bank with steep slopes', 'vineyards on a gentle slope, farm buildings to the east'];
@@ -3208,21 +3224,46 @@ function fitMission() {
   if (!MAP || !MAP.fitBounds) return; const pts = missionPts();
   if (pts.length > 1) MAP.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 10 }); else { const v = theatre().view; MAP.setView([v[0], v[1]], v[2]); }
 }
+// map tools (v1.24, staff 21 Nov): a rail of 3 icons, each opens a window – "Stile" (on click only), "Navigazione" (opens by itself in the flight plan tab),
+// "Minacce" (add threat zones / RED threats / BLUE objectives; opens by itself in phase 1). One window at a time.
+let MAPWIN = null, MAPWIN_TAB = null;
+const MTICON = { style: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/><path d="m2 17.5 10 5 10-5"/></svg>',
+  nav: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2Z"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/></svg>',
+  thr: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v5M9.5 11.5h5"/></svg>',
+  x: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>' };
+const MTNAME = { style: 'Stile', nav: 'Navigazione', thr: 'Minacce' };
+// what can be added with a click on the map in this phase (the old "Clic sulla mappa" select)
+function addModes() { const g = [];
+  if (TAB === 'scenario') g.push(['Zone di minaccia (fase 1)', Object.entries(CATS).map(([k, v]) => [`zone:${k}`, v.it, v.side === 'BLUE' ? '#2563eb' : '#dc2626'])]);
+  else if (S && S.t) { g.push(['Minacce RED', Object.entries(TT).map(([k, v]) => [`threat:${k}`, v.label, '#dc2626'])]); g.push(['Obiettivi BLUE', Object.entries(OBJT).map(([k, v]) => [`obj:${k}`, v.label, '#2563eb'])]); }
+  return g; }
+function mapWinHtml(w) {
+  const head = (sub) => `<div class="mtwhead">${MTICON[w]}<div style="flex:1"><b>${w === 'style' ? 'Stile della mappa' : w === 'nav' ? 'Navigazione' : 'Aggiungi sulla mappa'}</b><div class="muted" style="font-size:11px">${sub}</div></div><button class="mtclose" data-mapwin="${w}" aria-label="Chiudi">${MTICON.x}</button></div>`;
+  if (w === 'style') return head('Vale anche per le mappe di PDF e slide') + `<div class="mtwbody">${MSTYLES.map(([k, l]) => { const dis = k !== 'clean' && k !== 'dark' && !DEM.on, on = mapStyle() === k;
+    const sw = { clean: 'linear-gradient(135deg,#eef2f6,#fff)', relief: 'linear-gradient(135deg,#d9d4c7,#f3efe6)', tint: 'linear-gradient(135deg,#a7c08f,#e9d9a6)', dark: 'linear-gradient(135deg,#1e293b,#334155)' }[k];
+    const d = { clean: 'Solo coste e confini: ideale ad alta quota', relief: 'Ombreggiatura del terreno', tint: 'Rilievo colorato per altitudine', dark: 'Sfondo scuro per il briefing' }[k];
+    return `<label class="mtopt${on ? ' on' : ''}${dis ? ' dis' : ''}"><input type="radio" name="mstyle" data-mstyle="${k}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} style="width:auto"><span class="mtsw" style="background:${sw}"></span><span><b>${esc(l.replace(/^Sfondo: /, '').replace(/^./, c => c.toUpperCase()))}</b><br><span class="muted" style="font-size:11.5px">${dis ? 'Dati del terreno in caricamento…' : d}</span></span></label>`; }).join('')}</div>`;
+  if (w === 'nav') return head(TAB === 'fpl' ? 'Si apre da sola nei piani di volo' : 'VOR, NDB, fix, VRP, punti militari, aerovie') + `<div class="mtwbody">${navPanelHtml()}</div>`;
+  const g = addModes(), drawing = ADDMODE === 'th:draw' || ADDMODE === 'cus:draw', act = g.flatMap(x => x[1]).find(x => x[0] === ADDMODE);
+  return head(TAB === 'scenario' ? 'Fase 1 · si apre da sola' : 'Scegli il tipo, poi clicca sulla mappa') + `<div class="mtwbody">
+    ${drawing ? `<div class="mthint">✏️ ${ADDMODE === 'th:draw' ? 'Disegno del teatro' : 'Disegno area custom'} in corso: clic sulla mappa per i vertici.</div>` : ''}
+    ${act ? `<div class="mthint">Modalità attiva: <b>${esc(act[1])}</b> – clicca sulla mappa. <a href="#" data-addmode="">Annulla</a></div>` : ''}
+    ${g.length ? g.map(([t, items]) => `<div class="mtgrp">${esc(t)}</div>${items.map(([k, l, c]) => `<button class="mtitem${ADDMODE === k ? ' on' : ''}" data-addmode="${k}"><span style="background:${c}"></span>${esc(l)}</button>`).join('')}`).join('')
+      : '<div class="muted" style="font-size:12.5px">In questa fase non c\'è niente da aggiungere sulla mappa. Le zone di minaccia si aggiungono nella fase 1; minacce RED e obiettivi BLUE dopo l\'adattamento (fase 3).</div>'}
+    <div class="muted" style="font-size:11.5px;margin-top:6px">Trascina i marker per spostarli · clic per modificarli.</div></div>`; }
 function renderMapTools() {
   const el = $('#maptools'); if (!MAP) return;
-  let opts = '<option value="">— Clic sulla mappa: nessuna azione —</option>' + (ADDMODE === 'th:draw' ? '<option value="th:draw">✏️ Disegno del teatro (vertici)</option>' : '') + (ADDMODE === 'cus:draw' ? '<option value="cus:draw">✏️ Disegno area custom (vertici)</option>' : '');
-  if (TAB === 'scenario') opts += '<optgroup label="Aggiungi zona minaccia (fase 1)">' + Object.entries(CATS).map(([k, v]) => `<option value="zone:${k}">Zona: ${esc(v.it)}</option>`).join('') + '</optgroup>';
-  else if (S.t) {
-    opts += '<optgroup label="Aggiungi minaccia RED">' + Object.entries(TT).map(([k, v]) => `<option value="threat:${k}">${esc(v.label)}</option>`).join('') + '</optgroup>';
-    opts += '<optgroup label="Aggiungi obiettivo BLUE">' + Object.entries(OBJT).map(([k, v]) => `<option value="obj:${k}">${esc(v.label)}</option>`).join('') + '</optgroup>';
-  }
-  el.innerHTML = `<select id="addmode" style="width:280px">${opts}</select><select id="mapstyle" title="Sfondo della mappa (vale anche per le mappe di PDF e slide)" style="width:150px">${MSTYLES.map(([k, l]) => `<option value="${k}" ${mapStyle() === k ? 'selected' : ''} ${k !== 'clean' && k !== 'dark' && !DEM.on ? 'disabled' : ''}>${l}</option>`).join('')}</select><span class="muted" style="font-size:11px">Trascina i marker per spostarli · clic per modificarli</span>`;
-  el.insertAdjacentHTML('beforeend', `<button class="b sm" id="navbtn" title="Dati di navigazione sulla mappa: scegli cosa vedere" style="margin-left:4px">🧭 Navigazione ${NAVPANEL ? '▴' : '▾'}</button>${NAVPANEL ? navPanelHtml() : ''}`);
-  $('#navbtn').onclick = () => { NAVPANEL = !NAVPANEL; renderMapTools(); drawNav(); };
-  $('#mapstyle').onchange = e => { S.mapStyle = e.target.value; save(); applyMapStyle(); };
-  $('#addmode').value = ADDMODE;
-  $('#addmode').onchange = e => ADDMODE = e.target.value;
+  if (MAPWIN_TAB !== TAB) { MAPWIN_TAB = TAB; MAPWIN = TAB === 'fpl' ? 'nav' : TAB === 'scenario' ? 'thr' : (MAPWIN === 'style' ? 'style' : null); }
+  const btn = k => `<div class="mtcol"><button class="mtbtn${MAPWIN === k ? ' on' : ''}" data-mapwin="${k}" aria-label="${MTNAME[k]}" aria-pressed="${MAPWIN === k}" title="${MTNAME[k]}">${MTICON[k]}</button><span class="mtlab${MAPWIN === k ? ' on' : ''}">${MTNAME[k]}</span></div>`;
+  const drawing = ADDMODE === 'th:draw' || ADDMODE === 'cus:draw' || (ADDMODE && MAPWIN !== 'thr');
+  el.innerHTML = `<div class="mtrail">${btn('style')}${btn('nav')}${btn('thr')}</div>${MAPWIN ? `<div class="mtwin" id="mapwin-${MAPWIN}">${mapWinHtml(MAPWIN)}</div>` : ''}${drawing && MAPWIN !== 'thr' ? `<div class="mtpill"${MAPWIN ? ' style="top:auto;bottom:auto;position:static;width:auto;margin:0"' : ''}>${ADDMODE === 'th:draw' ? '✏️ Disegno del teatro in corso' : ADDMODE === 'cus:draw' ? '✏️ Disegno area custom in corso' : `Clic sulla mappa: <b>${esc((addModes().flatMap(x => x[1]).find(x => x[0] === ADDMODE) || [0, ADDMODE])[1])}</b> · <a href="#" data-addmode="">Annulla</a>`}</div>` : ''}`;
+  const pill = el.querySelector('.mtpill'), body = el.querySelector('.mtwbody'); if (pill && body) body.prepend(pill);
+  if (MAPWIN === 'nav') drawNav();
 }
+document.addEventListener('click', e => { const t = e.target.closest('[data-mapwin],[data-addmode]'); if (!t || !document.getElementById('maptools').contains(t)) return; e.preventDefault();
+  if (t.dataset.mapwin) { MAPWIN = MAPWIN === t.dataset.mapwin ? null : t.dataset.mapwin; renderMapTools(); return; }
+  if (t.dataset.addmode != null) { ADDMODE = ADDMODE === t.dataset.addmode ? '' : t.dataset.addmode; renderMapTools(); } });
+document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.mstyle) { S.mapStyle = e.target.dataset.mstyle; save(); applyMapStyle(); renderMapTools(); } });
 // complete reset: current event, imported sectorfile points, airspace source, filters, drawing / edit modes; saved events and settings (API URL, aliases) stay
 let RESETC = 0;
 function fullReset() {
@@ -3315,6 +3356,7 @@ function zoneTableHtml(near, res) {
   ${list.length ? `<div data-keep="zlist" id="zlist" style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}${/TBC|TBD/i.test(String(z.upper)) ? '<div style="font-size:11px">quota da confermare</div>' : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
 }
 function aspCard() {
+  if (lowNav() && S.resMode === 'manual' && !cusLocked()) { const sig = (S.meta.theatre || '') + '|' + (S.meta.events || []).join(','); if (S.atSig !== sig) { S.atSig = sig; const ids = atAreas().map(z => z.id); if (ids.length) { S.reserved = fixConfigs([...new Set([...(S.reserved || []), ...ids])]); save(); setTimeout(() => { drawMap(); toast(`Navigazione a bassa quota: accese le aree tattiche ${atAreas().map(z => z.name).join(', ')}`); }, 0); } } }
   const a = S.asp, near = nearZones(), res = new Set(S.reserved || []);
   const src = !a || a.source === 'none' || a.source === 'demo' ? 'nessuna (file AIP non caricato)' : a.source === 'aip' ? 'AIP Italia – aree militari (ENR 5 e SUP)' : a.source === 'api' ? 'API database' : 'file importato';
   return `<h2>Spazio aereo riservato</h2>
@@ -3727,7 +3769,7 @@ const fplClock = off => { const h = fplH(); return hhmm((((h == null ? 0 : h) + 
 // aircraft: ICAO designator (null = ZZZZ + TYP/), wake, cruise TAS kt, cruise level (FL; negative = altitude in hundreds of ft)
 const FPLAC = { 'F-35A': ['F35', 'M', 420, 250], 'F-35B': ['F35', 'M', 420, 250], 'EF-2000 Typhoon': ['EUFI', 'M', 420, 270], 'F-16': ['F16', 'M', 420, 250], 'F/A-18': ['F18H', 'M', 420, 250],
   'EA-18G Growler': ['F18H', 'M', 420, 250], 'F-15E': ['F15', 'M', 420, 250], 'F-15C': ['F15', 'M', 420, 270], 'F-22': ['F22', 'M', 450, 300], 'Rafale': ['RFAL', 'M', 420, 250], 'Gripen': [null, 'M', 420, 250],
-  'Tornado ECR': ['TOR', 'M', 420, 230], 'Tornado IDS': ['TOR', 'M', 420, 230], 'AMX': ['AMX', 'M', 380, 200], 'A-10': ['A10', 'M', 300, 150], 'AV-8B Harrier': [null, 'M', 400, 200], 'M-346': ['M346', 'M', 380, 200], 'MB-339': ['M339', 'L', 300, 150],
+  'Tornado ECR': ['TOR', 'M', 420, 230], 'Tornado IDS': ['TOR', 'M', 420, 230], 'A-10': ['A10', 'M', 300, 150], 'AV-8B Harrier': [null, 'M', 400, 200], 'M-346': ['M346', 'M', 380, 200], 'MB-339': ['M339', 'L', 300, 150],
   'HH-101': ['EH10', 'M', 130, -15], 'HH-139': ['A139', 'L', 130, -15], 'NH90': ['NH90', 'M', 130, -15], 'CH-47 Chinook': ['H47', 'M', 130, -15], 'UH-60 Black Hawk': ['H60', 'L', 130, -15], 'HH-60G Pave Hawk': ['H60', 'L', 130, -15],
   'HH-60W Jolly Green II': ['H60', 'L', 130, -15], 'MH-60M Black Hawk (SOAR)': ['H60', 'L', 130, -15], 'MH-47G Chinook (SOAR)': ['H47', 'M', 130, -15], 'CH-53E / CH-53K': ['H53', 'M', 130, -15], 'MV-22 / CV-22 Osprey': ['V22', 'M', 240, 120],
   'AW169': ['A169', 'L', 130, -15], 'AH-129 Mangusta': ['A129', 'L', 120, -15], 'AH-64 Apache': ['H64', 'L', 120, -15], 'A400M': ['A400', 'H', 330, 240], 'C-130J': ['C30J', 'M', 300, 200], 'C-27J': ['C27J', 'M', 280, 180], 'C-17': ['C17', 'H', 420, 300],
@@ -3916,17 +3958,17 @@ function drawFplRoute(add) { const f = S.t && S.t.flights.find(x => x.id === S.f
 // ICAO Annex 4 symbols (SVG): VOR hexagon, VOR-DME hexagon in a square, VORTAC hexagon with three blocks, TACAN blocks, DME square, NDB stippled circle,
 // significant point / fix triangle (open: the sector file has no compulsory flag), FRA point triangle in a circle, VRP flag; military points / gates are not ICAO (unpublished)
 const NAVC = { VOR: ['vor', 'VOR', '#0f5fa8'], VORDME: ['vor', 'VOR-DME', '#0f5fa8'], VORTAC: ['vortac', 'VORTAC', '#0f5fa8'], TACAN: ['tacan', 'TACAN', '#0f5fa8'], DME: ['tacan', 'DME', '#0f5fa8'],
-  NDB: ['ndb', 'NDB', '#7e22ce'], FE: ['fe', 'Fix en-route', '#1e293b'], FT: ['ft', 'Fix terminale', '#64748b'], FRA: ['fra', 'Punto FRA', '#0f766e'], VRP: ['vrp', 'VRP (AIP)', '#15803d'],
+  NDB: ['ndb', 'NDB', '#7e22ce'], FE: ['fe', 'Fix en-route', '#1e293b'], FT: ['ft', 'Fix terminale', '#64748b'], FRA: ['fra', 'Punto FRA', '#1e293b'], VRP: ['vrp', 'VRP (AIP)', '#9333ea'],
   MIL: ['mil', 'Punto militare (non pubblicato)', '#b45309'], GATE: ['gate', 'Gate militare (non pubblicato)', '#b45309'] };
-const NAVL_KEYS = [['vor', 'VOR / VOR-DME', 'VOR'], ['vortac', 'VORTAC', 'VORTAC'], ['tacan', 'TACAN / DME', 'TACAN'], ['ndb', 'NDB', 'NDB'], ['fe', 'Fix en-route', 'FE'], ['ft', 'Fix terminali', 'FT'], ['fra', 'Punti FRA', 'FRA'],
+const NAVL_KEYS = [['vor', 'VOR / VOR-DME', 'VOR'], ['vortac', 'VORTAC', 'VORTAC'], ['tacan', 'TACAN / DME', 'TACAN'], ['ndb', 'NDB', 'NDB'], ['fe', 'Fix en-route', 'FE'], ['ft', 'Fix terminali', 'FT'], ['fra', 'Punti FRA pieni', 'FRA'],
   ['vrp', 'VRP (AIP)', 'VRP'], ['mil', 'Punti militari', 'MIL'], ['gate', 'Gate militari', 'GATE'], ['awy', 'Aerovie basse', null], ['lbl', 'Nomi dei punti', null]];
-const NAVL_DEF = { vor: 1, vortac: 1, tacan: 1, ndb: 1, fe: 1, ft: 0, fra: 1, vrp: 1, mil: 1, gate: 1, awy: 1, lbl: 1 };
+const NAVL_DEF = { vor: 1, vortac: 1, tacan: 1, ndb: 1, fe: 1, ft: 0, fra: 1, vrp: 1, mil: 1, gate: 1, awy: 0, lbl: 1 };
 const navLay = () => { if (!S.navL) S.navL = { ...NAVL_DEF }; return S.navL; };
 function navCls(p) { if (p.k === 'V') { const x = p.x.toUpperCase(); return /VORTAC/.test(x) ? 'VORTAC' : /TACAN/.test(x) ? 'TACAN' : /VOR.?DME/.test(x) ? 'VORDME' : /\bDME\b/.test(x) ? 'DME' : 'VOR'; }
   if (p.k === 'N') return 'NDB'; if (p.k === 'R') return 'VRP'; if (p.k === 'M') return 'MIL'; if (p.k === 'G') return 'GATE';
-  if (p.k === 'F' && p.x[0] === 'H') return null; if (navFra(p)) return 'FRA'; return p.k === 'F' && p.x[0] === 'T' ? 'FT' : 'FE'; }
+  if (p.k === 'F' && p.x[0] === 'H') return null; return p.k === 'F' && p.x[0] === 'T' ? 'FT' : 'FE'; } // FRA is an attribute of a fix (navFra), not a class (staff 21 Nov)
 const NAVMINZ = { VOR: 6, VORDME: 6, VORTAC: 6, TACAN: 6, DME: 7, NDB: 7, FRA: 7, FE: 8, FT: 9, VRP: 9, MIL: 9, GATE: 9 };
-function navSvg(c, sz = 18) { const col = (NAVC[c] || NAVC.FE)[2], h = (r, rot = 0) => [0, 1, 2, 3, 4, 5].map(i => { const a = Math.PI / 3 * i + rot; return [9 + r * Math.cos(a), 9 + r * Math.sin(a)]; });
+function navSvg(c, sz = 18, fra = false) { const col = (NAVC[c] || NAVC.FE)[2], h = (r, rot = 0) => [0, 1, 2, 3, 4, 5].map(i => { const a = Math.PI / 3 * i + rot; return [9 + r * Math.cos(a), 9 + r * Math.sin(a)]; });
   const P = a => a.map(v => v.map(n => n.toFixed(1)).join(',')).join(' '), hx = h(5.2), dot = `<circle cx="9" cy="9" r="1.1" fill="${col}"/>`;
   const blocks = [0, 2, 4].map(i => { const a = hx[i], b = hx[(i + 1) % 6], mx = (a[0] + b[0]) / 2 - 9, my = (a[1] + b[1]) / 2 - 9, l = Math.hypot(mx, my), ox = mx / l * 3, oy = my / l * 3; return `<polygon points="${P([a, b, [b[0] + ox, b[1] + oy], [a[0] + ox, a[1] + oy]])}" fill="${col}"/>`; }).join('');
   let g = '';
@@ -3936,30 +3978,32 @@ function navSvg(c, sz = 18) { const col = (NAVC[c] || NAVC.FE)[2], h = (r, rot =
   else if (c === 'TACAN') g = `${[1, 3, 5].map(i => `<line x1="${hx[i][0]}" y1="${hx[i][1]}" x2="${hx[(i + 1) % 6][0]}" y2="${hx[(i + 1) % 6][1]}" stroke="${col}" stroke-width="1.2"/>`).join('')}${blocks}`;
   else if (c === 'DME') g = `<rect x="4" y="4" width="10" height="10" fill="none" stroke="${col}" stroke-width="1.3"/>${dot}`;
   else if (c === 'NDB') g = `<circle cx="9" cy="9" r="1.6" fill="${col}"/>${[[3.8, 8], [6.4, 12]].map(([r, n]) => Array.from({ length: n }, (_, i) => `<circle cx="${(9 + r * Math.cos(i / n * 6.283)).toFixed(1)}" cy="${(9 + r * Math.sin(i / n * 6.283)).toFixed(1)}" r=".75" fill="${col}"/>`).join('')).join('')}`;
-  else if (c === 'FE') g = `<polygon points="9,3.5 14.5,13.5 3.5,13.5" fill="#fff" stroke="${col}" stroke-width="1.4"/>`;
-  else if (c === 'FT') g = `<polygon points="9,5.5 12.8,12.5 5.2,12.5" fill="#fff" stroke="${col}" stroke-width="1.2"/>`;
-  else if (c === 'FRA') g = `<circle cx="9" cy="9.3" r="7.2" fill="none" stroke="${col}" stroke-width="1.1"/><polygon points="9,4.5 13.4,12.6 4.6,12.6" fill="#fff" stroke="${col}" stroke-width="1.3"/>`;
-  else if (c === 'VRP') g = `<line x1="5" y1="2.5" x2="5" y2="16" stroke="${col}" stroke-width="1.4"/><polygon points="5.6,3 15,6.4 5.6,9.8" fill="${col}"/>`;
+  else if (c === 'FE') g = `<polygon points="9,3.5 14.5,13.5 3.5,13.5" fill="${fra ? col : '#fff'}" stroke="${col}" stroke-width="1.4"/>`;
+  else if (c === 'FT') g = `<polygon points="9,5.5 12.8,12.5 5.2,12.5" fill="${fra ? col : '#fff'}" stroke="${col}" stroke-width="1.2"/>`;
+  else if (c === 'FRA') g = `<polygon points="9,3.5 14.5,13.5 3.5,13.5" fill="${col}" stroke="${col}" stroke-width="1.4"/>`; // legend only: filled triangle = FRA fix
+  else if (c === 'VRP') g = `<polygon points="9,5 13,12.2 5,12.2" fill="${col}" stroke="${col}" stroke-width="1"/>`; // small purple triangle (staff 21 Nov)
   else if (c === 'MIL') g = `<polygon points="9,3 15,9 9,15 3,9" fill="#fff" stroke="${col}" stroke-width="1.4"/><circle cx="9" cy="9" r="1.2" fill="${col}"/>`;
   else if (c === 'GATE') g = `<polygon points="9,3 15,9 9,15 3,9" fill="${col}" stroke="${col}" stroke-width="1"/><rect x="7.6" y="7.6" width="2.8" height="2.8" fill="#fff"/>`;
   return `<svg width="${sz}" height="${sz}" viewBox="0 0 18 18" style="vertical-align:middle;overflow:visible">${g}</svg>`; }
-const navTypeTxt = p => { const c = navCls(p); return c ? NAVC[c][1] + (c === 'FRA' && p.k === 'F' ? '' : '') : 'fix'; };
+const navTypeTxt = p => { const c = navCls(p); return (c ? NAVC[c][1] : 'fix') + (navFra(p) ? ' · FRA' : ''); };
+const navSvgP = (p, sz) => { const c = navCls(p); return c ? navSvg(c, sz, navFra(p) && !!(S && navLay().fra)) : ''; };
 let NAVPANEL = false;
 function navPanelHtml() { const L0 = navLay(), on = !!(S && S.navOn);
-  return `<div id="navpanel" style="flex-basis:100%;border-top:1px solid var(--line);padding-top:6px;margin-top:2px;font-size:12.5px">
+  return `<div id="navpanel" style="font-size:12.5px">
     <label style="display:flex;gap:6px;align-items:center;margin:0 0 4px;font-weight:700"><input type="checkbox" id="navon" style="width:auto" ${on ? 'checked' : ''}> Mostra i dati di navigazione</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;${on ? '' : 'opacity:.45'}">${NAVL_KEYS.map(([k, l, c]) => `<label style="display:flex;gap:5px;align-items:center;margin:0;font-weight:400;white-space:nowrap"><input type="checkbox" data-navl="${k}" style="width:auto" ${L0[k] ? 'checked' : ''} ${on ? '' : 'disabled'}>${c ? navSvg(c, 16) : k === 'awy' ? '<svg width="16" height="16"><line x1="1" y1="12" x2="15" y2="4" stroke="#64748b" stroke-width="1.5"/></svg>' : '<b style="width:16px;text-align:center">Aa</b>'}${l}</label>`).join('')}</div>
     <div class="muted" id="navcount" style="font-size:11.5px;margin-top:4px">${on ? '' : 'Spento.'}</div>
-    <div class="muted" style="font-size:11px">Simboli ICAO (Annesso 4). Zoomando compaiono più punti: VOR / TACAN subito, NDB e FRA, poi fix, VRP e punti militari. Con un piano di volo aperto, clic su un punto → "Aggiungi alla rotta".</div></div>`; }
+    <div class="muted" style="font-size:11px">Simboli ICAO (Annesso 4). "Punti FRA pieni" cambia solo il simbolo: un fix che è anche punto FRA diventa un triangolo pieno. Zoomando compaiono più punti: VOR / TACAN subito, NDB e FRA, poi fix, VRP e punti militari. Con un piano di volo aperto, clic su un punto → "Aggiungi alla rotta".</div></div>`; }
 function drawNav() { if (!MAP || typeof L === 'undefined') return; if (!NAVL) NAVL = L.layerGroup().addTo(MAP); NAVL.clearLayers(); const cnt = document.getElementById('navcount');
   if (!S || !S.navOn || !NAV || MODE !== 'staff') { if (cnt && S && S.navOn && !NAV) cnt.textContent = 'Dati di navigazione in caricamento…'; return; }
   const L0 = navLay(), z = MAP.getZoom ? MAP.getZoom() : 8, bb = MAP.getBounds ? MAP.getBounds() : null, inB = p => !bb || bb.contains(p), add = l => l.addTo(NAVL);
   if (L0.awy && z >= 7) { const G = navGraph(); if (G) for (const [aw, segs] of Object.entries(NAV.awy)) for (const sg of segs) { const ll = sg.map(id => G.pos[id]).filter(Boolean); if (ll.length > 1 && ll.some(inB)) add(L.polyline(ll, { color: '#64748b', weight: 1.2, opacity: .6, interactive: z >= 8 })).bindTooltip(`Aerovia ${aw}`, { sticky: true }); } }
   let shown = 0, zoomHid = 0; const fs = S.t && TAB === 'fpl' && S.t.flights.find(x => x.id === S.fplSel);
-  for (const p of NAV.pts) { const c = navCls(p); if (!c || !L0[NAVC[c][0]] || !inB(p.pos)) continue; if (z < NAVMINZ[c]) { zoomHid++; continue; } if (shown > 1500) { zoomHid++; continue; } shown++;
+  for (const p of NAV.pts) { const c = navCls(p); if (!c || !L0[NAVC[c][0]] || !inB(p.pos)) continue; if (z < (navFra(p) ? Math.min(7, NAVMINZ[c]) : NAVMINZ[c])) { zoomHid++; continue; } if (shown > 1500) { zoomHid++; continue; } shown++;
+    const fraOn = navFra(p) && L0.fra;
     const lbl = L0.lbl && (z >= 9 || (z >= 8 && ['VOR', 'VORDME', 'VORTAC', 'TACAN', 'NDB'].includes(c))) ? `<span class="navlbl">${esc(p.k === 'R' || p.k === 'G' ? navName(p) : p.id)}</span>` : '';
-    const m = add(L.marker(p.pos, { icon: L.divIcon({ className: 'navsym', html: navSvg(c) + lbl, iconSize: [18, 18], iconAnchor: [9, 9] }), keyboard: false, zIndexOffset: -500 }));
-    m.bindTooltip(`${esc(navName(p))} – ${NAVC[c][1]}${p.k === 'V' ? ' · ' + esc(p.x) : ''}${p.k === 'M' ? ' · ' + esc(p.x) : ''} · ${icaoLL(p.pos)}`);
+    const m = add(L.marker(p.pos, { icon: L.divIcon({ className: 'navsym', html: navSvg(c, 18, fraOn) + lbl, iconSize: [18, 18], iconAnchor: [9, 9] }), keyboard: false, zIndexOffset: -500 }));
+    m.bindTooltip(`${esc(navName(p))} – ${navTypeTxt(p)}${p.k === 'V' ? ' · ' + esc(p.x) : ''}${p.k === 'M' ? ' · ' + esc(p.x) : ''} · ${icaoLL(p.pos)}`);
     if (fs) m.bindPopup(() => navPopup(p, fs)); }
   if (cnt) cnt.textContent = `${shown} punti visibili${zoomHid ? ` · altri ${zoomHid} compaiono zoomando` : ''}${fs ? ` · rotta aperta: ${fs.cs}` : ''}.`; }
 function navPopup(p, f) { const pts = fplBuild(f).pts, def = fplInsAt(pts);
@@ -3977,8 +4021,8 @@ function navSearch(q, near) { q = String(q || '').trim().toUpperCase(); if (q.le
     hits.sort((a, b) => (b.id === q) - (a.id === q) || (b.id.startsWith(q)) - (a.id.startsWith(q)) || (near ? dist(a.pos, near) - dist(b.pos, near) : 0)); out.push(...hits.slice(0, 8).map(p => ({ p }))); }
   return out.slice(0, 9); }
 function fplEditorHtml(f, p) { const P = p.pts, ins = fplInsAt(P);
-  const row = (x, i) => { const c = x.k ? navCls(x) : null; return `<tr><td>${i + 1}</td><td>${c ? navSvg(c, 16) : '<span title="coordinate">⌖</span>'}</td><td><b>${esc(x.name)}</b>${x.k === 'M' || x.k === 'G' ? ' <span class="muted" style="font-size:11px">unpublished</span>' : ''}</td>
-    <td class="muted">${c ? NAVC[c][1] : 'coordinate'}</td><td style="font-family:monospace;font-size:11.5px">${icaoLL(x.pos)}</td><td>${x.aw ? esc(x.aw) : (i ? 'DCT' : '')}</td>
+  const row = (x, i) => { const c = x.k ? navCls(x) : null; return `<tr><td>${i + 1}</td><td>${c ? navSvgP(x, 16) : '<span title="coordinate">⌖</span>'}</td><td><b>${esc(x.name)}</b>${x.k === 'M' || x.k === 'G' ? ' <span class="muted" style="font-size:11px">unpublished</span>' : ''}</td>
+    <td class="muted">${c ? navTypeTxt(x) : 'coordinate'}</td><td style="font-family:monospace;font-size:11.5px">${icaoLL(x.pos)}</td><td>${x.aw ? esc(x.aw) : (i ? 'DCT' : '')}</td>
     <td style="white-space:nowrap"><button class="b sm" title="Su" data-fplmv="${f.id}|${i}|-1" ${i ? '' : 'disabled'}>▲</button><button class="b sm" title="Giù" data-fplmv="${f.id}|${i}|1" ${i < P.length - 1 ? '' : 'disabled'}>▼</button><button class="b sm" title="Togli" data-fpldel="${f.id}|${i}">✕</button></td></tr>`; };
   return `<label style="margin-top:8px">Rotta – punti</label><table style="font-size:12px"><tr><th>#</th><th></th><th>Punto</th><th>Tipo</th><th>Coordinate</th><th>Via</th><th></th></tr>
     <tr class="muted"><td></td><td>✈</td><td>${esc(p.s.dep)}</td><td>partenza</td><td colspan="3"></td></tr>${P.map(row).join('')}<tr class="muted"><td></td><td>✈</td><td>${esc(p.s.dest)}</td><td>arrivo</td><td colspan="3"></td></tr></table>
@@ -3987,7 +4031,7 @@ function fplEditorHtml(f, p) { const P = p.pts, ins = fplInsAt(P);
     <div id="fplres-${f.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>`; }
 function fplResHtml(f, q) { const P = fplBuild(f).pts, near = P.length ? P[Math.floor(P.length / 2)].pos : null, r = navSearch(q, near);
   if (!r.length) return String(q || '').trim().length >= 2 ? '<span class="muted" style="font-size:12px">Nessun punto trovato.</span>' : '';
-  return r.map(x => x.coord ? `<button class="b sm" data-fpladd="${f.id}|c|${x.coord.join(',')}">⌖ ${icaoLL(x.coord)}</button>` : `<button class="b sm" data-fpladd="${f.id}|p|${x.p.i}" title="${esc(NAVC[navCls(x.p)][1])} · ${icaoLL(x.p.pos)}">${navSvg(navCls(x.p), 14)} ${esc(navName(x.p))}</button>`).join(''); }
+  return r.map(x => x.coord ? `<button class="b sm" data-fpladd="${f.id}|c|${x.coord.join(',')}">⌖ ${icaoLL(x.coord)}</button>` : `<button class="b sm" data-fpladd="${f.id}|p|${x.p.i}" title="${esc(navTypeTxt(x.p))} · ${icaoLL(x.p.pos)}">${navSvgP(x.p, 14)} ${esc(navName(x.p))}</button>`).join(''); }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop, wy = window.scrollY, keep = {}; p.querySelectorAll('[data-keep]').forEach(el => keep[el.dataset.keep] = el.scrollTop);
   p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, fpl: renderFpl, export: renderExport }[TAB] || renderScenario)() +
@@ -5307,8 +5351,8 @@ Sara C.; tipo F-35A
 Paolo D.; tipo F-35A
 Andrea E.; Eurofighter
 Giulia F.; Eurofighter
-Davide G.; AMX
-Elena H.; AMX
+Davide G.; Tornado IDS
+Elena H.; Tornado IDS
 Fabio I.; HH-101
 Chiara L.; HH-101
 Matteo M.; AH-129
@@ -5607,7 +5651,7 @@ route();
 navInit().then(() => { NAVG = null; if (MAP && S && S.navOn) drawNav(); if (TAB === 'fpl' && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get NAVPANEL() { return NAVPANEL; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
