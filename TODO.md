@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **GCA option in the ATC / C2 step** (staff 21 Nov): a switch "Serve il GCA" (Ground Controlled Approach). On: a GCA position at the base(s) used for recoveries (callsign / frequency TBC – no invented frequencies), and the missions end with a radar approach: PAR or SRA at the base (e.g. a navigation mission: route, then recovery with a PAR / SRA). Shown in task cards / serials ("Recovery: PAR RWY xx at LIPS"), timeline (time for the approaches, one aircraft at a time), C2 table, masterplan, deck, kneeboard; the FPL is unchanged. Also offered in the missione libera / evento interno ("con GCA" = a participant controls; "da solo" = scripted GCA talk-down in the kneeboard?) – to confirm.
 - [ ] **Simpler generation** (staff 21 Nov, proposal – waiting for the staff's OK):
   - Step "Punti di navigazione (sectorfile)" removed: it dates from before the built-in navigation database; IFR and low-level routes now use data/navdb.json (fixes, VOR / NDB, VRP, military points) and, for low level, the AT areas; the import of another sectorfile / API stays only under "Avanzate" in Export (or is removed – ask).
   - Step "Nome e teatro" becomes "Teatro": the event name is generated automatically (as today) and no longer asked in the wizard; it can be changed from the event header / Export ("Nome evento" + 🎲). In the future single-user mode it is never asked (default "TRAINING MISSION <date>").
@@ -76,7 +77,7 @@
 
 ## Proposal: "missione libera" (not an event) – staff 21 Nov evening, refines the three kinds of use
 - First screen: "È un evento della divisione?" Yes -> today's flow (phases 1-5). No -> a separate short flow (4 steps), reusing areas, CAS geometry, nav database, FPL:
-  1. Cosa voglio volare: training AND light operational missions (staff: both), e.g. CAS, low-level nav, IFR nav, AAR (tanker flying the track or receiver), AEW orbit, intercept, SAR, firefighting, strike with a fictional target.
+  1. Cosa voglio volare (card "Navigazione", not "Navigazione IFR": IFR or VFR chosen later – staff 21 Nov): training AND light operational missions (staff: both), e.g. CAS, low-level nav, IFR nav, AAR (tanker flying the track or receiver), AEW orbit, intercept, SAR, firefighting, strike with a fictional target.
   2. Con cosa e da dove: aircraft (one or more), callsign(s), departure / arrival base, date and time. No names of controllers, no ATC.
   3. Dove: work area derived from base + mission type (low level -> nearest AT area, CAS -> suitable R area, AAR -> AAR area / track…), shown on the map, changeable; no theatre step.
   4. Pacchetto: FPL (editable), kneeboard 1-2 pages (route, area, levels, frequencies, mission data), map, booking e-mail text to it-specialops@ivao.aero (areas, times, levels, 48 h reminder), downloads.
