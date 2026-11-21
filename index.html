@@ -559,7 +559,7 @@ function resolveType(raw) {
    ===================================================================== */
 function newScenario() {
   return {
-    version: 1, id: uid(), updated: Date.now(),
+    version: 1, id: uid(), updated: Date.now(), kind: '', // '' = not chosen yet, official / internal / free (staff 21 Nov)
     meta: { op: 'EXERCISE ' + pick(WORDS), events: [], theatre: '', difficulty: 'MEDIUM', hHour: '', date: '', bullseye: pick(WORDS) },
     factions: { blue: pick(BLUE_NAMES), red: pick(RED_NAMES) },
     cats: [],
@@ -571,6 +571,16 @@ function newScenario() {
   };
 }
 let MODE = 'staff';
+// kind of use (staff 21 Nov): official = division SO staff or an official SOG (VFS), internal = "Evento interno" (no branding, never published),
+// free = "Missione libera" (short flow). Events saved before v1.26 have no kind: official.
+const KIND = () => !S ? 'official' : S.kind === undefined ? 'official' : S.kind;
+const isInternal = () => KIND() === 'internal', isFree = () => KIND() === 'free';
+const isSog = () => KIND() === 'official' && !!(S.org && S.org.sog);
+const orgName = () => isSog() ? `${S.org.name || 'VFS'} – IVAO Special Operations Group` : (mpGet().division || 'the division');
+let OFFICIAL = window.claude ? null : true; // may create official events: artifact editors (user.canEdit()); null = being checked
+async function officialInit() { if (!window.claude || typeof window.claude.use !== 'function') { OFFICIAL = true; return; }
+  try { const u = await window.claude.use('user'); OFFICIAL = u ? !!(await u.canEdit()) : false; } catch (e) { OFFICIAL = false; }
+  if (S && S.kind === '' && typeof renderPanel === 'function') renderPanel(); }
 let S = lsGet('ivao-so-current', null) || newScenario();
 let TAB = 'scenario', SUBTAB = 'manual', CSV_PENDING = null;
 function save() { if (MODE !== 'staff') return; S.updated = Date.now(); lsSet('ivao-so-current', S); if (typeof renderEvBadge === 'function') renderEvBadge(); if (typeof demSoon === 'function') demSoon(); }
@@ -1368,7 +1378,8 @@ const MPDEF = Object.fromEntries(MPSEC.flatMap(([, it]) => it.map(([k, , d]) => 
 const mpOn = k => { const v = (S.mpSec || {})[k]; return v === undefined ? !!(MPDEF[k] && MPDEF[k]()) : !!v; };
 const mpTxt = (k, gen) => { const v = (S.mpTxt || {})[k]; return v && v.trim() ? v : gen; };
 function genIntroTxt() { const mp = mpGet(), th = theatre();
-  return `${S.meta.op} is an IVAO Special Operations training event organised by ${mp.division || 'the division'}. It is scheduled on ${S.meta.date || 'a date to be announced'}${S.meta.hHour ? `, with H-hour at ${S.meta.hHour}` : ''}. The exercise takes place in real ${th.fir} FIR airspace over ${th.region}; ${PROF().sober ? 'the scenario is fictional.' : 'all factions, units and events are fictional.'}`; }
+  if (isInternal()) return `${S.meta.op} is a training mission. It is scheduled on ${S.meta.date || 'a date to be agreed'}${S.meta.hHour ? `, with H-hour at ${S.meta.hHour}` : ''}. The exercise takes place in real ${th.fir} FIR airspace over ${th.region}; ${PROF().sober ? 'the scenario is fictional.' : 'all factions, units and events are fictional.'}`;
+  return `${S.meta.op} is an IVAO Special Operations training event organised by ${orgName()}. It is scheduled on ${S.meta.date || 'a date to be announced'}${S.meta.hHour ? `, with H-hour at ${S.meta.hHour}` : ''}. The exercise takes place in real ${th.fir} FIR airspace over ${th.region}; ${PROF().sober ? 'the scenario is fictional.' : 'all factions, units and events are fictional.'}`; }
 function genAspTxt() { const th = theatre();
   return `The exercise is flown inside the ${th.fir} FIR over ${th.region}. Real airspace and procedures apply to all GAT; exercise traffic operates as OAT inside the reserved areas.${RB().length ? ` Airfields held by RED (${RB().join(', ')}) are closed to BLUE traffic for the duration of the exercise.` : ''}`; }
 
@@ -1529,7 +1540,7 @@ function generateGeneric() {
   if (prWanted()) genPR(); else S.pr = null;
   if (sarWanted()) genSAR(); else S.sar = null;
   if (aibWanted()) genAIB(); else S.aib = null;
-  save(); renderAll(true); toast('Scenario generico creato');
+  save(); renderAll(true); if (!isFree()) toast('Scenario generico creato');
 }
 
 /* =====================================================================
@@ -1834,8 +1845,70 @@ const card8 = b => CARD8[Math.round(((b % 360) + 360) % 360 / 45) % 8];
 const casCfg = () => { S.casCfg = Object.assign({ nJtac: 0, perJ: 3, rw: 0, night: false, fmt: 'DD', magvar: 3.5 }, S.casCfg || {}); return S.casCfg; };
 const magHdg = trueBrg => String(Math.round(((trueBrg - casCfg().magvar) % 360 + 360) % 360) || 360).padStart(3, '0');
 const isHelo = f => f && (AC.find(a => a.type === f.type) || {}).cat === 'HELO';
-const wpnOf = f => CAS_WPN[f.type] || (isHelo(f) ? ['70 mm rockets', 'gun'] : ['GBU-12', 'Mk-82']);
+const wpnOf = f => { const l = loAG(f); if (l.length) return l; return CAS_WPN[f.type] || (isHelo(f) ? ['70 mm rockets', 'gun'] : ['GBU-12', 'Mk-82']); };
 
+// ---- loadouts per flight (staff 21 Nov) ----
+// stores compatible with each type: public sources, to be checked by the staff. g = gun, ecm = internal self-protection suite
+const STORES = {
+  'F-35A': { ag: ['GBU-12', 'GBU-31', 'GBU-32', 'GBU-38', 'GBU-39 SDB', 'AGM-88G AARGM-ER'], aa: ['AIM-120', 'AIM-9X'], pod: [], tank: [], g: '25 mm gun', ecm: 1 },
+  'F-35B': { ag: ['GBU-12', 'GBU-32', 'GBU-38', 'GBU-39 SDB'], aa: ['AIM-120', 'AIM-9X'], pod: ['25 mm gun pod'], tank: [], ecm: 1 },
+  'EF-2000 Typhoon': { ag: ['GBU-16', 'GBU-48', 'Paveway IV', 'Storm Shadow', 'Brimstone'], aa: ['Meteor', 'AIM-120', 'IRIS-T', 'AIM-9L'], pod: ['Litening targeting pod'], tank: ['1000 l tank'], g: '27 mm gun', ecm: 1 },
+  'F-16': { ag: ['GBU-12', 'GBU-31', 'GBU-38', 'Mk-82', 'AGM-65 Maverick', 'AGM-88 HARM'], aa: ['AIM-120', 'AIM-9X'], pod: ['Sniper targeting pod', 'HTS pod', 'ECM pod'], tank: ['370 gal tank'], g: '20 mm gun', ecm: 0 },
+  'F/A-18': { ag: ['GBU-12', 'GBU-31', 'GBU-32', 'GBU-38', 'Mk-83', 'AGM-65 Maverick', 'AGM-88 HARM', 'AGM-84 Harpoon'], aa: ['AIM-120', 'AIM-9X'], pod: ['ATFLIR targeting pod'], tank: ['330 gal tank'], g: '20 mm gun', ecm: 1 },
+  'EA-18G Growler': { ag: ['AGM-88 HARM'], aa: ['AIM-120'], pod: ['ALQ-99 jamming pod'], tank: ['480 gal tank'], ecm: 1 },
+  'F-15E': { ag: ['GBU-12', 'GBU-31', 'GBU-38', 'GBU-39 SDB', 'Mk-82', 'AGM-65 Maverick'], aa: ['AIM-120', 'AIM-9X'], pod: ['Sniper targeting pod'], tank: ['610 gal tank'], g: '20 mm gun', ecm: 1 },
+  'F-15C': { ag: [], aa: ['AIM-120', 'AIM-9X'], pod: [], tank: ['610 gal tank'], g: '20 mm gun', ecm: 1 },
+  'F-22': { ag: ['GBU-32', 'GBU-39 SDB'], aa: ['AIM-120', 'AIM-9X'], pod: [], tank: [], g: '20 mm gun', ecm: 1 },
+  'Rafale': { ag: ['AASM Hammer', 'GBU-12', 'GBU-24', 'SCALP', 'AM39 Exocet'], aa: ['Meteor', 'MICA'], pod: ['Talios targeting pod'], tank: ['2000 l tank'], g: '30 mm gun', ecm: 1 },
+  'Gripen': { ag: ['GBU-12', 'GBU-49', 'Mk-82', 'RBS 15'], aa: ['Meteor', 'AIM-120', 'IRIS-T'], pod: ['Litening targeting pod'], tank: ['1100 l tank'], g: '27 mm gun', ecm: 1 },
+  'Tornado ECR': { ag: ['AGM-88 HARM'], aa: ['AIM-9L'], pod: ['ECM pod'], tank: ['1500 l tank'], g: '27 mm gun', ecm: 0 },
+  'Tornado IDS': { ag: ['GBU-16', 'GBU-32', 'GBU-48', 'Storm Shadow', 'Mk-83'], aa: ['AIM-9L'], pod: ['Litening targeting pod', 'RecceLite pod', 'ECM pod'], tank: ['1500 l tank'], g: '27 mm gun', ecm: 0 },
+  'A-10': { ag: ['GBU-12', 'GBU-38', 'AGM-65 Maverick', 'Mk-82', '2.75 in rockets'], aa: ['AIM-9'], pod: ['Litening targeting pod', 'ECM pod'], tank: ['600 gal tank'], g: '30 mm gun', ecm: 0 },
+  'AV-8B Harrier': { ag: ['GBU-12', 'GBU-32', 'GBU-38', 'AGM-65 Maverick', 'Mk-82'], aa: ['AIM-120', 'AIM-9'], pod: ['Litening targeting pod'], tank: ['300 gal tank'], g: '25 mm gun pod', ecm: 0 },
+  'M-346': { ag: ['GBU-12', 'Mk-82'], aa: ['AIM-9L'], pod: ['Litening targeting pod'], tank: ['630 l tank'], g: '12.7 mm gun pod', ecm: 0 },
+  'MB-339': { ag: ['2.75 in rockets', 'Mk-82'], aa: [], pod: [], tank: ['tip tanks'], g: 'gun pods', ecm: 0 },
+  'F-104': { ag: [], aa: ['AIM-9'], pod: [], tank: ['tip tanks'], g: '20 mm gun', ecm: 0 },
+  'MQ-9 Reaper': { ag: ['GBU-12', 'GBU-38', 'AGM-114 Hellfire'], aa: [], pod: [], tank: [], ecm: 0, nocf: 1 },
+  'AH-129 Mangusta': { ag: ['Spike ER', '70 mm rockets'], aa: ['Stinger'], pod: [], tank: [], g: '20 mm gun', ecm: 0 },
+  'AH-64 Apache': { ag: ['AGM-114 Hellfire', '70 mm rockets'], aa: ['Stinger'], pod: [], tank: [], g: '30 mm gun', ecm: 0 },
+};
+const LO_KIND = w => /AIM|Meteor|MICA|IRIS|Stinger/.test(w) ? 'aa' : /tank/.test(w) ? 'tank' : /pod|Litening|Sniper|ATFLIR|Talios|RecceLite|ALQ/.test(w) && !/gun pod/.test(w) ? 'pod' : /gun/.test(w) ? 'g' : 'ag';
+const loStores = type => { const c = STORES[type]; if (!c) return []; return [...c.ag, ...c.aa, ...c.pod, ...c.tank, ...(c.g ? [c.g] : [])]; };
+const loMil = f => { const a = AC.find(x => x.type === f.type); return !!STORES[f.type] || (!!a && ['FIGHTER', 'ATTACK', 'HELO', 'TRANSPORT', 'TANKER', 'AEW', 'MPA', 'ISR'].includes(a.cat) && !FPL_CIV_TYPE(f)); };
+const FPL_CIV_TYPE = f => /light|helo\)|jet \(|regional|Canadair|Fire Boss|Skycrane|PC-12|AW109|AS350|AW189|Bell 412/i.test(f.type || '');
+function loDefault(f) { const c = STORES[f.type], it = [], add = (q, w) => w && it.push([q, w]), first = (l, re) => (l || []).find(x => re.test(x));
+  const lo = { items: it, cf: loMil(f) && !(c && c.nocf) ? 'standard' : 'none', ecm: c ? (c.ecm ? 'internal' : c.pod.some(x => /ECM|ALQ/.test(x)) ? 'pod' : 'none') : 'none' };
+  if (!c) return lo;
+  const aa2 = () => { const m = first(c.aa, /AIM-120|Meteor|MICA/), sh = first(c.aa, /AIM-9|IRIS|MICA|Stinger/); if (m) add(2, m); if (sh && sh !== m) add(2, sh); };
+  const tgp = () => add(1, first(c.pod, /targeting/)), tank = n => add(n, c.tank[0]);
+  const wl = (CAS_WPN[f.type] || []).filter(w => !/gun/.test(w));
+  switch (f.task) {
+    case 'CAS': wl.slice(0, 2).forEach(w => add(/rocket/.test(w) ? 2 : /Hellfire|Spike/.test(w) ? 4 : 2, w)); if (!wl.length) add(2, c.ag[0]); tgp(); add(2, first(c.aa, /AIM-9|IRIS|Stinger/)); tank(1); break;
+    case 'STRIKE': add(2, first(c.ag, /Storm Shadow|SCALP|GBU-31|GBU-32|GBU-48|GBU-24|AASM|GBU-16/) || c.ag[0]); tgp(); aa2(); tank(1); break;
+    case 'SEAD': add(2, first(c.ag, /AGM-88|HARM/) || first(c.ag, /GBU-3[18]|AASM/)); add(1, first(c.pod, /HTS|ALQ/)); aa2(); tank(1); break;
+    case 'ANTISHIP': add(2, first(c.ag, /Harpoon|Exocet|RBS|Marte/) || first(c.ag, /Maverick/)); aa2(); tank(1); break;
+    case 'DCA': case 'OCA': case 'ESCORT': case 'QRA': case 'LOWSLOW': { const m = first(c.aa, /AIM-120|Meteor|MICA/), sh = first(c.aa, /AIM-9|IRIS/); if (m) add(4, m); if (sh && sh !== m) add(2, sh); if (!m && !sh && c.aa[0]) add(2, c.aa[0]); tank(f.task === 'ESCORT' || f.task === 'OCA' ? 2 : 1); break; }
+    case 'RECCE': add(1, first(c.pod, /Recce/) || first(c.pod, /targeting/)); add(2, first(c.aa, /AIM-9|IRIS/)); tank(1); break;
+    case 'RESCORT': add(2, first(c.ag, /rocket|Maverick|Hellfire/) || c.ag[0]); break;
+    case 'LOWNAV': case 'IFRNAV': case 'RECEIVER': case 'TARGET': tank(f.task === 'RECEIVER' ? 0 : 1); break;
+  }
+  if (c.g && ['CAS', 'RESCORT', 'DCA', 'OCA', 'ESCORT', 'QRA', 'LOWSLOW', 'STRIKE'].includes(f.task)) add(1, c.g);
+  lo.items = it.filter(x => x[0] > 0 && x[1]); return lo; }
+const loCfTxt = v => v === 'none' ? '' : v === 'standard' ? 'chaff / flare standard' : `chaff / flare ${v}`;
+function loTxt(lo, en = true) { if (!lo) return ''; const it = lo.items.map(([q, w]) => LO_KIND(w) === 'g' || q === 1 ? w : `${q} × ${w}`);
+  const sp = [loCfTxt(lo.cf), lo.ecm === 'internal' ? 'ECM internal' : lo.ecm === 'pod' ? 'ECM pod' : ''].filter(Boolean);
+  return [it.join(', ') || (en ? 'no external stores' : 'nessun carico esterno'), ...sp].join(' · '); }
+// air-to-ground weapons a flight carries (CAS 9-line reads them)
+const loAG = f => f && f.lo ? f.lo.items.filter(([, w]) => ['ag', 'g'].includes(LO_KIND(w)) || /gun pod/.test(w)).map(([, w]) => w) : [];
+function loApply(t) { if (!t || !t.flights) return; const man = S.loMan || {};
+  t.flights.forEach(f => { const m = man[f.cs]; f.lo = m && m.type === f.type && m.task === f.task ? JSON.parse(JSON.stringify(m.lo)) : loDefault(f); }); }
+function loSet(f, lo) { S.loMan = Object.assign({}, S.loMan, { [f.cs]: { type: f.type, task: f.task, lo: JSON.parse(JSON.stringify(lo)) } }); f.lo = lo; }
+function loEditorHtml(f, attr = 'data-lo') { const lo = f.lo || loDefault(f), c = STORES[f.type], cand = loStores(f.type), man = !!(S.loMan || {})[f.cs];
+  return `<div class="lored" style="margin-top:4px">${lo.items.map(([q, w], i) => `<span class="chip" style="display:inline-flex;gap:4px;align-items:center">${LO_KIND(w) === 'g' ? '' : `<input ${attr}="${esc(f.cs)}" data-lof="q" data-loi="${i}" value="${q}" style="width:34px;padding:1px 3px">×`} ${esc(w)} <button class="b sm danger" ${attr}del="${esc(f.cs)}" data-loi="${i}" style="padding:0 5px">×</button></span>`).join(' ') || '<span class="muted" style="font-size:12px">nessun carico esterno</span>'}
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:4px;align-items:flex-end">${cand.length ? `<div style="flex:0 0 190px"><label>Aggiungi</label><select ${attr}add="${esc(f.cs)}"><option value="">— ${c ? 'carichi compatibili' : ''} —</option>${cand.map(w => `<option>${esc(w)}</option>`).join('')}</select></div>` : `<span class="muted" style="font-size:11px">Nessun catalogo carichi per ${esc(f.type)}.</span>`}
+      <div style="flex:0 0 130px"><label>Chaff / flare</label><select ${attr}="${esc(f.cs)}" data-lof="cf">${[['standard', 'standard'], ['none', 'nessuno']].map(([k, l]) => `<option value="${k}" ${lo.cf === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div style="flex:0 0 120px"><label>ECM</label><select ${attr}="${esc(f.cs)}" data-lof="ecm">${[['internal', 'interno'], ['pod', 'pod'], ['none', 'nessuno']].map(([k, l]) => `<option value="${k}" ${lo.ecm === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      ${man ? `<button class="b sm shrink" ${attr}reset="${esc(f.cs)}">Ripristina il carico proposto</button>` : ''}</div></div>`; }
 // --- coordinates for line 6 ---
 function toMGRS(lat, lon) {
   const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
@@ -3015,7 +3088,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -3024,7 +3097,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -3342,7 +3415,7 @@ function mapWinHtml(w) {
     <div class="muted" style="font-size:11.5px;margin-top:6px">Trascina i marker per spostarli · clic per modificarli.</div></div>`; }
 function renderMapTools() {
   const el = $('#maptools'); if (!MAP) return;
-  if (MAPWIN_TAB !== TAB) { MAPWIN_TAB = TAB; MAPWIN = TAB === 'fpl' ? 'nav' : TAB === 'scenario' ? 'thr' : (MAPWIN === 'style' ? 'style' : null); }
+  if (MAPWIN_TAB !== TAB) { MAPWIN_TAB = TAB; MAPWIN = TAB === 'fpl' ? 'nav' : TAB === 'scenario' && S && S.kind !== '' && !isFree() ? 'thr' : (MAPWIN === 'style' ? 'style' : null); }
   const btn = k => `<div class="mtcol"><button class="mtbtn${MAPWIN === k ? ' on' : ''}" data-mapwin="${k}" aria-label="${MTNAME[k]}" aria-pressed="${MAPWIN === k}" title="${MTNAME[k]}">${MTICON[k]}</button><span class="mtlab${MAPWIN === k ? ' on' : ''}">${MTNAME[k]}</span></div>`;
   const drawing = ADDMODE === 'th:draw' || ADDMODE === 'cus:draw' || (ADDMODE && MAPWIN !== 'thr');
   el.innerHTML = `<div class="mtrail">${btn('style')}${btn('nav')}${btn('thr')}</div>${MAPWIN ? `<div class="mtwin" id="mapwin-${MAPWIN}">${mapWinHtml(MAPWIN)}</div>` : ''}${drawing && MAPWIN !== 'thr' ? `<div class="mtpill"${MAPWIN ? ' style="top:auto;bottom:auto;position:static;width:auto;margin:0"' : ''}>${ADDMODE === 'th:draw' ? '✏️ Disegno del teatro in corso' : ADDMODE === 'cus:draw' ? '✏️ Disegno area custom in corso' : `Clic sulla mappa: <b>${esc((addModes().flatMap(x => x[1]).find(x => x[0] === ADDMODE) || [0, ADDMODE])[1])}</b> · <a href="#" data-addmode="">Annulla</a>`}</div>` : ''}`;
@@ -3506,9 +3579,8 @@ const aspNeeded = () => !PROF().civil; // civil events fly in normal airspace: n
 function wSteps() {
   const P = PROF(), R = REL(), st = [{ id: 'ev', t: 'Tipo di evento' }];
   if (!evChosen()) return st;
-  st.push({ id: 'req', t: 'Cosa serve' }, { id: 'th', t: 'Nome e teatro' });
+  st.push({ id: 'req', t: 'Cosa serve' }, { id: 'th', t: 'Teatro' });
   st.push({ id: 'asp', t: 'Spazio aereo riservato', off: !aspNeeded() && !S.showAsp });
-  if (R.points) st.push({ id: 'pts', t: 'Punti di navigazione' });
   if (R.threats) st.push({ id: 'thr', t: 'Minacce e fazioni' });
   st.push({ id: 'c2', t: 'Postazioni ATC / C2' }, { id: 'gen', t: GEN() ? 'Scenario generato' : 'Genera' });
   return st;
@@ -3519,7 +3591,7 @@ function wSummary(id) {
   switch (id) {
     case 'ev': return evChosen() ? PROF().list.map(e => e.it).join(' + ') : 'nessuno scelto';
     case 'req': { const ts = reqTasks().filter(t => ROLES[t]); return `${ts.filter(t => !offT(t)).length} di ${ts.length} ruoli`; }
-    case 'th': return thChosen() ? `${S.meta.op} · ${th.name}` : 'teatro da scegliere';
+    case 'th': return thChosen() ? th.name : 'teatro da scegliere';
     case 'asp': return !aspNeeded() && !S.showAsp ? 'non serve per eventi civili' : `${RES().length} aree · ${cusLocked() ? 'solo aree custom' : S.resMode === 'manual' ? 'scelte da te' : S.resMode === 'auto' ? 'proposte dal generatore' : 'non ancora scelte'}${(S.cor || []).length ? ` · ${S.cor.length} corridoi OAT` : ''}`;
     case 'pts': return POINTS.items.length ? `${POINTS.items.length} punti` : 'punti sintetici';
     case 'thr': return `${S.factions.blue} vs ${S.factions.red} · ${S.cats.filter(c => !CATS[c].evt).length} tipi di minaccia`;
@@ -3536,7 +3608,7 @@ function wBody(id) {
       ${evChosen() && P.sober ? `<p class="muted" style="font-size:12px">${P.civil ? 'Evento civile: niente fazioni, minacce né spazio aereo riservato.' : 'Evento senza opposizione: niente fazioni, minacce o uso di armi.'}</p>` : ''}
       ${varHtml()}`;
     case 'req': return `<p class="muted" style="margin-top:0">Ruoli richiesti ai partecipanti. Un ruolo tolto non viene assegnato e sparisce dai documenti.</p>${reqCard()}`;
-    case 'th': return `<label>Nome evento</label><div class="row"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop" title="Nome casuale">🎲</button></div>
+    case 'th': return `<p class="muted" style="margin-top:0;font-size:12px">Il nome dell'evento (${esc(S.meta.op)}) è generato in automatico: lo cambi in Export.</p>
       <div class="row"><div><label>Teatro (spazio aereo reale)</label>${sel('theatre', { ...(thChosen() || ADDMODE === 'th:draw' ? {} : { '': '— scegli il teatro —' }), ...thl, CUSTOM: S.thCustom ? `✏️ ${S.thCustom.name}${S.thCustom.name === 'Teatro disegnato' ? '' : ' (disegnato a mano)'}` : '✏️ Disegnalo tu sulla mappa…' }, ADDMODE === 'th:draw' ? 'CUSTOM' : S.meta.theatre)}</div><div class="shrink"><label>&nbsp;</label><button class="b" id="rth" title="Teatro casuale">🎲</button></div>
       ${R.bull ? `<div><label>Bullseye della missione</label>${bullSelHtml()}</div>` : ''}</div>
       ${ADDMODE === 'th:draw' ? `<div class="card" style="margin-top:8px"><b style="font-size:13px">Disegna il teatro</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Clic sulla mappa per ogni vertice (${(S.thDraft || []).length} finora), poi "Chiudi teatro". Basi, FIR e posizione delle forze vengono ricavate dal disegno; le aree riservate proposte sono quelle che toccano il teatro.</p>
@@ -3765,9 +3837,9 @@ function renderTailor() {
   h += asgHtml(t);
   h += aspIssuesHtml();
   h += `<div class="card" style="font-size:12.5px"><b>Revisione:</b> ${esc(revLabel())}${curRev() ? ' del ' + esc(curRev().date) : ''}. Quando il tabellone è definitivo emetti una nuova revisione nella scheda Export: il masterplan riporterà lo storico.</div>`;
-  h += `<h2>Flight BLUE (${t.flights.length})</h2><table><tr><th>Callsign</th><th>Tipo</th><th>#</th><th>Base</th><th>Task</th><th>Freq</th>${gcaOn() ? '<th>Recupero</th>' : ''}</tr>
+  h += `<h2>Flight BLUE (${t.flights.length})</h2><table><tr><th>Callsign</th><th>Tipo</th><th>#</th><th>Base</th><th>Task</th><th>Freq</th>${gcaOn() ? '<th>Recupero</th>' : ''}<th>Carico</th></tr>
   ${t.flights.map(f => `<tr><td class="blue">${esc(f.cs)}</td><td>${esc(f.type)}</td><td>${f.size}</td><td style="width:70px"><input data-edit="flight" data-id="${f.id}" data-f="base" value="${esc(f.base || '')}"></td>
-   <td><select data-edit="flight" data-id="${f.id}" data-f="task">${taskOpts(f.task)}</select></td><td style="width:78px"><input data-edit="flight" data-id="${f.id}" data-f="freq" value="${esc(f.freq || 'TBD')}"></td>${gcaOn() ? `<td style="width:120px">${f.task === 'STANDBY' ? '' : `<select data-gcafl="${esc(f.cs)}">${Object.entries(GCA_MODE).map(([k, l]) => `<option value="${k}" ${gcaMode(f) === k ? 'selected' : ''}>${esc(l[0])}</option>`).join('')}</select>`}</td>` : ''}</tr>`).join('')}</table>
+   <td><select data-edit="flight" data-id="${f.id}" data-f="task">${taskOpts(f.task)}</select></td><td style="width:78px"><input data-edit="flight" data-id="${f.id}" data-f="freq" value="${esc(f.freq || 'TBD')}"></td>${gcaOn() ? `<td style="width:120px">${f.task === 'STANDBY' ? '' : `<select data-gcafl="${esc(f.cs)}">${Object.entries(GCA_MODE).map(([k, l]) => `<option value="${k}" ${gcaMode(f) === k ? 'selected' : ''}>${esc(l[0])}</option>`).join('')}</select>`}</td>` : ''}<td style="font-size:11.5px;max-width:240px">${esc(loTxt(f.lo, false))} <button class="b sm shrink" data-loopen="${esc(f.cs)}" title="Modifica il carico">✎</button></td></tr>${LOOPEN === f.cs ? `<tr><td colspan="${gcaOn() ? 8 : 7}" style="background:#f8fafc"><b style="font-size:12px">Carico di ${esc(f.cs)} (${esc(f.type)}) – proposto per ${esc(ROLES[f.task] || f.task)}</b>${loEditorHtml(f)}<div class="muted" style="font-size:11px">Catalogo dei carichi per tipo da fonti pubbliche: lo verifica lo staff. Le armi aria-suolo del carico sono quelle proposte nelle 9-line CAS.</div></td></tr>` : ''}`).join('')}</table>
   <p class="muted">Se cambi un task premi "Rigenera minacce dai task".</p>
   <h2>Minacce RED (${t.threats.length})</h2><table><tr><th>ID</th><th>Minaccia</th><th>Risposta</th><th>Stato</th><th></th></tr>
   ${t.threats.map(x => `<tr><td class="red">${x.id}</td><td><input data-edit="threat" data-id="${x.id}" data-f="name" value="${esc(x.name)}"></td><td>${esc(x.resp)}</td><td class="${x.status === 'AVOID' ? 'amber' : 'red'}">${x.status}</td><td><button class="b sm danger" data-del="threat" data-id="${x.id}">✕</button></td></tr>`).join('')}</table>
@@ -3782,9 +3854,29 @@ function renderTailor() {
   <div class="row" style="margin-top:10px"><button class="b primary" data-tab="fpl">Avanti: Piani di volo →</button><button class="b" id="goexp">Vai all'export →</button></div>`;
   return h;
 }
+// area booking e-mail (staff 21 Nov): internal events and missione libera ask the areas 48 h before to the SO department; only a reminder (offline flying needs nothing)
+const BOOK_TO = 'it-specialops@ivao.aero';
+function bookTime(off) { const d = evDate(), h = String(S.meta.hHour || '').match(/(\d{1,2})[:.]?(\d{2})/); if (d == null || !h) return null; return new Date(d + ((+h[1]) * 60 + (+h[2]) + off) * 60000); }
+function bookMail(o = {}) { const p2 = n => String(n).padStart(2, '0'), hm = t => t ? `${p2(t.getUTCHours())}${p2(t.getUTCMinutes())}` : 'TBD';
+  const st = bookTime(o.start != null ? o.start : -15), en = bookTime(o.end != null ? o.end : 120), dl = bookTime((o.start != null ? o.start : -15) - 48 * 60);
+  const areas = (o.areas || RES()).filter(z => z && z.poly), fl = (o.flights || (S.t ? S.t.flights : [])).map(f => `${f.cs} (${f.size} x ${f.type})`);
+  const day = S.meta.date || 'DATE TBD', subj = `Area activation request – ${S.meta.op} – ${day}`;
+  const body = [`Hello,`, ``, `we would like to request the activation of the following areas for a training mission.`, ``, `Mission: ${S.meta.op}`, `Date: ${day}`, `Time: ${hm(st)} – ${hm(en)} UTC`, ``,
+    `Areas:`, ...(areas.length ? areas.map(z => `- ${z.name}${z.id && /^LI-/.test(z.id) ? ` (${z.id.replace(/^LI-/, '')})` : ''}: ${z.lower} – ${z.upper}${o.levels && o.levels[z.id] ? `, used ${o.levels[z.id]}` : ''}`) : ['- none (route only)']), ``,
+    `Flights: ${fl.join(', ') || 'TBD'}`, ``, `Thank you.`].join('\n');
+  return { to: BOOK_TO, subj, body, deadline: dl ? `${p2(dl.getUTCDate())} ${MON[dl.getUTCMonth()]} ${dl.getUTCFullYear()}, ${hm(dl)} UTC` : '', href: `mailto:${BOOK_TO}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}` }; }
+function bookCardHtml(o) { const m = bookMail(o);
+  return `<div class="card"><b>Mail di prenotazione delle aree</b><p class="muted" style="margin:4px 0;font-size:12.5px">${m.deadline ? `Prenota le aree entro il <b>${esc(m.deadline)}</b> (48 ore prima).` : 'Le aree si prenotano 48 ore prima: imposta data e H-hour per avere la scadenza.'} Se voli offline non serve.</p>
+    <div class="muted" style="font-size:12px">A: <b>${m.to}</b> · Oggetto: ${esc(m.subj)}</div><textarea readonly style="min-height:150px;font-family:monospace;font-size:11.5px">${esc(m.body)}</textarea>
+    <div class="row" style="margin-top:4px"><a class="b sm shrink" href="${esc(m.href)}" target="_blank" rel="noopener">Apri la mail</a><button class="b sm shrink" data-copytxt="${esc(m.body)}">Copia il testo</button></div></div>`; }
+const RR_EN = 'IVAO Rules & Regulations apply (S.3.9 – S.3.10): intercepting, targeting or escorting another user only with the written consent of every party (private message) before starting; identification of real traffic only on request of online ATC; civil aircraft are intercepted following AIP ENR 1.12; a formation is never used to intercept a user who does not want to be intercepted.';
 function renderExport() {
   const saved = lsGet('ivao-so-saved', []); const mp = mpGet();
   return `<h2>Fase 5 · Export</h2>
+  ${KIND() !== 'free' ? `<div class="card"><b>Tipo di evento</b>: ${isInternal() ? 'Evento interno – nessun marchio IVAO, documenti intitolati "Mission pack", non si pubblica sulla pagina della divisione.' : isSog() ? `Evento ufficiale di un SOG (${esc(S.org.name || 'VFS')}): il masterplan lo invia il CEO del SOG sul sito ufficiale IVAO Special Operations, l'approvazione è dello staff HQ. Non si pubblica da qui.` : 'Evento ufficiale della divisione.'}
+    ${KIND() === 'official' ? `<div class="row" style="margin-top:6px;align-items:flex-end"><div style="flex:0 0 220px"><label>Organizzatore</label><select id="orgsel"><option value="">Staff SO della divisione</option><option value="sog" ${isSog() ? 'selected' : ''}>SOG ufficiale IVAO</option></select></div>${isSog() ? `<div style="flex:0 0 140px"><label>Nome del SOG</label><input id="orgname" value="${esc(S.org.name || 'VFS')}"></div>` : ''}</div>` : ''}</div>` : ''}
+  ${isInternal() ? bookCardHtml() : ''}
+  <div class="card"><b>Nome dell'evento</b><div class="row" style="margin-top:4px"><input id="op" value="${esc(S.meta.op)}"><button class="b shrink" id="rop" title="Nome casuale">🎲</button></div></div>
   <div class="card"><b>PowerPoint</b>
   <p class="muted" style="margin:4px 0">Il deck generico serve per annunciare l'evento; il briefing richiede la fase 3.</p>
   <div class="row"><button class="b primary" id="pptgen" ${GEN() ? '' : 'disabled'}>Deck scenario generico</button><button class="b primary" id="pptbrief" ${S.t ? '' : 'disabled'}>Deck briefing missione</button></div>
@@ -3795,9 +3887,9 @@ function renderExport() {
   ${(S.revs || []).length ? `<table><tr><th>Rev.</th><th>Data</th><th>Descrizione</th></tr>${S.revs.map(r => `<tr><td><b>${r.rev}</b></td><td>${esc(r.date)}</td><td>${esc(r.note)}</td></tr>`).join('')}</table>` : '<p class="muted" style="margin:4px 0">Nessuna revisione emessa: i documenti escono come "Draft".</p>'}
   <div class="row" style="margin-top:6px"><div><label>Nota della prossima revisione (facoltativa)</label><input id="revnote" placeholder="${(S.revs || []).length ? (S.t ? 'Adattata al tabellone piloti' : 'Aggiornamento scenario') : 'Prima emissione – prima delle adesioni'}"></div><button class="b primary shrink" id="issuerev">Emetti Rev. ${(S.revs || []).length}</button></div></div>
   ${S.t ? `<div class="card"><b>Piani di volo suggeriti</b><p class="muted" style="margin:4px 0">Un piano ICAO per ogni flight (modificabili nella linguetta 4 · Piani di volo). Escono anche nel deck briefing, nel masterplan (sezione "Piani di volo suggeriti") e nella pagina pubblica con il briefing.</p><div class="row"><button class="b shrink" id="fpldl">Scarica i piani di volo (testo)</button><button class="b shrink" data-tab="fpl">Apri i piani di volo</button></div></div>` : ''}
-  <div class="card"><b>Masterplan PDF</b> <span class="muted">– impaginato come il template IVAO SO</span>
-  <div class="row"><div><label>Divisione</label><input data-mp="division" value="${esc(mp.division)}"></div><div><label>Email contatto</label><input data-mp="email" value="${esc(mp.email)}"></div></div>
-  <div class="row"><div><label>Forum</label><input data-mp="forum" value="${esc(mp.forum)}"></div><div><label>Discord</label><input data-mp="discord" value="${esc(mp.discord)}"></div></div>
+  <div class="card"><b>${isInternal() ? 'Mission pack PDF' : 'Masterplan PDF'}</b> <span class="muted">– ${isInternal() ? 'stesso contenuto del masterplan, senza marchi né parti della divisione' : 'impaginato come il template IVAO SO'}</span>
+  ${isInternal() ? '' : `<div class="row"><div><label>Divisione</label><input data-mp="division" value="${esc(mp.division)}"></div><div><label>Email contatto</label><input data-mp="email" value="${esc(mp.email)}"></div></div>
+  <div class="row"><div><label>Forum</label><input data-mp="forum" value="${esc(mp.forum)}"></div><div><label>Discord</label><input data-mp="discord" value="${esc(mp.discord)}"></div></div>`}
   <label>Link carte aeroporti (usa {ICAO})</label><input data-mp="charts" value="${esc(mp.charts)}" placeholder="vuoto = rimando all'AIP Italia">
   <label>Briefing</label><textarea data-mp="briefing" style="min-height:60px">${esc(mp.briefing)}</textarea>
   <label>Risorse aggiuntive (una per riga, i link diventano cliccabili)</label><textarea data-mp="resources" style="min-height:60px">${esc(mp.resources)}</textarea>
@@ -3808,15 +3900,15 @@ function renderExport() {
   <label>Background</label><textarea id="bg" style="min-height:70px">${esc(S.background)}</textarea>
   <label>Spazio aereo – testo introduttivo</label><textarea data-mpt="asp" style="min-height:60px">${esc(mpTxt('asp', genAspTxt()))}</textarea>
   <div class="row" style="margin-top:6px"><button class="b sm shrink" id="mpreset">Ripristina sezioni e testi automatici</button></div></div>
-  <div class="row" style="margin-top:8px"><button class="b primary" id="mpdf" ${GEN() ? '' : 'disabled'}>Scarica Masterplan PDF</button></div>
+  <div class="row" style="margin-top:8px"><button class="b primary" id="mpdf" ${GEN() ? '' : 'disabled'}>Scarica ${isInternal() ? 'Mission pack' : 'Masterplan'} PDF</button></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">${S.t ? 'Include flight, minacce, ROE, SPINS e code words della fase 3.' : 'Versione preliminare: completa la fase 3 per avere ruoli, minacce e briefing dettagliati.'}</p></div>
-  <div class="card"><b>Pagina pubblica</b> <span class="muted">– quello che vedono i partecipanti</span>
+  ${isInternal() || isSog() ? `<div class="card"><b>Pagina pubblica</b><p class="muted" style="margin:4px 0;font-size:12.5px">${isInternal() ? 'Un evento interno non si pubblica: condividi con i partecipanti il file dell\'evento (📁 Eventi salvati → esporta) e i documenti scaricati.' : 'Gli eventi dei SOG non si pubblicano da qui: scarica il masterplan e il CEO del SOG fa la richiesta sul sito ufficiale IVAO Special Operations.'}</p></div>` : `<div class="card"><b>Pagina pubblica</b> <span class="muted">– quello che vedono i partecipanti</span>
   <p class="muted" style="margin:4px 0">Ora pubblicato: ${PUB ? esc(PUB.scenario.meta.op) + ' · ' + new Date(PUB.publishedAt).toLocaleString() + (PUB.scenario.t ? ' · briefing completo' : ' · solo annuncio') : 'nessuna missione'}</p>
   <label class="chip"><input type="checkbox" id="withnames" ${WITH_NAMES ? 'checked' : ''}> Includi i nomi di piloti e controllori nel deck di briefing (solo uso interno, mai da pubblicare)</label>
   <label class="chip"><input type="checkbox" id="pubbrief" ${S.t && PUB_BRIEF ? 'checked' : ''} ${S.t ? '' : 'disabled'}> Includi il briefing completo (flight, minacce, deck di briefing)</label>
   <div class="row" style="margin-top:8px"><button class="b" id="pubpreview">👁 Anteprima</button><button class="b primary" id="pubpublish">Pubblica sulla pagina pubblica</button></div>
   <div class="row" style="margin-top:6px"><button class="b" id="pubhtml">Scarica pagina pubblica (.html)</button></div>
-  <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>
+  <p class="muted" style="margin:6px 0 0;font-size:12px">"Pubblica" aggiorna questa pagina per tutti i visitatori (solo chi può modificarla). Il file .html serve per ospitarla su un sito della divisione.</p></div>`}
   ${notamHtml()}
   ${S.t && S.t.gci ? `<div class="card"><b>GCI / QRA pack – solo staff e controllori</b><p class="muted" style="margin:4px 0">Messaggi di scramble (TANGO) con i campi dinamici vuoti, inject con gli orari, brief dei bersagli, segnali di intercettazione ICAO, scheda di briefing GCI, blocchi, criteri di kill, tabelle di autenticazione, CAP, checklist e fraseologia con i nominativi dell'evento.</p><button class="b primary shrink" id="gcipack">Scarica GCI pack</button></div>` : ''}
   ${S.t && S.t.aar ? `<div class="card"><b>AAR pack – tanker, ricevitori e controllori</b><p class="muted" style="margin:4px 0">Una AAR card per tanker (${S.t.aar.cards.map(c => esc(c.tanker) + ' ' + c.rv).join(', ')}) con lo schema della track, la procedura di rendezvous, la fraseologia (boom o sonda e cestello), le regole generali, EMCON e le tabelle di riferimento.</p><button class="b primary shrink" id="aarpack">Scarica AAR pack</button></div>` : ''}
@@ -3828,7 +3920,8 @@ function renderExport() {
     <div class="row" style="flex-wrap:wrap">${[...S.pr.csar.map(c => c.id), ...S.pr.med.map(m => m.id)].map(id => `<button class="b shrink" data-prpack="${id}">${id}</button>`).join('')}<button class="b primary shrink" data-prpack="ALL">Tutti</button></div></div>` : ''}
   ${REL().cas ? `<div class="card"><b>JTAC pack (CAS) – solo staff e JTAC</b><p class="muted" style="margin:4px 0">PDF con mappa del settore, situation update, check-in atteso, game plan e 9-line di ogni flight. Le 9-line si vedono anche nella linguetta CAS / JTAC.</p>
     <div class="row" style="flex-wrap:wrap">${!casDone().ok ? `<span class="muted" style="font-size:12px">Disponibile a scenario completato: ${esc(casDone().why)}.</span>` : S.cas.jtacs.map(J => `<button class="b shrink" data-jpack="${J.id}">${esc(J.cs)}</button>`).join('') + '<button class="b primary shrink" data-jpack="ALL">Tutti i JTAC</button>'}</div></div>` : ''}
-  <div class="card"><b>Salvare e riaprire l'evento</b><p class="muted" style="margin:4px 0">Usa <b>📁 Eventi salvati</b> in alto: salva, riapri, duplica, esporta o importa un evento.</p><button class="b" id="evbtn2">📁 Apri eventi salvati</button></div>`;
+  <div class="card"><b>Salvare e riaprire l'evento</b><p class="muted" style="margin:4px 0">Usa <b>📁 Eventi salvati</b> in alto: salva, riapri, duplica, esporta o importa un evento.</p><button class="b" id="evbtn2">📁 Apri eventi salvati</button></div>
+  <details class="card"><summary style="cursor:pointer"><b>Avanzate</b> <span class="muted" style="font-size:12px">– punti di navigazione da un altro sectorfile / API</span></summary><p class="muted" style="font-size:12px">Non serve di solito: rotte e piani di volo usano il database di navigazione integrato (sector file IVAO Italy e AIP). Un file importato qui si aggiunge ai punti per le rotte generate.</p>${ptsCard().replace(/^\s*<h2>[^<]*<\/h2>/, '')}</details>`;
 }
 /* =====================================================================
    FLIGHT PLANS (v1.22) – suggested ICAO flight plan for every flight
@@ -3838,6 +3931,7 @@ function renderExport() {
    no SID / STAR in Italian flight plans. Italian OAT format (default): RMK/OAT or RMK/OAT GAT; "OAT ICAO Format": OAT / GAT in field 15.
    The plan is a starting point: every field can be edited, a manual edit is kept, "Ripristina suggerito" goes back.
    ===================================================================== */
+let LOOPEN = ''; // flight whose loadout editor is open
 let NAV = null, NAVG = null, NAVL = null; // navigation database (data/navdb.json), airway graph, map layer
 async function navInit() { try { const r = await fetch('data/navdb.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json();
   const pts = j.pts.map(([id, la, lo, k, x], i) => ({ id, pos: [la, lo], k, x: x || '', i })), by = {};
@@ -3938,7 +4032,7 @@ function fplSuggest(f) { const A = fplAc(f), W = fplWork(f), warn = [], civil = 
   if (!vfr && lvl < 0) lvl = 100;
   { const L0 = lvl > 0 ? lvl : -lvl / 10, fit = W.areas.filter(z => zFit(z, [L0, L0])); W.areas = fit.length ? fit : W.areas.slice(0, 1); W.area = W.areas[0] || null; } // only the areas at the flight's level
   const pts = [], w0 = W.pts[0], wl = W.pts[W.pts.length - 1];
-  const exit = base && AIRPORTS[base][3] !== 'CIV' ? fplProc(base, w0, vfr) : null, arr = base && AIRPORTS[base][3] !== 'CIV' ? fplProc(base, wl, vfr) : null;
+  const exit = base && AIRPORTS[base][3] !== 'CIV' ? fplProc(base, w0, vfr) : null, ab = f.arr && AIRPORTS[f.arr] ? f.arr : base, arr = ab && AIRPORTS[ab][3] !== 'CIV' ? fplProc(ab, wl, vfr) : null;
   if (exit) pts.push(fplPt(exit, 'exit'));
   const ent = fplEntry(exit ? exit.pos : dep, w0, vfr), ex2 = fplEntry(dep, wl, vfr);
   const gat = !oat || mixed, ifrGat = gat && !vfr;
@@ -3959,7 +4053,7 @@ function fplSuggest(f) { const A = fplAc(f), W = fplWork(f), warn = [], civil = 
   for (let i = 1; i < pts.length; i++) if (pts[i] && pts[i - 1] && pts[i].name === pts[i - 1].name && dist(pts[i].pos, pts[i - 1].pos) < 0.5 && !(pts[i - 1].role === 'entry' && pts[i].role === 'leave')) { // same point twice in a row (airway end = area entry)
     const keep = ['entry', 'leave', 'exit', 'arr'].includes(pts[i].role) ? i : i - 1, drop = keep === i ? i - 1 : i; if (keep === i && pts[drop].aw) pts[i].aw = pts[drop].aw; pts.splice(drop, 1); i--; }
   const stay = Math.max(0, W.win[1] - W.win[0]);
-  const s = { f, A, W, oat, mixed, vfr, lvl, spd: A.tas, dep: base || 'ZZZZ', dest: base || 'ZZZZ', pts: pts.filter(Boolean), aid, stay, warn };
+  const s = { f, A, W, oat, mixed, vfr, lvl, spd: A.tas, dep: base || 'ZZZZ', dest: ab || 'ZZZZ', pts: pts.filter(Boolean), aid, stay, warn };
   // alternate: nearest other BLUE base, otherwise the nearest military / joint aerodrome
   const cand = (S.blueBases || []).filter(i => i !== base && ap(i)).concat(Object.keys(AIRPORTS).filter(i => i !== base && AIRPORTS[i][3] !== 'CIV'));
   s.altn = base ? (cand.sort((a, b) => dist(dep, ap(a)) - dist(dep, ap(b)))[0] || '') : '';
@@ -4134,7 +4228,7 @@ function fplResHtml(f, q) { const P = fplBuild(f).pts, near = P.length ? P[Math.
   return r.map(x => x.coord ? `<button class="b sm" data-fpladd="${f.id}|c|${x.coord.join(',')}">⌖ ${icaoLL(x.coord)}</button>` : `<button class="b sm" data-fpladd="${f.id}|p|${x.p.i}" title="${esc(navTypeTxt(x.p))} · ${icaoLL(x.p.pos)}">${navSvgP(x.p, 14)} ${esc(navName(x.p))}</button>`).join(''); }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop, wy = window.scrollY, keep = {}; p.querySelectorAll('[data-keep]').forEach(el => keep[el.dataset.keep] = el.scrollTop);
-  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, fpl: renderFpl, export: renderExport }[TAB] || renderScenario)() +
+  p.innerHTML = MODE === 'staff' && S && S.kind === '' ? kindChooserHtml() : isFree() && TAB !== 'fpl' ? freeHtml() : (isFree() ? '<button class="b sm shrink" data-tab="scenario" style="margin-bottom:6px">← Torna al pacchetto</button>' : '') + ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, fpl: renderFpl, export: renderExport }[TAB] || renderScenario)() +
     `<datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist>`;
   p.scrollTop = top; p.querySelectorAll('[data-keep]').forEach(el => { if (keep[el.dataset.keep] != null) el.scrollTop = keep[el.dataset.keep]; }); if (window.scrollY !== wy) window.scrollTo(0, wy);
 }
@@ -4142,8 +4236,193 @@ function renderAll(fit) {
   if (typeof renderEvBadge === 'function') renderEvBadge();
   { const tc = document.getElementById('tabcas'); if (tc) tc.hidden = !(GEN() && casWanted()); if (TAB === 'cas' && !(GEN() && casWanted())) TAB = 'scenario'; const tp = document.getElementById('tabpr'); if (tp) tp.hidden = !(GEN() && prWanted()); if (TAB === 'pr' && !(GEN() && prWanted())) TAB = 'scenario'; const ts = document.getElementById('tabsar'); if (ts) ts.hidden = !(GEN() && sarWanted()); if (TAB === 'sar' && !(GEN() && sarWanted())) TAB = 'scenario'; const ta = document.getElementById('tabaib'); if (ta) ta.hidden = !(GEN() && aibWanted()); if (TAB === 'aib' && !(GEN() && aibWanted())) TAB = 'scenario'; }
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
+  { const tb = document.getElementById('tabs'), gp = document.getElementById('gopublic'); if (tb) tb.hidden = S.kind === '' || isFree(); if (gp) gp.hidden = S.kind === '' || isFree() || isInternal(); }
   renderPanel(); renderMapTools(); drawMap(fit);
 }
+
+/* =====================================================================
+   FIRST SCREEN AND "MISSIONE LIBERA" (staff 21 Nov, mockup "Mockup – missione libera")
+   ===================================================================== */
+function kindChooserHtml() { const off = OFFICIAL;
+  const card = (k, t, d, dis) => `<button class="kcard${dis ? ' dis' : ''}" data-kind="${k}" ${dis ? 'disabled' : ''} style="display:block;width:100%;text-align:left;margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:${dis ? 'not-allowed' : 'pointer'};opacity:${dis ? .55 : 1}"><b style="font-size:16px">${t}</b><div class="muted" style="font-size:12.5px;margin-top:3px">${d}</div></button>`;
+  return `<h2>Cosa vuoi preparare?</h2>
+  ${card('official', 'Evento ufficiale della divisione', off === false ? 'Solo per lo staff SO della divisione e i SOG ufficiali IVAO (chi può modificare questa pagina).' : off == null ? 'Verifica dei permessi in corso…' : 'Staff SO della divisione o SOG ufficiale: masterplan IVAO SO, pagina pubblica, NOTAM.', off !== true)}
+  ${card('internal', 'Evento interno', 'Stesso generatore (scenario, partecipanti, CAS, AAR, CSAR…), documenti "Mission pack" senza marchi; non si pubblica.')}
+  ${card('free', 'Missione libera', 'Una missione da volare da solo o con altri partecipanti: 4 passi, piano di volo, kneeboard e mail di prenotazione delle aree.')}`; }
+
+const FREE_MIS = [ // key, label (staff UI), event, English name
+  ['CAS', 'CAS', 'CAS', 'Close air support'], ['NAVL', 'Navigazione a bassa quota', 'NAVL', 'Low-level navigation'], ['NAV', 'Navigazione', 'NAVI', 'Navigation'],
+  ['AAR', 'Rifornimento in volo', 'AAR', 'Air-to-air refuelling'], ['AEW', 'AEW', 'AEW', 'AEW orbit'], ['ID', 'Intercettazione', 'ID', 'Interception'],
+  ['STRIKE', 'Strike', 'SEAD', 'Strike'], ['SAR', 'SAR', 'SAR', 'Search and rescue'], ['AIB', 'Antincendio', 'AIB', 'Aerial firefighting']];
+const FREE_ROLES = { CAS: ['CAS'], NAVL: ['LOWNAV'], NAV: ['IFRNAV'], AAR: ['RECEIVER', 'AAR'], AEW: ['AEW', 'DCA'], ID: ['QRA', 'TARGET'], STRIKE: ['STRIKE', 'SEAD'], SAR: ['SAR'], AIB: ['AIB'] };
+const freeMis = k => FREE_MIS.find(m => m[0] === k) || null;
+const FREE = () => { const d = { step: 1, mis: '', solo: true, thr: false, rr: false, flights: [], date: '', hh: '19:00', dur: 40, area: null }; if (!S.free) S.free = d; else for (const k in d) if (!(k in S.free)) S.free[k] = d[k]; return S.free; };
+function freeDefDate() { const d = new Date(Date.now() + 7 * 864e5); return `${String(d.getUTCDate()).padStart(2, '0')} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; }
+function freeTaskFor(mis, type) { const a = AC.find(x => x.type === type), r = FREE_ROLES[mis] || [];
+  if (mis === 'AAR') return a && a.cat === 'TANKER' ? 'AAR' : 'RECEIVER'; if (mis === 'AEW') return a && a.cat === 'AEW' ? 'AEW' : 'DCA'; return r[0]; }
+function freeTypes(mis) { const r = FREE_ROLES[mis] || []; return acFor(r.length ? r : ['IFRNAV']); }
+function freeNewFlight() { const F = FREE(), types = freeTypes(F.mis), n = F.flights.length, type = types[0] || 'EF-2000 Typhoon', a = AC.find(x => x.type === type) || { cat: 'FIGHTER' };
+  const pool = CS_POOL[a.cat] || CS_POOL.OTHER || ['TRAINER'], used = new Set(F.flights.map(f => f.cs)); let cs = ''; for (let i = 0; !cs || used.has(cs); i++) cs = `${pool[(n + i) % pool.length]} ${1 + Math.floor((n + i) / pool.length)}`;
+  const dep = (F.flights[0] && F.flights[0].dep) || 'LIPS';
+  return { id: uid(), cs, type, size: ['FIGHTER', 'ATTACK'].includes(a.cat) && F.mis !== 'NAV' ? 2 : 1, dep, arr: dep, form: true, task: freeTaskFor(F.mis, type) }; }
+// candidate work areas for the mission, near the departure base
+function freeCands() { const F = FREE(), f0 = F.flights[0], base = f0 && ap(f0.dep); if (!base) return []; if ((!S.asp || !(S.asp.zones || []).length) && AIPDATA) defaultAirspace();
+  const m = F.mis, ok = z => { const u = z.use || [];
+    if (m === 'CAS' || m === 'STRIKE') return u.includes('FIRING') || u.includes('A2G');
+    if (m === 'NAVL') return /^LI-AT/.test(z.id) || u.includes('LOWLEVEL');
+    if (m === 'AAR') return z.type === 'AAR' || u.includes('AAR');
+    if (m === 'AEW' || m === 'ID') return (u.includes('A2A') || u.includes('AIR') || u.includes('SUPERSONIC')) && zArea(z.poly) > 300;
+    return false; };
+  const band = TASK_FL[freeTaskFor(m, f0.type)] || (m === 'CAS' ? [100, 200] : null), fit = z => !band || zBandOk(z, band); // areas whose levels fit the mission first
+  return LIBF().filter(z => z.type !== 'COR' && z.poly && ok(z)).map(z => ({ z, d: dist(base, centroid(z.poly)) / NMK, fit: fit(z) })).filter(x => x.d < 170).sort((a, b) => (b.fit - a.fit) || a.d - b.d).slice(0, 8); }
+const freeNeedsArea = () => ['CAS', 'STRIKE', 'NAVL', 'AAR', 'AEW', 'ID'].includes(FREE().mis);
+// flights of the mission as generator flights (a flight not in formation = one plan per aircraft)
+function freeFlights() { const out = [];
+  FREE().flights.forEach(x => { const a = AC.find(q => q.type === x.type) || { cat: 'FIGHTER', roles: [] }, one = (cs, size) => out.push({ id: uid(), cs, type: x.type, cat: a.cat, roles: a.roles, pilots: [], size, task: x.task || freeTaskFor(FREE().mis, x.type), base: x.dep, arr: x.arr && x.arr !== x.dep ? x.arr : undefined });
+    if (x.form || x.size < 2) one(x.cs, x.size); else { const m = x.cs.match(/^(.*?)(\d+)$/); for (let i = 0; i < x.size; i++) one(m ? `${m[1]}${+m[2] + i}` : `${x.cs} ${i + 1}`, 1); } });
+  return out; }
+function freePrep() { const F = FREE(), c = freeCands(); if (freeNeedsArea() && F.area === null && c.length) { F.area = c[0].z.id; F.built = 0; } if (!F.built) freeBuild(); }
+let FREEB = false;
+function freeBuild() { if (FREEB) return false; FREEB = true; try { return freeBuild0(); } finally { FREEB = false; } }
+function freeBuild0() { const F = FREE(), mis = freeMis(F.mis); if (!mis || !F.flights.length) return false;
+  const area = F.area ? LIBF().find(z => z.id === F.area) : null, bases = [...new Set(F.flights.flatMap(f => [f.dep, f.arr]).filter(b => AIRPORTS[b]))];
+  const pts = [...bases.map(ap), ...(area ? area.poly : [])], la = pts.map(p => p[0]), lo = pts.map(p => p[1]), pad = area ? 0.35 : 0.9;
+  const poly = [[Math.min(...la) - pad, Math.min(...lo) - pad], [Math.min(...la) - pad, Math.max(...lo) + pad], [Math.max(...la) + pad, Math.max(...lo) + pad], [Math.max(...la) + pad, Math.min(...lo) - pad]].map(p => p.map(v => +v.toFixed(3)));
+  S.thCustom = mkTheatre(poly, 'Free mission'); setEvents([mis[2]]); setTheatre('CUSTOM');
+  S.meta.date = F.date || freeDefDate(); S.meta.hHour = `${F.hh || '19:00'}Z`; S.meta.tl = { dur: (+F.dur || 40) + 70, dep: 15, tr: 20, ret: 20, land: 15 };
+  if (!/^(EXERCISE|TRAINING) /.test(S.meta.op || '')) S.meta.op = 'TRAINING ' + pick(WORDS);
+  S.bases = {}; S.baseOrd = []; bases.forEach(b => { S.bases[b] = { side: 'BLUE', roles: ['ALL'], rroles: ['ALL'] }; S.baseOrd.push(b); }); S.basesSet = true; S.blueBases = bases.slice(); S.redBases = [];
+  S.resMode = 'manual'; S.reserved = area ? [area.id] : []; S.off = [];
+  if (!F.thr) S.cats = S.cats.filter(k => CATS[k] && (CATS[k].evt || (F.mis === 'STRIKE' && k === 'HVT') || (F.mis === 'CAS' && k === 'GROUND')));
+  S.roster = { pilots: [], controllers: [] }; S.c2sel = null;
+  generateGeneric(); S.cor = [];
+  const flights = freeFlights(), assigned = {}; flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
+  if (flights.some(f => f.task === 'QRA')) qraSetup(flights);
+  const el = generateElements(flights); if (!F.thr) el.threats = el.threats.filter(x => x.status === 'TARGET' && x.flight && flights.some(f => f.id === x.flight)); // simulated threats off: only the targets of the flights
+  S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
+  assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  F.built = Date.now(); save(); return true; }
+function freeStepBar(st) { return `<div style="display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap">${['Cosa voglio volare', 'Con cosa e da dove', 'Dove', 'Il pacchetto'].map((t, i) => `<button class="b sm${st === i + 1 ? ' primary' : ''}" data-fstep="${i + 1}" ${i + 1 > freeReach() ? 'disabled' : ''} style="flex:1 1 0;min-width:0;font-size:11.5px;padding:6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i + 1} · ${t}</button>`).join('')}</div>`; }
+function freeReach() { const F = FREE(); if (!F.mis || (F.mis === 'ID' && !F.rr)) return 1; if (!F.flights.length || F.flights.some(f => !AIRPORTS[f.dep] || !AC.find(a => a.type === f.type))) return 2; return F.built ? 4 : 3; }
+function freeHtml() { const F = FREE(), st = Math.min(F.step, freeReach());
+  let h = `<div class="row" style="align-items:center"><div class="muted" style="font-size:11px;letter-spacing:.08em;font-weight:700;flex:1">MISSIONE LIBERA</div><button class="b sm shrink" data-kindreset="1">← Cambia tipo di missione</button></div>${freeStepBar(st)}`;
+  if (st === 1) h += freeStep1(); else if (st === 2) h += freeStep2(); else if (st === 3) h += freeStep3(); else h += freeStep4();
+  return h; }
+function freeStep1() { const F = FREE();
+  return `<h2>Cosa voglio volare</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${FREE_MIS.map(([k, l]) => `<button class="b" data-fmis="${k}" style="padding:14px 10px;text-align:left;${F.mis === k ? 'outline:2px solid var(--ivao);background:#eef2ff' : ''}"><b>${esc(l)}</b>${k === 'ID' ? ' <span class="chip" style="font-size:10px;padding:1px 6px;margin-left:4px;background:#fef3c7;border-color:#f59e0b">R&amp;R</span>' : ''}</button>`).join('')}</div>
+  <h3 style="margin:14px 0 4px">Come la voli</h3><div class="row" style="flex-wrap:wrap"><label class="chip"><input type="radio" name="fsolo" data-fsolo="1" ${F.solo ? 'checked' : ''}> Da solo</label><label class="chip"><input type="radio" name="fsolo" data-fsolo="0" ${F.solo ? '' : 'checked'}> Con altri partecipanti</label></div>
+  <p class="muted" style="font-size:12px;margin:4px 0">${F.solo ? 'Da solo: chiamate radio e 9-line già scritte nel kneeboard, da seguire senza controllore.' : 'Con altri partecipanti: chi fa il JTAC, il GCI o il bersaglio riceve la sua scheda (pacchetto, passo 4).'}</p>
+  ${F.mis === 'ID' ? `<div class="card" style="border-color:#f59e0b;background:#fffbeb;margin-top:8px"><b>Intercettazione: rispetta le regole IVAO (Rules &amp; Regulations, S.3.9 – S.3.10)</b><ul style="margin:6px 0 6px 18px;padding:0;font-size:12.5px">
+    <li>Si intercetta, si "prende di mira" o si scorta un altro utente solo con il <b>consenso scritto di tutti</b> (intercettore e intercettato), via messaggio privato nei client IVAO, <b>prima</b> di iniziare.</li>
+    <li>Le missioni di identificazione su traffico reale si fanno solo <b>su richiesta dell'ATC online</b>: transponder spento o non valido, deviazione dal piano di volo, nessun contatto radio con l'ATC.</li>
+    <li>L'intercettazione di aerei civili segue la procedura "Interception of Civil Aircraft" dell'AIP (ENR 1.12).</li>
+    <li>Una formazione non va usata per intercettare chi non vuole essere intercettato.</li></ul>
+    <p class="muted" style="font-size:12px;margin:0 0 6px">Consiglio: volala con un altro partecipante che fa il bersaglio, d'accordo prima del volo.</p>
+    <label class="chip"><input type="checkbox" id="frr" ${F.rr ? 'checked' : ''}> Ho letto e rispetterò le regole IVAO</label></div>` : ''}
+  <label class="chip" style="margin-top:10px"><input type="checkbox" id="fthr" ${F.thr ? 'checked' : ''}> Aggiungi minacce simulate (SAM, MANPADS, CAP da evitare o attaccare)</label>
+  <div class="row" style="margin-top:12px"><button class="b primary shrink" data-fstep="2" ${freeReach() < 2 ? 'disabled' : ''}>Avanti →</button></div>`; }
+function freeStep2() { const F = FREE(); if (!F.flights.length) F.flights.push(freeNewFlight()); if (!F.date) F.date = freeDefDate();
+  const types = freeTypes(F.mis), apts = Object.keys(AIRPORTS).sort(), roles = FREE_ROLES[F.mis] || [];
+  const aptOpts = cur => apts.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${k} – ${esc(AIRPORTS[k][0])}</option>`).join('');
+  const card = (x, i) => { const pf = { cs: x.cs, type: x.type, task: x.task, size: x.size }; pf.lo = ((S.loMan || {})[x.cs] && S.loMan[x.cs].type === x.type && S.loMan[x.cs].task === x.task) ? S.loMan[x.cs].lo : loDefault(pf);
+    const w = [x.dep, x.arr].filter((b, j, a) => b && a.indexOf(b) === j).map(b => baseWarn(b) && (!SCHOOL[b] || !baseOk(b, x.task, { type: x.type, cat: (AC.find(a => a.type === x.type) || {}).cat })) ? `${b}: ${baseWarn(b)}` : '').filter(Boolean);
+    return `<div class="card" style="margin-top:8px"><div class="row" style="align-items:center"><b style="flex:1">Flight ${i + 1}</b>${F.flights.length > 1 ? `<button class="b sm danger shrink" data-fdel="${x.id}">✕</button>` : ''}</div>
+    <div class="tgrid"><div><label>Nominativo</label><input data-ff="${x.id}" data-k="cs" value="${esc(x.cs)}"></div>
+      <div style="grid-column:span 2"><label>Aereo</label><select data-ff="${x.id}" data-k="type">${[...new Set([x.type, ...types])].map(t => `<option ${t === x.type ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+      <div><label>Numero</label><select data-ff="${x.id}" data-k="size">${[1, 2, 3, 4].map(n => `<option ${n === x.size ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      ${roles.length > 1 ? `<div style="grid-column:span 2"><label>Ruolo</label><select data-ff="${x.id}" data-k="task">${roles.map(r => `<option value="${r}" ${r === x.task ? 'selected' : ''}>${esc(ROLES[r] || r)}</option>`).join('')}</select></div>` : ''}
+      <div style="grid-column:span 2"><label>Partenza</label><select data-ff="${x.id}" data-k="dep">${aptOpts(x.dep)}</select></div><div style="grid-column:span 2"><label>Arrivo</label><select data-ff="${x.id}" data-k="arr">${aptOpts(x.arr)}</select></div></div>
+    ${w.map(t => `<div style="font-size:11.5px;color:#b45309">⚠ ${esc(t)}</div>`).join('')}
+    ${x.size > 1 ? `<label class="chip" style="margin-top:6px"><input type="checkbox" data-ff="${x.id}" data-k="form" ${x.form ? 'checked' : ''}> In formazione (un solo piano di volo)</label>` : ''}
+    <div style="margin-top:6px"><b style="font-size:12.5px">Carico</b> <span class="muted" style="font-size:11.5px">proposto per ${esc(ROLES[x.task] || x.task)} · solo i carichi compatibili con il ${esc(x.type)}</span>${loEditorHtml(pf)}</div></div>`; };
+  return `<h2>Con cosa e da dove</h2>${F.flights.map(card).join('')}
+  <button class="b sm shrink" id="fadd" style="margin-top:8px">+ Aggiungi un flight</button>
+  <div class="tgrid" style="margin-top:12px"><div style="grid-column:span 2"><label>Data</label><input id="fdate" value="${esc(F.date)}" placeholder="12 DEC 2026"></div><div><label>Decollo (UTC)</label><input id="fhh" value="${esc(F.hh)}" placeholder="19:00"></div><div><label>Tempo in area (min)</label><input id="fdur" type="number" min="10" max="240" value="${esc(F.dur)}"></div></div>
+  <p class="muted" style="font-size:12px;margin:4px 0">Servono per il piano di volo e per la mail di prenotazione delle aree.</p>
+  <p class="muted" style="font-size:11px;margin:2px 0">Catalogo dei carichi per tipo da fonti pubbliche: lo verifica lo staff.</p>
+  <div class="row" style="margin-top:10px"><button class="b shrink" data-fstep="1">← Indietro</button><button class="b primary shrink" data-fstep="3" ${freeReach() < 3 ? 'disabled' : ''}>Avanti →</button></div>`; }
+function freeSummary() { const t = S.t; if (!t) return ''; const F = FREE(), out = [];
+  RES().forEach(z => out.push(`<div><b>${esc(z.name)}</b> · ${esc(z.lower)} – ${esc(z.upper)} · ente ${esc(zoneAtsTxt(z))}</div>`));
+  if (S.cas && S.cas.jtacs.length) { const J = S.cas.jtacs[0], T = J.tasks.find(x => x.flight) || J.tasks[0]; if (T) { const tg = J.targets.find(x => x.id === T.target) || J.targets[0];
+    out.push(`<div><b>Livelli:</b> ${T.block ? 'blocco ' + esc(T.block) : 'bassa quota'}</div><div><b>Holding:</b> ${esc(patTxt(J).toLowerCase())} su CP ${esc(J.cps[0].name)}${esc(pubCor(J.cps[0]))}</div><div><b>Bersaglio:</b> ${esc(tg.id)} – ${esc(tg.desc)}</div>`); } }
+  (t.serials || []).filter(r => r.kind !== 'GCA').slice(0, 3).forEach(r => out.push(`<div class="muted" style="font-size:12px">${esc(r.title)}: ${esc(r.text)}</div>`));
+  return out.join(''); }
+function freeStep3() { const F = FREE(), c = freeCands();
+  return `<h2>Dove</h2><p class="muted" style="margin-top:0;font-size:12.5px">Area proposta in base alla base di partenza e al tipo di missione. Puoi sceglierne un'altra.</p>
+  ${c.map(({ z, d, fit }) => `<label class="card" style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;cursor:pointer;${F.area === z.id ? 'border-color:var(--ivao);background:#eef2ff' : ''}"><input type="radio" name="farea" data-farea="${esc(z.id)}" ${F.area === z.id ? 'checked' : ''} style="width:auto;margin-top:3px"><div><b>${esc(z.name)}</b><div class="muted" style="font-size:12px">${esc(z.lower)} – ${esc(z.upper)} · ${Math.round(d)} NM da ${esc(F.flights[0].dep)}${z.activity ? ' · ' + esc(z.activity) : ''}${fit ? '' : ' · <span style="color:#b45309">livelli bassi per questa missione</span>'}</div></div></label>`).join('') || (freeNeedsArea() ? '<p class="muted">Nessuna area adatta entro 170 NM dalla base: la missione si fa sulla rotta.</p>' : '')}
+  <label class="card" style="display:flex;gap:8px;align-items:center;margin-top:6px;cursor:pointer"><input type="radio" name="farea" data-farea="" ${!F.area ? 'checked' : ''} style="width:auto">${freeNeedsArea() ? 'Nessuna area riservata' : 'Nessuna area riservata (rotta / scenario vicino alla base)'}</label>
+  <div class="card" style="margin-top:10px;font-size:13px">${freeSummary() || '<span class="muted">Missione non ancora generata.</span>'}<div class="row" style="margin-top:6px"><button class="b sm shrink" id="fregen">Rigenera</button></div></div>
+  <div class="row" style="margin-top:10px"><button class="b shrink" data-fstep="2">← Indietro</button><button class="b primary shrink" data-fstep="4" ${S.t ? '' : 'disabled'}>Avanti →</button></div>`; }
+function freeStep4() { const F = FREE(), t = S.t, cas = REL().cas && !F.solo, id = !F.solo && t && t.gci, aar = !F.solo && t && t.aar;
+  return `<h2>Il tuo pacchetto</h2>
+  ${RES().length ? bookCardHtml({ start: 0, end: (+F.dur || 40) + 60 }) : '<div class="card"><b>Prenotazione delle aree</b><p class="muted" style="margin:4px 0">Nessuna area riservata: non serve prenotare.</p></div>'}
+  <div class="card"><b>Piano di volo</b> <span class="muted" style="font-size:12px">– testo ICAO da copiare, modificabile nella linguetta dei piani di volo</span>${fplAll().map(({ f, p }) => `<div style="margin-top:6px"><div class="muted" style="font-size:12px">${esc(f.cs)}</div><textarea readonly style="min-height:110px;font-family:monospace;font-size:11.5px">${esc(p.icaoTxt)}</textarea><button class="b sm shrink" data-copytxt="${esc(p.icaoTxt)}">Copia</button></div>`).join('')}</div>
+  <div class="card"><b>Kneeboard (PDF, A5)</b><p class="muted" style="margin:4px 0;font-size:12.5px">Per ogni flight: carico, area, ${REL().cas ? 'holding, check-in e 9-line, ' : ''}${F.solo ? 'chiamate radio da seguire, ' : ''}piano di volo, log di navigazione, frequenze ed emergenze.</p><button class="b primary shrink" id="fknee">Scarica</button></div>
+  <div class="card"><b>Mappa della missione</b><p class="muted" style="margin:4px 0;font-size:12.5px">Immagine con area, rotta${REL().cas ? ' e holding' : ''}.</p><button class="b shrink" id="fmap">Scarica</button></div>
+  ${cas ? `<div class="card"><b>Scheda per chi fa il JTAC</b><p class="muted" style="margin:4px 0;font-size:12.5px">JTAC pack: situation update, check-in atteso, game plan e 9-line.</p><button class="b shrink" data-jpack="ALL">Scarica</button></div>` : ''}
+  ${id ? `<div class="card"><b>Scheda per chi fa il GCI / il bersaglio</b><button class="b shrink" id="gcipack">Scarica</button></div>` : ''}
+  ${aar ? `<div class="card"><b>AAR card (tanker e ricevitori)</b><button class="b shrink" id="aarpack">Scarica</button></div>` : ''}
+  <p class="muted" id="pptstatus" style="margin:6px 0"></p>
+  <div class="row" style="margin-top:10px"><button class="b shrink" data-fstep="3">← Indietro</button><button class="b shrink" data-tab="fpl">Modifica i piani di volo</button></div>`; }
+// kneeboard: A5 pages, one or two per flight (English, no names)
+async function exportKneeboard(btn) {
+  if (typeof PDFLib === 'undefined' || !S.t) return toast('Libreria PDF non caricata'); if (btn) btn.disabled = true;
+  try { const { PDFDocument, rgb, StandardFonts } = PDFLib, pdf = await PDFDocument.create(), F = FREE(), mis = freeMis(F.mis) || ['', '', '', 'Training mission'];
+    pdf.setTitle(`${S.meta.op} – Kneeboard`);
+    const R = await pdf.embedFont(StandardFonts.Helvetica), B = await pdf.embedFont(StandardFonts.HelveticaBold), M = await pdf.embedFont(StandardFonts.Courier);
+    const PW = 419.53, PH = 595.28, ML = 28, CW = PW - 2 * ML, BLUE = rgb(13 / 255, 44 / 255, 153 / 255), GREY = rgb(.35, .38, .45);
+    const clean = s => String(s ?? '').replace(/→/g, '->').replace(/[–—]/g, '-').replace(/·/g, '-').replace(/×/g, 'x').replace(/°/g, ' deg').replace(/[“”]/g, '"').replace(/’/g, "'").replace(/[^\x20-\x7E\xA0-\xFF\n]/g, '');
+    let pg = null, y = 0;
+    const page = (h) => { pg = pdf.addPage([PW, PH]); pg.drawRectangle({ x: 0, y: PH - 34, width: PW, height: 34, color: BLUE }); pg.drawText(clean(h), { x: ML, y: PH - 22, size: 11, font: B, color: rgb(1, 1, 1) }); y = 50; };
+    const wrap = (txt, f, s, w) => { const out = []; for (const para of clean(txt).split('\n')) { let line = ''; for (const word of para.split(' ')) { const tryL = line ? line + ' ' + word : word; if (f.widthOfTextAtSize(tryL, s) > w && line) { out.push(line); line = word; } else line = tryL; } out.push(line); } return out; };
+    const txt = (t, o = {}) => { const f = o.f || R, s = o.s || 8.5, lines = wrap(t, f, s, CW - (o.x || 0)); for (const l of lines) { if (y + s + 2 > PH - 24) page(o.cont || 'continued'); pg.drawText(l, { x: ML + (o.x || 0), y: PH - y - s, size: s, font: f, color: o.c || rgb(0, 0, 0) }); y += s + 2.5; } y += o.after ?? 2; };
+    const head = t => { y += 4; txt(t.toUpperCase(), { f: B, s: 8, c: BLUE, after: 1 }); };
+    for (const { f, p } of fplAll()) {
+      const H = `${f.cs} - ${mis[3]}${F.solo ? ' (solo)' : ''}`; page(H);
+      txt(`${S.meta.date || ''} - ${S.meta.hHour || ''} - ${f.size} x ${f.type} - ${f.base}${f.arr ? ' -> ' + f.arr : ''}`, { f: B, s: 9 });
+      if (f.lo) { head('Loadout'); txt(loTxt(f.lo)); }
+      const fr = RES(); if (fr.length) { head('Area'); fr.forEach(z => txt(`${z.name} (${z.lower} - ${z.upper}) - ATS unit ${zoneAtsTxt(z)}`)); }
+      if (F.mis === 'ID') { head('IVAO Rules & Regulations'); txt(RR_EN, { s: 7.5 }); }
+      const J = S.cas && S.cas.jtacs.find(x => x.tasks.some(T => T.flight === f.id));
+      if (J) { const T = J.tasks.find(x => x.flight === f.id); head(`CAS - JTAC ${J.cs} ${J.freq || ''}`); txt(`Holding: ${patTxt(J)} on CP ${J.cps[0].name}${pubCor(J.cps[0])}, ${T.block ? 'block ' + T.block : 'low level'}, playtime ${T.playtime} min.`);
+        head(F.solo ? 'Check-in (to read)' : 'Check-in'); txt(casCheckIn(J, T).filter(Boolean).join(', ') + '.', { f: M, s: 7.5 });
+        const n = casNine(J, T, S.t); head(`9-line${F.solo ? ' (scripted)' : ''} - ${casGamePlan(J, T)}`); n.lines.forEach(([k, l, v]) => txt(`${k}  ${l}: ${v}`, { f: M, s: 7.5, after: 0 })); y += 3;
+        txt('Remarks: ' + n.remarks.join('; '), { s: 7.5 }); txt('Restrictions: ' + n.restr.join('; '), { s: 7.5 });
+        if (F.solo) txt('Solo: fly the holding, read the check-in, then fly the 9-line as briefed (simulated attack inside the final attack headings), egress and report BDA to yourself.', { s: 7.5, c: GREY }); }
+      (S.t.serials || []).filter(r => r.flights.includes(f.id) && r.kind !== 'CAS').forEach(r => { head(r.title); txt(r.text); if (r.success) txt('Success: ' + r.success, { s: 7.5, c: GREY }); });
+      if (f.rec) { head('Recovery'); txt(f.rec); }
+      page(`${f.cs} - flight plan, nav log, frequencies`);
+      head('Flight plan'); p.icaoTxt.split('\n').forEach(l => txt(l, { f: M, s: 7.5, after: 0 })); y += 4;
+      head('Nav log'); txt('From - To - Track (M) - NM - min', { f: B, s: 7.5, after: 0 }); (p.legs || []).forEach(l => txt(`${l.from} - ${l.to} - ${String(l.trk).padStart(3, '0')} - ${l.nm} - ${l.min}`, { f: M, s: 7.5, after: 0 })); y += 4;
+      head('Frequencies'); (S.t.c2 || []).filter(c => c.freq && c.freq !== 'TBD').forEach(c => txt(`${c.cs} ${c.freq} - ${c.role}`, { s: 7.5, after: 0 })); txt('GUARD 121.500 / 243.000', { s: 7.5 });
+      head('Emergencies'); txt('Real emergency: KNOCK IT OFF, squawk 7700, follow ATC. Lost comms: squawk 7600, continue as filed and land at the planned aerodrome. Weather below minima: return to base.', { s: 7.5 });
+    }
+    const bytes = await pdf.save(); await download(`${fileBase()}_KNEEBOARD.pdf`, new Blob([bytes], { type: 'application/pdf' })); toast('Kneeboard generato');
+  } catch (e) { console.error(e); toast('Errore: ' + e.message); }
+  if (btn) btn.disabled = false; }
+async function exportFreeMap(btn) { if (btn) btn.disabled = true; try { const m = await renderMap('brief', { light: true, w: 1400, h: 900 }); if (m) await download(`${fileBase()}_MAP.png`, new Blob([dataUrlBytes(m)], { type: 'image/png' })); else toast('Mappa non disponibile'); } catch (e) { toast('Errore: ' + e.message); } if (btn) btn.disabled = false; }
+document.addEventListener('click', e => { const t = e.target.closest('[data-kind],[data-kindreset],[data-fmis],[data-fstep],[data-fdel],#fadd,#fregen,#fknee,#fmap,[data-copytxt]'); if (!t || MODE !== 'staff' || !S) return;
+  if (t.dataset.copytxt != null) { e.preventDefault(); try { navigator.clipboard.writeText(t.dataset.copytxt); toast('Copiato'); } catch (er) { toast('Copia non riuscita'); } return; }
+  if (t.dataset.kind) { S.kind = t.dataset.kind; if (S.kind === 'free') { FREE(); S.free.step = 1; } TAB = 'scenario'; save(); renderAll(true); return; }
+  if (t.dataset.kindreset) { S.kind = ''; save(); renderAll(true); return; }
+  const F = FREE();
+  if (t.dataset.fmis) { if (F.mis !== t.dataset.fmis) { F.mis = t.dataset.fmis; F.flights = []; F.area = null; F.built = 0; S.t = null; } save(); renderPanel(); return; }
+  if (t.dataset.fstep) { F.step = +t.dataset.fstep; if (F.step >= 3) freePrep(); save(); renderAll(true); $('#panel').scrollTop = 0; return; }
+  if (t.dataset.fdel) { F.flights = F.flights.filter(x => x.id !== t.dataset.fdel); F.built = 0; save(); renderPanel(); return; }
+  if (t.id === 'fadd') { F.flights.push(freeNewFlight()); F.built = 0; save(); renderPanel(); return; }
+  if (t.id === 'fregen') { F.built = 0; freeBuild(); renderAll(true); return; }
+  if (t.id === 'fknee') return exportKneeboard(t);
+  if (t.id === 'fmap') return exportFreeMap(t); });
+document.addEventListener('change', e => { const t = e.target, d = t.dataset || {}; if (MODE !== 'staff' || !S || !isFree()) return; const F = FREE();
+  if (d.fsolo != null) { F.solo = d.fsolo === '1'; save(); renderPanel(); return; }
+  if (t.id === 'frr') { F.rr = t.checked; save(); renderPanel(); return; }
+  if (t.id === 'fthr') { F.thr = t.checked; F.built = 0; save(); return; }
+  if (d.farea != null) { F.area = d.farea || ''; F.built = 0; freeBuild(); renderAll(true); return; }
+  if (d.ff) { const x = F.flights.find(q => q.id === d.ff); if (!x) return; const k = d.k;
+    if (k === 'size') x.size = +t.value; else if (k === 'form') x.form = t.checked; else x[k] = k === 'cs' ? t.value.toUpperCase().trim() : t.value;
+    if (k === 'type') x.task = freeTaskFor(F.mis, x.type); if (k === 'dep' && (!x.arr || x.arr === x._dep0)) x.arr = x.dep; x._dep0 = x.dep;
+    F.built = 0; if (k === 'dep') F.area = null; save(); renderPanel(); return; }
+  if (t.id === 'fdate' || t.id === 'fhh' || t.id === 'fdur') { F[{ fdate: 'date', fhh: 'hh', fdur: 'dur' }[t.id]] = t.id === 'fdate' ? t.value.toUpperCase().trim() : t.value.trim(); F.built = 0; save(); return; } });
 
 /* ---------- event handling (delegated) ---------- */
 function find(kind, id) {
@@ -4173,6 +4452,22 @@ document.addEventListener('click', e => { const t = e.target.closest('[data-nava
   if (t.dataset.fpldel) { const [id, i] = t.dataset.fpldel.split('|'), f = fp(id); if (!f) return; const P = fplPts(f); P.splice(+i, 1); if (P[+i]) delete P[+i].aw; save(); renderPanel(); drawMap(); return; }
   if (t.dataset.fpladd) { const [id, k, v] = t.dataset.fpladd.split('|'), f = fp(id); if (!f) return; const ps = document.querySelector(`[data-fplpos="${id}"]`), at = ps ? +ps.value : fplInsAt(fplBuild(f).pts);
     const pt = k === 'c' ? fplCoord(v.split(',').map(Number), 'en') : fplPt(NAV.pts[+v], 'en'); fplInsert(f, pt, at); toast(`${pt.name} aggiunto alla rotta`); } });
+// loadout editor (flights table, missione libera): data-lo* attributes, flight found by callsign
+function loFlight(cs) { const f = S.t && S.t.flights.find(x => x.cs === cs); if (f) return f;
+  const x = isFree() && (FREE().flights || []).find(q => q.cs === cs); if (!x) return null; const pf = { cs: x.cs, type: x.type, task: x.task, size: x.size }, m = (S.loMan || {})[cs];
+  pf.lo = m && m.type === x.type && m.task === x.task ? m.lo : loDefault(pf); return pf; }
+function loChanged(f) { if (isFree() && !(S.t && S.t.flights.includes(f))) FREE().built = 0; else if (isFree()) FREE().built = FREE().built; if (f.task === 'CAS' && S.cas) S.cas.jtacs.forEach(J => J.tasks.forEach(T => { if (T.flight === f.id) { const w = wpnOf(f); if (!w.includes(T.wpn)) { T.wpn = (T.method === 'BOC' ? w.find(x => GPS_WPN.test(x)) : null) || w[0]; T.wpnMan = false; } } })); save(); renderPanel(); }
+document.addEventListener('click', e => { const t = e.target.closest('[data-loopen],[data-lodel],[data-loreset]'); if (!t || !S) return; e.preventDefault();
+  if (t.dataset.loopen != null) { LOOPEN = LOOPEN === t.dataset.loopen ? '' : t.dataset.loopen; renderPanel(); return; }
+  const f = loFlight(t.dataset.lodel || t.dataset.loreset); if (!f) return;
+  if (t.dataset.loreset) { if (S.loMan) delete S.loMan[f.cs]; f.lo = loDefault(f); return loChanged(f); }
+  const lo = JSON.parse(JSON.stringify(f.lo || loDefault(f))); lo.items.splice(+t.dataset.loi, 1); loSet(f, lo); loChanged(f); });
+document.addEventListener('change', e => { const t = e.target, d = t.dataset || {}; if (d.lo == null && d.loadd == null) return; const f = loFlight(d.lo || d.loadd); if (!f) return;
+  const lo = JSON.parse(JSON.stringify(f.lo || loDefault(f)));
+  if (d.loadd != null) { if (!t.value) return; const w = t.value, ex = lo.items.find(x => x[1] === w); if (ex) ex[0] += LO_KIND(w) === 'g' ? 0 : 1; else lo.items.push([LO_KIND(w) === 'g' || LO_KIND(w) === 'pod' ? 1 : 2, w]); }
+  else if (d.lof === 'q') { const q = Math.max(0, Math.min(16, parseInt(t.value) || 0)); if (q) lo.items[+d.loi][0] = q; else lo.items.splice(+d.loi, 1); }
+  else lo[d.lof] = t.value;
+  loSet(f, lo); loChanged(f); });
 document.addEventListener('input', e => { const id = e.target.dataset && e.target.dataset.fplq; if (!id || !S.t) return; const f = S.t.flights.find(x => x.id === id), r = document.getElementById('fplres-' + id); if (f && r) r.innerHTML = fplResHtml(f, e.target.value); });
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' || !(e.target.dataset && e.target.dataset.fplq)) return; const b = document.querySelector(`#fplres-${e.target.dataset.fplq} [data-fpladd]`); if (b) { e.preventDefault(); b.click(); } });
 document.addEventListener('click', e => { const t = e.target.closest('[data-fplsel],[data-fplcopy],[data-fplreset],#fpldl,#fplresetall'); if (!t || !S.t) return;
@@ -4267,6 +4562,8 @@ document.addEventListener('change', e => {
   if (t.dataset.map !== undefined && CSV_PENDING) { CSV_PENDING.map[+t.dataset.map] = t.value; return; }
   const id = t.id;
   if (id === 'op') S.meta.op = t.value;
+  if (id === 'orgsel') { S.org = t.value ? Object.assign({ name: 'VFS' }, S.org, { sog: true }) : null; save(); renderPanel(); return; }
+  if (id === 'orgname') { S.org = Object.assign({}, S.org, { sog: true, name: t.value.trim() || 'VFS' }); save(); return; }
   if (id === 'theatre') { if (!t.value) return; if (t.value === 'CUSTOM' && !S.thCustom) { thDrawStart(); return; } setTheatre(t.value); return; }
   if (id === 'casnothr') { casView().noThr = !t.checked; save(); drawMap(); return; }
   if (id === 'authon') { S.meta.auth = t.checked; if (S.t) applyAuth(S.t); save(); renderPanel(); return; }
@@ -4333,7 +4630,7 @@ document.addEventListener('click', e => {
   if (t.dataset.sdel !== undefined) { const s = lsGet('ivao-so-saved', []); s.splice(+t.dataset.sdel, 1); lsSet('ivao-so-saved', s); renderPanel(); return; }
   const v = id => ($('#' + id) || {}).value || '';
   switch (t.id) {
-    case 'rop': S.meta.op = 'OPERATION ' + pick(OP_A) + ' ' + pick(OP_B); break;
+    case 'rop': S.meta.op = opName(); break;
     case 'rth': setTheatre(pick(THEATRES).id); return;
     case 'thdraw': thDrawStart(); return;
     case 'thcancel': ADDMODE = ''; S.thDraft = []; save(); renderPanel(); drawMap(); return;
@@ -4541,9 +4838,9 @@ const K = { BG: '0B1220', PANEL: '131C2E', PANEL2: '1B2740', LINE: '2A3A57', TEX
 const FONT = 'Arial';
 function deckInit(kind) {
   const p = new PptxGenJS(); p.layout = 'LAYOUT_16x9';
-  p.title = `${S.meta.op} – ${kind === 'generic' ? 'Scenario overview' : 'Mission briefing'}`; p.author = 'IVAO SO Mission Generator'; p.company = 'IVAO Special Operations (training)';
+  p.title = `${S.meta.op} – ${kind === 'generic' ? 'Scenario overview' : 'Mission briefing'}`; p.author = isInternal() ? 'Mission generator' : 'IVAO SO Mission Generator'; p.company = isInternal() ? 'Training mission' : isSog() ? orgName() : 'IVAO Special Operations (training)';
   p.theme = { headFontFace: FONT, bodyFontFace: FONT };
-  const footer = `${S.meta.op}  ·  ${kind === 'generic' ? 'SCENARIO OVERVIEW' : 'MISSION BRIEFING'}  ·  Fictional training scenario – IVAO`;
+  const footer = `${S.meta.op}  ·  ${kind === 'generic' ? 'SCENARIO OVERVIEW' : 'MISSION BRIEFING'}  ·  Fictional training scenario${isInternal() ? '' : ' – IVAO'}`;
   p.defineSlideMaster({ title: 'CONTENT', background: { color: K.BG }, objects: [
     { text: { text: 'EXERCISE  ·  EXERCISE  ·  EXERCISE', options: { x: 0, y: 0.06, w: 10, h: 0.22, align: 'center', fontSize: 9, bold: true, color: K.AMBER, fontFace: FONT, charSpacing: 2 } } },
     { text: { text: footer, options: { x: 0.5, y: 5.27, w: 8, h: 0.25, fontSize: 9, color: K.MUTED, fontFace: FONT } } } ],
@@ -4584,7 +4881,7 @@ function addLibSlides(p) {
 function chunk(a, n) { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out.length ? out : [[]]; }
 function cover(p, sub) {
   const s = p.addSlide({ masterName: 'COVER' }); const th = theatre();
-  s.addText('IVAO SPECIAL OPERATIONS · TRAINING', { x: 0.7, y: 1.0, w: 8.6, h: 0.3, fontSize: 12, color: K.MUTED, bold: true, charSpacing: 3, fontFace: FONT, margin: 0, isTextBox: true });
+  s.addText(isInternal() ? 'TRAINING MISSION' : isSog() ? `${(S.org.name || 'VFS').toUpperCase()} · IVAO SPECIAL OPERATIONS GROUP` : 'IVAO SPECIAL OPERATIONS · TRAINING', { x: 0.7, y: 1.0, w: 8.6, h: 0.3, fontSize: 12, color: K.MUTED, bold: true, charSpacing: 3, fontFace: FONT, margin: 0, isTextBox: true });
   s.addText(S.meta.op, { x: 0.7, y: 1.4, w: 8.6, h: 1.0, fontSize: 40, bold: true, color: 'FFFFFF', fontFace: FONT, margin: 0, isTextBox: true, fit: 'shrink' });
   s.addText(sub, { x: 0.7, y: 2.45, w: 8.6, h: 0.45, fontSize: 20, color: K.AMBER, fontFace: FONT, margin: 0, isTextBox: true });
   s.addShape('ellipse', { x: 0.72, y: 3.33, w: 0.18, h: 0.18, fill: { color: K.BLUE }, line: { color: K.BLUE } });
@@ -4694,6 +4991,7 @@ async function deckBrief() {
     const lines = [];
     fs.forEach(f => { lines.push({ text: `${f.cs}  ·  ${f.size} × ${f.type}  ·  ${f.base || ''}`, options: { bold: true, color: K.BLUEL, fontSize: 12.5, breakLine: true } });
       lines.push({ text: `Task: ${ROLES[f.task] || f.task}`, options: { fontSize: 11.5, breakLine: true } });
+      if (f.lo && (f.lo.items.length || f.lo.cf !== 'none')) lines.push({ text: `Loadout: ${loTxt(f.lo)}`, options: { fontSize: 10.5, breakLine: true } });
       if (f.rec) lines.push({ text: f.rec, options: { fontSize: 10.5, color: K.CYAN, breakLine: true } });
       t.threats.filter(x => x.flight === f.id).forEach(x => lines.push({ text: `→ ${x.id} ${x.name} · BULLS ${bref(x.pos)}`, options: { fontSize: 11, color: K.REDL, breakLine: true } }));
       t.objectives.filter(o => o.flight === f.id).forEach(o => lines.push({ text: `→ ${o.id} ${o.name} · ${fmtLL(o.pos)}`, options: { fontSize: 11, color: K.BLUEL, breakLine: true } }));
@@ -4846,7 +5144,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const { PDFDocument, rgb, StandardFonts, PDFName, PDFString } = PDFLib;
   const mp = mpGet(), t = S.t, th = theatre(), g = geom();
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'gci' ? 'GCI pack' : jsel.kind === 'aar' ? 'AAR pack' : jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
+  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'gci' ? 'GCI pack' : jsel.kind === 'aar' ? 'AAR pack' : jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : isInternal() ? 'Mission pack' : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
   let F = {};
   if (assets.fonts && window.fontkit) { pdf.registerFontkit(window.fontkit); for (const k of Object.keys(assets.fonts)) F[k] = await pdf.embedFont(assets.fonts[k], { subset: false }); }
   else { F.reg = await pdf.embedFont(StandardFonts.Helvetica); F.bold = await pdf.embedFont(StandardFonts.HelveticaBold); F.ital = await pdf.embedFont(StandardFonts.HelveticaOblique); F.head = F.bold; F.xb = F.bold; }
@@ -4855,7 +5153,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     .map(ch => set.has(ch.codePointAt(0)) ? ch : ({ '–': '-', '—': '-', '·': '-', '×': 'x', '°': ' deg', '“': '"', '”': '"', '’': "'", '•': '-' }[ch] ?? '')).join(''); };
   const BLUE = rgb(13 / 255, 44 / 255, 153 / 255), BLACK = rgb(0, 0, 0), WHITE = rgb(1, 1, 1), LINK = rgb(0, 0, 1), GREY = rgb(.35, .38, .45);
   const PW = 595.28, PH = 841.89, ML = 62, CW = PW - 2 * ML, TOP = 84, BOT = 66;
-  const event = S.meta.op, date = S.meta.date || 'Date TBD', division = mp.division || 'Division';
+  const event = S.meta.op, date = S.meta.date || 'Date TBD', plain = isInternal(), division = plain ? '' : isSog() ? orgName() : (mp.division || 'Division');
   const W = (txt, f, s) => f.widthOfTextAtSize(clean(txt, f), s);
   const draw = (pg, txt, x, yTop, f, s, color = BLACK) => pg.drawText(clean(txt, f), { x, y: PH - yTop, size: s, font: f, color });
   const addLink = (pg, x, yTop, w, h, url) => {
@@ -4869,21 +5167,21 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   // ---------- cover ----------
   const cover = pdf.addPage([PW, PH]);
   cover.drawRectangle({ x: 0, y: 0, width: PW, height: PH, color: BLUE });
-  if (assets.logo) { try { const img = await pdf.embedPng(assets.logo); const s = 300; cover.drawImage(img, { x: (PW - s) / 2, y: PH - 95 - s, width: s, height: s }); } catch (e) { } }
+  if (assets.logo && !plain) { try { const img = await pdf.embedPng(assets.logo); const s = 300; cover.drawImage(img, { x: (PW - s) / 2, y: PH - 95 - s, width: s, height: s }); } catch (e) { } }
   cover.drawRectangle({ x: 58, y: PH - 610, width: 2.5, height: 138, color: WHITE });
-  draw(cover, 'International Virtual Aviation Organisation', 76, 500, F.xb, 19, WHITE);
+  draw(cover, plain ? 'Mission pack' : 'International Virtual Aviation Organisation', 76, 500, F.xb, 19, WHITE);
   draw(cover, event, 76, 530, F.head, 15, WHITE);
   draw(cover, division, 76, 553, F.reg, 11, WHITE);
   draw(cover, date + (S.meta.hHour ? ` · H-hour ${S.meta.hHour}` : '') + ` · ${revLabel()}${curRev() ? ' (' + curRev().date + ')' : ''}`, 76, 572, F.reg, 9, WHITE);
   draw(cover, jsel ? (jsel.kind === 'gci' ? 'GCI / QRA PACK – staff and controllers only, contains the injects and the target briefs' : jsel.kind === 'aar' ? 'AAR PACK – AAR cards, RV procedures and phraseology for tankers, receivers and controllers' : jsel.kind === 'aib' ? 'AIB PACK – staff and DOS only, contains the fire evolution' : jsel.kind === 'sar' ? 'SAR PACK – staff and RCC only, contains the solutions' : jsel.kind === 'pr' ? 'PR PACK (CSAR / MEDEVAC) – staff, AMC and OSC only, do not distribute to pilots' : 'JTAC PACK – staff and JTACs only, do not distribute to pilots') : (PROF().sober ? 'Training exercise – fictional scenario, real airspace' : 'Training scenario – fictional factions, real airspace'), 76, 595, F.ital, 8.5, WHITE);
   const cx = (txt, f, s, y) => draw(cover, txt, (PW - W(txt, f, s)) / 2, y, f, s, WHITE);
-  cx('Special Operations Department', F.ital, 12, 765); cx('International Virtual Aviation Organisation', F.reg, 12, 783);
+  if (!plain) { cx('Special Operations Department', F.ital, 12, 765); cx('International Virtual Aviation Organisation', F.reg, 12, 783); }
   // ---------- inner page machinery ----------
   let page = null, y = 0, inner = 0; const toc = [];
   const newPage = () => {
     page = pdf.addPage([PW, PH]); inner++; y = TOP;
-    draw(page, 'International Virtual Aviation Organisation', ML, 36, F.xb, 7);
-    draw(page, division.toUpperCase(), ML, 50, F.xb, 7);
+    draw(page, plain ? 'MISSION PACK' : 'International Virtual Aviation Organisation', ML, 36, F.xb, 7);
+    if (division) draw(page, division.toUpperCase(), ML, 50, F.xb, 7);
     const r = (txt, yy) => draw(page, txt, PW - ML - W(txt, F.xb, 7), yy, F.xb, 7);
     r(event.toUpperCase(), 36); r(`${date} · ${revLabel()}`.toUpperCase(), 50);
     const pn = `Page ${inner}`; draw(page, pn, PW - ML - W(pn, F.xb, 7.5), PH - 34, F.xb, 7.5);
@@ -5108,7 +5406,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   else para('Draft – not yet issued.', { font: F.ital, size: 8 });
   // ---------- Introduction ----------
   sec('Introduction');
-  if (mpOn('intro')) { para(mpTxt('intro', genIntroTxt())); para(S.background || genBackground()); }
+  if (mpOn('intro')) { para(mpTxt('intro', genIntroTxt())); para(S.background || genBackground()); if (isInternal()) para(RR_EN, { font: F.ital, size: 8.5 }); }
   if (mpOn('obj')) {
     if (PROF().sober) { para(`Event type: ${evLabel()}. Flights operate from ${S.blueBases.join(', ') || 'the airfields listed below'}.` + (t ? ` Participation: ${S.roster.pilots.length} pilots in ${t.flights.length} flights and ${S.roster.controllers.length} controllers.` : '')); h6('Training objectives'); bullets(evObjectives()); }
     else para(`BLUE – ${S.factions.blue} (friendly forces, operating from ${S.blueBases.join(', ')}). RED – ${S.factions.red} (hostile forces, holding ${RB().join(', ') || 'parts of the area'}).` + (t ? ` Participation: ${S.roster.pilots.length} pilots in ${t.flights.length} flights and ${S.roster.controllers.length} controllers.` : '')); }
@@ -5209,8 +5507,8 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec('Roles');
   if (t) {
     if (mpOn('flights')) { para('Participants are grouped into flights. Each flight has one primary task' + (PROF().sober ? ' (see the task allocation in the Briefing section).' : ' linked to a RED threat or a BLUE objective.') + '');
-    table([{ h: 'Callsign', w: .16 }, { h: 'Aircraft', w: .26 }, { h: 'Base', w: .1 }, { h: 'Task', w: .3 }, { h: 'Frequency', w: .18 }],
-      t.flights.map(f => [{ t: f.cs, bold: true }, `${f.size} x ${f.type}`, f.base || '-', ROLES[f.task] || f.task, f.freq || 'TBD']));
+    table([{ h: 'Callsign', w: .14 }, { h: 'Aircraft', w: .2 }, { h: 'Base', w: .08 }, { h: 'Task', w: .2 }, { h: 'Loadout', w: .28 }, { h: 'Frequency', w: .1 }],
+      t.flights.map(f => [{ t: f.cs, bold: true }, `${f.size} x ${f.type}`, f.base || '-', ROLES[f.task] || f.task, f.lo ? loTxt(f.lo) : '-', f.freq || 'TBD']), { size: 7.5 });
     if (t.flights.some(f => f.rec)) { h6('Recovery – GCA (PAR / SRA)'); para('Every flight ends with a radar approach. The APP gives the approach and the vectors to final; the GCA gives only the final talk-down; the TWR clears the landing. The flight plan does not change.'); t.flights.filter(f => f.rec).forEach(f => para(`${f.cs}: ${f.rec.replace(/^Recovery to /, 'to ')}`, { size: 8 })); } }
     if (mpOn('airframes')) { h6('Roles and allowed airframes');
     const tasks = [...new Set(t.flights.map(f => f.task))];
@@ -5256,8 +5554,8 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   for (const r of res) { const m = r.match(/https?:\/\/\S+/); if (m) { const pre = r.slice(0, m.index); rich([{ t: '- ' + pre }, { t: m[0], link: m[0] }]); } else rich([{ t: '- ' + r }]); }
   y += 4; }
   // ---------- Contact ----------
-  sec('Contact');
-  if (mpOn('contact')) {
+  if (!plain) sec('Contact');
+  if (mpOn('contact') && !plain) {
   if (mp.email) rich([{ t: 'Email: ' }, { t: mp.email, link: 'mailto:' + mp.email }]);
   if (mp.forum) rich([{ t: 'Forum: ' }, { t: mp.forum, link: mp.forum }]);
   if (mp.discord) rich([{ t: 'Discord: ' }, { t: mp.discord, link: mp.discord }]); }
@@ -5356,8 +5654,8 @@ async function exportMasterplan(btn) {
     const first = await buildMasterplanPdf(null, assets, mapPng);       // pass 1: find section pages
     const final = await buildMasterplanPdf(first.tocMap, assets, mapPng); // pass 2: contents with page numbers
     const bytes = await final.pdf.save();
-    await download(`${fileBase()}_MASTERPLAN.pdf`, new Blob([bytes], { type: 'application/pdf' }));
-    if (st) st.textContent = 'Masterplan generato' + (final.custom ? '.' : ' (font di riserva).');
+    await download(`${fileBase()}_${isInternal() ? 'MISSION_PACK' : 'MASTERPLAN'}.pdf`, new Blob([bytes], { type: 'application/pdf' }));
+    if (st) st.textContent = (isInternal() ? 'Mission pack generato' : 'Masterplan generato') + (final.custom ? '.' : ' (font di riserva).');
   } catch (err) { console.error(err); if (st) st.textContent = 'Errore: ' + err.message; }
   btn.disabled = false;
 }
@@ -5468,7 +5766,7 @@ Francesca Q.; ATC; GCI
 Stefano R.; ATC; APP
 Irene S.; ATC; JTAC`;
 function loadDemo() {
-  S = newScenario();
+  S = newScenario(); S.kind = 'official';
   S.meta.events = ['MIX']; S.resMode = 'auto'; Object.assign(S.meta, { op: 'OPERATION SILENT TRIDENT', theatre: 'SA', difficulty: 'MEDIUM', date: '12 DEC 2026', hHour: '19:00Z' });
   S.factions = { blue: 'Aurelian Coalition', red: 'Volkar Federation' };
   S.cats = ['IADS', 'AIR', 'GROUND', 'HVT', 'PERSONNEL', 'SHORAD', 'RENEGADE', 'LOGISTICS'];
@@ -5507,6 +5805,7 @@ async function buildPublicHtml(payload) {
   return src.replace(re, (m, a, b) => a + json + b);
 }
 async function publishPublic(btn) {
+  if (isInternal() || isSog() || isFree()) return toast('Questo tipo di evento non si pubblica sulla pagina della divisione');
   const art = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('artifact') : null;
   if (!art) return toast('Pubblicazione diretta non disponibile qui: usa "Scarica pagina pubblica (.html)"');
   btn.disabled = true;
@@ -5537,7 +5836,7 @@ function renderPublic() {
       <h2 style="margin-top:16px">Controllers wanted</h2><p>${esc(c2Wanted().join('; '))}.</p></section>`;
   const brief = t ? `
     <section class="pcard"><h2>Flights &amp; tasking</h2>
-      ${tbl(['Callsign', 'Aircraft', 'Base', 'Task', 'Package', 'Freq'], t.flights.map(f => [`<b class="blue">${esc(f.cs)}</b>`, `${f.size} × ${esc(f.type)}`, esc(f.base || '-'), esc(ROLES[f.task] || f.task), esc(PKG[f.pkg] || f.pkg), esc(f.freq || 'TBD')]))}</section>
+      ${tbl(['Callsign', 'Aircraft', 'Base', 'Task', 'Package', 'Loadout', 'Freq'], t.flights.map(f => [`<b class="blue">${esc(f.cs)}</b>`, `${f.size} × ${esc(f.type)}`, esc(f.base || '-'), esc(ROLES[f.task] || f.task), esc(PKG[f.pkg] || f.pkg), esc(f.lo ? loTxt(f.lo) : '-'), esc(f.freq || 'TBD')]))}</section>
     ${S.aib && REL().aib ? `<section class="pcard"><h2>Aerial firefighting</h2><p class="muted">Flight plan VFR, item 18 STS/FFR and OPAREA/. CL-415 fly as CAN + number, civil operators as registration + BAT, military aircraft as OAT. Every drop is cleared by the DOS on TBT; report the start of operations to ATS and re-contact ATS when leaving the area.</p></section>` : ''}
     ${S.sar && REL().sar ? `<section class="pcard"><h2>Search and rescue</h2><p class="muted">The RCC passes the search action plan on frequency. Callsign RESCUE INDIA LIMA / MIKE + letter (e.g. RILA), flight plan item 18 STS/SAR. The first unit on scene acts as OSC; monitor 121.500.</p></section>` : ''}
     ${S.pr && REL().pr && S.pr.csar.length ? `<section class="pcard"><h2>Personnel recovery</h2><p class="muted">Isolated crews call MAYDAY on GUARD and then listen on CSAR A. Positions are passed from the SARDOT only.</p>${tbl(['Scenario', 'CSAR RV', 'SARDOT'], S.pr.csar.map(c => [`<b>${esc(c.id)}</b>`, esc(prLoc(c.rv)), esc(c.sardot.name + '  ' + prLoc(c.sardot.pos))]))}</section>` : ''}
@@ -5754,8 +6053,8 @@ initMap();
 route();
 navInit().then(() => { NAVG = null; if (MAP && S && S.navOn) drawNav(); if (TAB === 'fpl' && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
-if (MODE === 'staff') evInit();
-window.APP = { LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+if (MODE === 'staff') { evInit(); officialInit(); }
+window.APP = { freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

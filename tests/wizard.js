@@ -10,6 +10,8 @@ await page.click('[data-tab="scenario"]'); await page.waitForTimeout(100);
 if(!(await page.$('#gen'))||!(await page.$('#newscn'))) fail.push('generated step: buttons missing');
 // new empty event (press twice: the demo is unsaved)
 await page.click('#newscn'); await page.waitForTimeout(100); if(await page.$('#newscn')) { await page.click('#newscn'); await page.waitForTimeout(150); }
+const pickOfficial=async()=>{ if(!(await page.$('[data-kind="official"]'))) fail.push('no first screen after a new event'); else { await page.click('[data-kind="official"]'); await page.waitForTimeout(100); } };
+await pickOfficial();
 let r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, checked:document.querySelectorAll('[data-evt]:checked').length}));
 if(r.ev||r.gen||r.checked) fail.push('new event not empty '+JSON.stringify(r));
 r=await page.evaluate(()=>({th:APP.S.meta.theatre, bases:APP.S.blueBases.length, res:APP.RES().length})); if(r.th||r.bases||r.res) fail.push('new event has theatre/bases/areas '+JSON.stringify(r));
@@ -27,6 +29,7 @@ await page.click('[data-wstep="gen"]'); await page.click('#genauto'); await page
 r=await page.evaluate(()=>({gen:!!APP.S.gen, zones:APP.S.zones.length, open:APP.wOpen()})); if(!r.gen||!r.zones||r.open!=='gen') fail.push('generate '+JSON.stringify(r));
 // civil event: no reserved-area step body, no threats, no area question
 await page.click('#newscn'); await page.waitForTimeout(80); if(await page.evaluate(()=>APP.S.meta.events.length)) { await page.click('#newscn'); await page.waitForTimeout(120); }
+await pickOfficial();
 await page.check('[data-evt="AIB"]'); await page.waitForTimeout(80);
 r=await page.evaluate(()=>APP.wSteps().map(x=>x.id+(x.off?'(off)':''))); if(r.join()!=='ev,req,th,asp(off),c2,gen') fail.push('AIB steps '+r);
 for (let i=0;i<10;i++) { let nx=await page.$('[data-wnext]'); if(!nx && await page.$('#theatre')) { await page.selectOption('#theatre','SA'); await page.waitForTimeout(80); nx=await page.$('[data-wnext]'); } if(!nx) break; const id=await nx.getAttribute('data-wnext'); if(id==='asp') fail.push('Avanti opens the hidden airspace step'); await nx.click(); await page.waitForTimeout(60); }

@@ -253,3 +253,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * `S.gca` – `{ on }`, switch "Serve il GCA" of the C2 step. `S.gcaFl` – `{ <callsign>: 'ANY' | 'PAR' | 'SRA' }`, recovery type per flight (default ANY = PAR / SRA at the GCA's choice). `S.c2edit` – true when the staff edited the C2 rows (they are no longer proposed again when the ATC data arrives).
 * Generated flights may carry `rec` (recovery text, only with the GCA on); `S.t.serials` may contain `kind: 'GCA'` items; `S.t.c2` rows may have `key` TWR, AAR, NVY, AREA, GCA. C2 rows may carry `warn` (Italian, staff UI only).
 * `data/navdb.json` gains `atc` (`[cs, freq, icao, kind]`, from data/atc.json) and `acc` (`{ ring, acc: { LIPP, LIBB, LIMM }, rest: 'LIRR' }`, from data/acc.json). `data/aip_zones.json` zones may carry `unit` (ATS unit as written in the AIP, e.g. "Padova SCCAM"); an API that serves areas can send `unit` too.
+
+## v1.26 additions
+
+* `S.kind` – `''` (not chosen: first screen), `official`, `internal`, `free`; missing = official (events saved before v1.26). `S.org` – `{ sog: true, name: 'VFS' }` for an official event of a SOG, otherwise null.
+* `S.loMan` – `{ <callsign>: { type, task, lo } }` loadouts edited by hand. Generated flights carry `lo` = `{ items: [[qty, store]], cf: 'standard' | 'none', ecm: 'internal' | 'pod' | 'none' }` and may carry `arr` (arrival aerodrome when different from `base`).
+* `S.free` – missione libera: `{ step, mis, solo, thr, rr, flights: [{ id, cs, type, size, dep, arr, form, task }], date, hh, dur, area, built }`; the generated mission uses the usual fields (`S.t`, `S.cas`, theatre CUSTOM, `S.reserved`).
