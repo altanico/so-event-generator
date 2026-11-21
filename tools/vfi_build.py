@@ -29,6 +29,7 @@ for fn in sorted(os.listdir(d)):
         note = ''
         if len(txt) == 2 and CODE.fullmatch(txt[0]) and not CODE.fullmatch(txt[1]): txt = [txt[1], txt[0]]; note = 'name / code swapped in source'
         name = txt[0]; code = txt[1] if len(txt) > 1 else ''
+        if not code and (m := re.fullmatch(r'(.*?[A-Z]{2,})(' + ad[2:] + r'[NSEW]{1,2}\d)', name)): name, code = m[1], m[2]; note = 'name and code glued in source'
         if re.fullmatch(r'\d+', code): note = f'{code} in the code field (altitude?)'; code = ''
         if ' - ' in name and not code: name, code = name.split(' - ')[0].strip(), name.split(' - ')[1].strip()
         kind = 'VRP' if CODE.fullmatch(code) else 'GATE'
