@@ -3,7 +3,7 @@
 Formats (semicolon separated, // = comment):
   VOR (IVAO sector file spec): ident;freq;lat;lon;[visibility 0 show / 1 hide];[type 0 VOR, 1 VORDME, 2 VORTACAN, 3 TACAN, 4 DME];[TACAN channel];[HLD-…]
   NDB: ident;freq kHz;lat;lon;[1 = outside Italy]
-  FIX: ident;lat;lon;flag a;flag b;[HLD-…]
+  FIX (IVAO spec): ident;lat;lon;type 0 enroute / 1 terminal / 2 both / 3 hidden;boundary 0 / 1;[HLD-… = holding published, ignored for now]
 Coordinates: N045.55.27.600 = 45°55'27.6". Output: data/nav.json {airac, vor[], ndb[], fix[]} with [ident, lat, lon, ...]. Usage: python3 tools/nav_build.py 2612"""
 import json, os, re, sys
 SRC = os.path.join(os.path.dirname(__file__), '..', 'data', 'nav_src'); OUT = os.path.join(os.path.dirname(__file__), '..', 'data', 'nav.json')
@@ -38,7 +38,8 @@ def main():
     for r, ext in rows('.fix'):
         la, lo = coord(r[1]), coord(r[2])
         if la is None or lo is None: bad.append(('FIX', r[0])); continue
-        out['fix'].append([r[0], la, lo, r[3] if len(r) > 3 else '', r[4] if len(r) > 4 else ''])
+        typ = {'0': 'E', '1': 'T', '2': 'B', '3': 'H'}.get(r[3] if len(r) > 3 else '', 'E')  # enroute / terminal / both / hidden
+        out['fix'].append([r[0], la, lo, typ, 1 if len(r) > 4 and r[4] == '1' else 0])  # ident, lat, lon, type, boundary
     json.dump(out, open(OUT, 'w'), separators=(',', ':'))
     print(len(out['vor']), 'VOR', len(out['ndb']), 'NDB', len(out['fix']), 'FIX', '- skipped (bad coordinates):', bad)
 if __name__ == '__main__': main()
