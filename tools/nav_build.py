@@ -39,7 +39,7 @@ def main():
         la, lo = coord(r[1]), coord(r[2])
         if la is None or lo is None: bad.append(('FIX', r[0])); continue
         typ = {'0': 'E', '1': 'T', '2': 'B', '3': 'H'}.get(r[3] if len(r) > 3 else '', 'E')  # enroute / terminal / both / hidden
-        out['fix'].append([r[0], la, lo, typ, 1 if len(r) > 4 and r[4] == '1' else 0])  # ident, lat, lon, type, boundary
+        out['fix'].append([r[0], la, lo, typ, 1 if len(r) > 4 and r[4] == '1' else 0])  # ident, lat, lon, type, FRA point ("boundary" flag = of interest for the Free Route Airspace)
     json.dump(out, open(OUT, 'w'), separators=(',', ':'))
     print(len(out['vor']), 'VOR', len(out['ndb']), 'NDB', len(out['fix']), 'FIX', '- skipped (bad coordinates):', bad)
 if __name__ == '__main__': main()
