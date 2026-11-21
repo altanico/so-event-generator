@@ -1,6 +1,8 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Symbols and defaults** (staff 21 Nov): FRA point = filled triangle, no circle; VRP = small triangle, purple (no flag); lower airways OFF by default in the "Navigazione" panel.
+- [ ] **Low-level navigation -> tactical areas** (staff 21 Nov): when the event has low-level navigation (NAV_L / task LOWNAV) and the staff reaches the step "Spazio aereo riservato", the tactical areas (AT PIEMONTE, AT EMILIA, AT TOSCANA, AT MARCHE NORD, AT MOLISE, AT BASILICATA, AT SICILIA NORD, AT SICILIA SUD – data/aip_zones.json, 500 FT AGL / TBC) are switched on automatically: shown on the map and pre-selected as reserved areas (the ones in the chosen theatre; in automatic mode the generator uses them for the low-level route; in manual mode they are ticked and the staff can untick them). Without low-level navigation nothing changes.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
