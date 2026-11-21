@@ -61,6 +61,17 @@
 - Talk-on text generator (needs photoreal references, so probably staff-written).
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
 
+## Proposal: "missione libera" (not an event) – staff 21 Nov evening, refines the three kinds of use
+- First screen: "È un evento della divisione?" Yes -> today's flow (phases 1-5). No -> a separate short flow (4 steps), reusing areas, CAS geometry, nav database, FPL:
+  1. Cosa voglio volare: training AND light operational missions (staff: both), e.g. CAS, low-level nav, IFR nav, AAR (tanker flying the track or receiver), AEW orbit, intercept, SAR, firefighting, strike with a fictional target.
+  2. Con cosa e da dove: aircraft (one or more), callsign(s), departure / arrival base, date and time. No names of controllers, no ATC.
+  3. Dove: work area derived from base + mission type (low level -> nearest AT area, CAS -> suitable R area, AAR -> AAR area / track…), shown on the map, changeable; no theatre step.
+  4. Pacchetto: FPL (editable), kneeboard 1-2 pages (route, area, levels, frequencies, mission data), map, booking e-mail text to it-specialops@ivao.aero (areas, times, levels, 48 h reminder), downloads.
+- Solo training is valid (staff): CAS without JTAC = holding, scripted radio calls, pre-written 9-lines to follow, simulated attack; tanker flying the track alone; AEW flying a perfect orbit; each mission type has a "da solo" version (scripted) and a "con altri" version (e.g. a friend plays JTAC and gets his card).
+- Threats: optional switch for realism (simulated SAM / MANPADS / CAP to avoid or to attack), off by default.
+- Dropped in this flow: event name, background (at most one generated line), BLUE / RED factions, ATC / C2, controllers in the roster, tailoring phase, masterplan, NOTAM, deck, public page.
+- Group of friends: the same flow with more aircraft (question 2 to the staff: explained, waiting for the answer).
+
 ## Proposal under discussion: three kinds of use (staff 21 Nov)
 - **Division event (staff)** – as today; the staff chooses everything; NEW: a suggested final flight plan for every flight (ICAO FPL text: route from base to the area / track / IP and back, levels, EET), in the masterplan / mission deck / pilot pack.
 - **Group mission (users)** – a group of friends creates its own "event" and flies the generated missions; it stays inside the group (never published or divulged: no artifact DB, no public page; shared inside the group as a file). Same generator in a simplified mode. Planner reminder: area activation must be requested by e-mail 48 h before (it-specialops@ivao.aero) – a reminder with a ready-made e-mail text (areas, date, times, vertical limits, callsigns); only a reminder, because the mission can also be flown offline.
