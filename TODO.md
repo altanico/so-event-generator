@@ -61,6 +61,12 @@
 - Talk-on text generator (needs photoreal references, so probably staff-written).
 - Re-attack / second 9-line per flight, 5-line for helicopters if the manual adopts it.
 
+## Proposal: loadouts per flight (staff 21 Nov evening – to discuss)
+- Today: only CAS has weapons (CAS_WPN: list per aircraft type, default chosen from the attack method, changeable per task); every other mission has no loadout; no air-to-air stores, pods, tanks or self-protection.
+- Proposal: a loadout per flight, editable: catalogue of stores compatible with each aircraft type – air-to-ground (GBU-12 / -38 / -32, Mk-82 / -83, AGM-65 / -88, SDB, Storm Shadow…), air-to-air (AIM-120, AIM-9, IRIS-T, Meteor…), pods (targeting, recce, ECM), fuel tanks, gun – and self-protection: chaff / flare (quantity or "standard"), ECM. Default loadout from the task (DCA, SEAD, STRIKE, CAS, RECCE…), the staff / user changes it; CAS 9-line and weapon choices read from it; shown in task cards, kneeboard, masterplan "Loadout" column, FPL field 18 nothing (not needed).
+- Data: the compatibility catalogue per type is prepared by Claude from public sources and checked by the staff; chaff / flare quantities not invented: "standard" unless the staff gives numbers.
+- Same for events and missione libera.
+
 ## Proposal: "missione libera" (not an event) – staff 21 Nov evening, refines the three kinds of use
 - First screen: "È un evento della divisione?" Yes -> today's flow (phases 1-5). No -> a separate short flow (4 steps), reusing areas, CAS geometry, nav database, FPL:
   1. Cosa voglio volare: training AND light operational missions (staff: both), e.g. CAS, low-level nav, IFR nav, AAR (tanker flying the track or receiver), AEW orbit, intercept, SAR, firefighting, strike with a fictional target.
