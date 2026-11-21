@@ -22,7 +22,9 @@ for p in mf['fix']:
     if p[4] != 'BE': pts.append([p[0], p[1], p[2], 'M', p[3]])
 for p in mv['pts']: pts.append([p[0], p[2], p[3], 'G', p[4] + '|' + p[1]])
 for p in pts: p[1], p[2] = round(p[1], 5), round(p[2], 5)
-out = {'airac': '2612', 'src': 'IVAO Italy sector files (AIRAC 2612), AIP Italia ENR 6.3.1', 'pts': pts, 'awy': aw['awy'], 'manual': aw['manual']}
+atc = json.load(open('data/atc.json')); acc = json.load(open('data/acc.json'))
+out = {'airac': '2612', 'src': 'IVAO Italy sector files (AIRAC 2612), AIP Italia ENR 6.3.1', 'pts': pts, 'awy': aw['awy'], 'manual': aw['manual'],
+       'atc': atc['pos'], 'acc': {'ring': acc['ring'], 'acc': acc['acc'], 'rest': acc['rest']}}
 json.dump(out, open('data/navdb.json', 'w'), separators=(',', ':'), ensure_ascii=False)
 from collections import Counter
 print(len(pts), dict(Counter(p[3] for p in pts)), len(aw['awy']), 'routes')

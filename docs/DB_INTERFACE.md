@@ -247,3 +247,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.24 additions
 
 * `S.atSig` – theatre + events for which the tactical areas (AT …) were ticked automatically for low-level navigation in manual mode (so the staff can untick them). `S.navL.awy` default 0. Aircraft type AMX removed: a saved roster line "AMX" now resolves as unknown type.
+
+## v1.25 additions
+
+* `S.gca` – `{ on }`, switch "Serve il GCA" of the C2 step. `S.gcaFl` – `{ <callsign>: 'ANY' | 'PAR' | 'SRA' }`, recovery type per flight (default ANY = PAR / SRA at the GCA's choice). `S.c2edit` – true when the staff edited the C2 rows (they are no longer proposed again when the ATC data arrives).
+* Generated flights may carry `rec` (recovery text, only with the GCA on); `S.t.serials` may contain `kind: 'GCA'` items; `S.t.c2` rows may have `key` TWR, AAR, NVY, AREA, GCA. C2 rows may carry `warn` (Italian, staff UI only).
+* `data/navdb.json` gains `atc` (`[cs, freq, icao, kind]`, from data/atc.json) and `acc` (`{ ring, acc: { LIPP, LIBB, LIMM }, rest: 'LIRR' }`, from data/acc.json). `data/aip_zones.json` zones may carry `unit` (ATS unit as written in the AIP, e.g. "Padova SCCAM"); an API that serves areas can send `unit` too.

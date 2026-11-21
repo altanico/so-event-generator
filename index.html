@@ -254,18 +254,45 @@ const AIRPORTS = {
   LICG:['Pantelleria',36.8165,11.9689,'JOINT'], LICD:['Lampedusa',35.4979,12.6181,'CIV'],
 };
 
+// aerodromes not proposed as bases (staff 21 Nov): they can still be picked by hand, with a warning
+const NOBASE = ['LIPX', 'LIMS', 'LIRA', 'LIRG', 'LIRN', 'LIEA', 'LICG', 'LIBR'];
+// flying schools with short runways: basic training only (navigation) – Latina propeller trainers, Galatina basic jets (staff 21 Nov)
+const SCHOOL = { LIRL: { it: 'scuola di volo a elica', en: 'propeller flying school', cats: ['LIGHT'] }, LIBN: { it: 'scuola di volo jet basici (M-345, MB-339)', en: 'basic jet flying school (M-345, MB-339)', types: ['M-345', 'MB-339'] } };
+const SCHOOL_GRP = ['NAVM', 'IFR'];
+const noProp = k => NOBASE.includes(k) || !!SCHOOL[k]; // never in automatic base proposals
+// ATS units of military and joint aerodromes (staff 21 Nov). acc = ACC (MIL sector LIxx_MIL_CTR); app = approach positions in order of use
+// (the APP never follows the ACC: Crotone is in Brindisi ACC but its APP is LICA_ES0_APP); appIf = usable only when that position is online; twr; gca = PAR / SRA talk-down (complementary to APP)
+const ADEP = {
+  LIPA: { acc: 'LIPP', app: ['LIPA_APP'], twr: 'LIPA_TWR' },
+  LIPI: { acc: 'LIPP', app: ['LIPA_APP'], twr: 'LIPI_TWR', gca: 'LIPI_G_APP' },
+  LIPS: { acc: 'LIPP', app: ['LIPH_APP'], twr: 'LIPS_TWR', gca: 'LIPS_G_APP' },
+  LIPC: { acc: 'LIPP', app: ['LIPE_W_APP', 'LIPE_E_APP'], twr: 'LIPC_TWR', gca: 'LIPC_G_APP' },
+  LIPL: { acc: 'LIMM', app: ['LIPX_ES0_APP'], twr: 'LIPL_TWR', gca: 'LIPL_G_APP' },
+  LIMN: { acc: 'LIMM', app: ['LIMC_ANE_APP'], twr: 'LIMN_TWR' },
+  LIRE: { acc: 'LIRR', app: ['LIRF_TW1_APP', 'LIRF_PN1_APP'], appAny: true, twr: 'LIRE_TWR' },
+  LIED: { acc: 'LIRR', app: ['LIEE_APP', 'LIEE_MIL_APP'], appIf: { LIEE_MIL_APP: 'LIEE_APP' }, twr: 'LIED_TWR' },
+  LICZ: { acc: 'LIRR', app: ['LICC_APP'], twr: 'LICZ_TWR' },
+  LIBG: { acc: 'LIBB', app: ['LIBG_APP'], twr: null },
+  LIRP: { acc: 'LIRR', app: ['LIRP_APP'], twr: 'LIRP_TWR' }, LIRS: { acc: 'LIRR', app: ['LIRS_APP'], twr: 'LIRS_TWR', gca: 'LIRS_G_APP' },
+  LIRV: { acc: 'LIRR', app: ['LIRV_APP'], twr: 'LIRV_TWR' }, LIRL: { acc: 'LIRR', app: ['LIRL_APP'], twr: 'LIRL_TWR' },
+  LIRM: { acc: 'LIRR', app: ['LIRM_APP'], twr: 'LIRM_TWR', gca: 'LIRM_G_APP' }, LIBA: { acc: 'LIRR', app: ['LIBA_APP'], twr: 'LIBA_TWR' },
+  LICT: { acc: 'LIRR', app: ['LICT_APP'], twr: 'LICT_TWR' },
+  LIBV: { acc: 'LIBB', app: ['LIBV_APP'], twr: 'LIBV_TWR', gca: 'LIBV_G_APP' }, LIBN: { acc: 'LIBB', app: ['LIBN_APP'], twr: 'LIBN_TWR', gca: 'LIBN_G_APP' },
+};
+const ACC_NAME = { LIMM: 'Milano', LIPP: 'Padova', LIRR: 'Roma', LIBB: 'Brindisi' };
+
 // Theatres: real Italian airspace, fictional conflict geometry. FIR labels are indicative.
 const THEATRES = [
   {id:'NE',name:'Nord-Est – Friuli / Alto Adriatico',fir:'LIMM',region:'eastern Friuli and the Gulf of Trieste',
-   view:[45.7,12.7,8],red:{center:[45.92,13.45],r:40,bases:['LIPQ']},main:'LIPS',blue:['LIPA','LIPS','LIPZ','LIPX','LIPH'],sea:[45.45,13.05],outside:[44.95,13.55]},
+   view:[45.7,12.7,8],red:{center:[45.92,13.45],r:40,bases:['LIPQ']},main:'LIPS',blue:['LIPA','LIPS','LIPZ','LIPI','LIPH'],sea:[45.45,13.05],outside:[44.95,13.55]},
   {id:'NO',name:'Nord-Ovest – Liguria / Piemonte',fir:'LIMM',region:'western Liguria and southern Piedmont',
-   view:[44.6,8.5,8],red:{center:[44.3,7.95],r:45,bases:['LIMZ','LIMG']},main:'LIPL',blue:['LIMN','LIMC','LIMS','LIPL','LIMJ'],sea:[43.85,8.7],outside:[43.35,7.9]},
+   view:[44.6,8.5,8],red:{center:[44.3,7.95],r:45,bases:['LIMZ','LIMG']},main:'LIPL',blue:['LIMN','LIMC','LIPL','LIMJ'],sea:[43.85,8.7],outside:[43.35,7.9]},
   {id:'CT',name:'Centro – Toscana / Lazio',fir:'LIRR',region:'northern Lazio (Tuscia, around Viterbo)',
    view:[42.5,11.7,8],red:{center:[42.33,12.2],r:45,bases:['LIRV','LIRG']},blue:['LIRS','LIRP','LIRJ','LIRQ'],sea:[42.0,11.5],outside:[42.35,13.3]},
   {id:'SA',name:'Sardegna',fir:'LIRR',region:'northern Sardinia (Gallura and Sassari)',
    view:[40.2,9.4,8],red:{center:[40.75,8.95],r:60,bases:['LIEO','LIEA']},blue:['LIED','LIEE','LIET','LIRE'],sea:[41.15,10.1],outside:[41.7,9.2]},
   {id:'SI',name:'Sicilia',fir:'LIRR',region:'eastern Sicily (Catania plain and Etna)',
-   view:[37.7,13.8,8],red:{center:[37.45,14.85],r:55,bases:['LICZ','LICC']},blue:['LICT','LICJ','LICG'],sea:[37.25,15.5],outside:[36.7,16.2]},
+   view:[37.7,13.8,8],red:{center:[37.45,14.85],r:55,bases:['LICZ','LICC']},blue:['LICT','LICJ'],sea:[37.25,15.5],outside:[36.7,16.2]},
   {id:'PU',name:'Puglia – Salento / Canale d\'Otranto',fir:'LIBB',region:'the Salento peninsula',
    view:[40.75,17.3,8],red:{center:[40.3,18.05],r:45,bases:['LIBN','LIBR']},main:'LIBV',blue:['LIBV','LIBD','LIBA','LIBG'],sea:[40.55,18.85],outside:[40.3,19.6]},
 ];
@@ -294,6 +321,7 @@ const AC = [
   ['Tornado IDS','FIGHTER',['STRIKE','ANTISHIP','RECCE','CAS'],['TORNADO','TORNADOIDS','PA200','A200','IDS']],
   ['A-10','ATTACK',['CAS','RESCORT'],['A10','A10C','WARTHOG','THUNDERBOLT']],
   ['AV-8B Harrier','ATTACK',['CAS','STRIKE'],['AV8B','AV8','HARRIER']],
+  ['M-345','ATTACK',['LOWNAV','IFRNAV'],['M345','T345','HET']],
   ['M-346','ATTACK',['LOWSLOW','CAS'],['M346','T346','MASTER']],
   ['MB-339','ATTACK',['LOWSLOW','CAS'],['MB339','T339']],
   ['HH-101','HELO',['CSAR','INSERT','HAARRCV'],['HH101','HH101A','AW101','EH101','CAESAR','MERLIN']],
@@ -551,7 +579,7 @@ const theatre = () => (S.meta.theatre === 'CUSTOM' && S.thCustom) ? S.thCustom :
 // theatre drawn by hand: every field the generator needs is derived from the polygon and the nearest airports / preset theatre
 function mkTheatre(poly, name) {
   const c = centroid(poly), maxR = Math.max(...poly.map(v => dist(c, v))), apl = Object.entries(AIRPORTS).map(([k, a]) => ({ k, p: [a[1], a[2]], mil: a[3] !== 'CIV', d: dist(c, [a[1], a[2]]) })).sort((a, b) => a.d - b.d);
-  const near = THEATRES.slice().sort((a, b) => dist(c, a.view) - dist(c, b.view))[0], mil = apl.filter(a => a.mil && a.d < 350);
+  const near = THEATRES.slice().sort((a, b) => dist(c, a.view) - dist(c, b.view))[0], mil = apl.filter(a => a.mil && !noProp(a.k) && a.d < 350);
   const B = (mil[0] || apl[0]).p; let redC = dest(c, bearing(B, c), maxR * 0.35); if (!pip(redC, poly)) redC = c;
   const redBase = apl.filter(a => a.k !== (mil[0] || {}).k && (pip(a.p, poly) || dist(a.p, redC) < maxR * 0.6)).sort((a, b) => dist(a.p, redC) - dist(b.p, redC))[0];
   const blue = mil.filter(a => !redBase || a.k !== redBase.k).slice(0, 5).map(a => a.k);
@@ -788,7 +816,7 @@ function parseAirspace(json) { // {zones|areas, frequencies|freqs} or a GeoJSON 
   };
   const addZ = (p, geo) => { const poly = toPoly(geo); if (!poly || poly.length < 3) return;
     zones.push({ id: String(p.id ?? p.code ?? p.designator ?? p.name ?? uid()), name: String(p.name ?? p.designator ?? p.id ?? 'Zone'), type: normType(p.type ?? p.class ?? p.category),
-      lower: String(p.lower ?? p.lower_limit ?? p.floor ?? 'GND'), upper: String(p.upper ?? p.upper_limit ?? p.ceiling ?? 'UNL'), notes: String(p.notes ?? p.remarks ?? p.activation ?? ''), activity: String(p.activity ?? ''), use: Array.isArray(p.use) ? p.use : [], hours: String(p.hours ?? ''), ...(p.section ? { section: String(p.section) } : {}), ...(Array.isArray(p.blocks) ? { blocks: p.blocks } : {}), ...(Array.isArray(p.axis) ? { axis: p.axis } : {}), ...(Array.isArray(p.wpt) ? { wpt: p.wpt, half: +p.half || 0, radio: String(p.radio ?? ''), pref: p.pref || [], excl: String(p.excl ?? '') } : {}), poly }); };
+      lower: String(p.lower ?? p.lower_limit ?? p.floor ?? 'GND'), upper: String(p.upper ?? p.upper_limit ?? p.ceiling ?? 'UNL'), notes: String(p.notes ?? p.remarks ?? p.activation ?? ''), activity: String(p.activity ?? ''), use: Array.isArray(p.use) ? p.use : [], hours: String(p.hours ?? ''), ...(p.unit ? { unit: String(p.unit) } : {}), ...(p.section ? { section: String(p.section) } : {}), ...(Array.isArray(p.blocks) ? { blocks: p.blocks } : {}), ...(Array.isArray(p.axis) ? { axis: p.axis } : {}), ...(Array.isArray(p.wpt) ? { wpt: p.wpt, half: +p.half || 0, radio: String(p.radio ?? ''), pref: p.pref || [], excl: String(p.excl ?? '') } : {}), poly }); };
   if (json && json.type === 'FeatureCollection') (json.features || []).forEach(f => addZ({ ...(f.properties || {}), id: f.id ?? (f.properties || {}).id }, f.geometry));
   ((json && (json.zones || json.areas)) || []).forEach(z => addZ(z, z.geometry || z.poly || z.coords || z.polygon));
   ((json && (json.frequencies || json.freqs)) || []).forEach(f => { const v = String(f.freq ?? f.frequency ?? f.mhz ?? ''); if (!v) return;
@@ -1099,9 +1127,10 @@ const C2DEF = {
   GCI: () => gciNorth() ? { role: 'GCI / CRC – Poggio Renatico (LIVK_CRC_CTR)', cs: 'PIOPPO RADAR', freq: '136.200' } : { role: 'GCI / CRC – Licola (LIRO_CRC_CTR)', cs: 'BARCA RADAR', freq: '136.250' },
   AEW: () => ({ role: 'AEW / AWACS – airborne control (LIZZ_AEW_CTR)', cs: 'LEGION', freq: '136.400' }),
   APP: m => ({ role: `Military approach / tower – ${m.main}`, cs: `${m.main}_APP` }),
-  JTAC: () => varOn('CAS', 'ctrl', 'FACA') ? { role: 'FAC(A) – airborne forward air controller (flown by a CAS flight lead)', cs: 'HAMMER' } : { role: 'JTAC – close air support control', cs: 'HAMMER' },
-  CTR: () => ({ role: `Area control – ${theatre().fir} FIR`, cs: `${theatre().fir}_CTR` }),
-  RCC: () => ({ role: 'Rescue coordination (CSAR)', cs: 'KINGPIN' }),
+  JTAC: () => varOn('CAS', 'ctrl', 'FACA') ? { role: 'FAC(A) – airborne forward air controller, flown by a CAS flight lead (LIZZ_JTA_CTR)', cs: 'HAMMER', freq: atcFreq('LIZZ_JTA_CTR') || '136.160' } : { role: 'JTAC – close air support control (LIZZ_JTA_CTR)', cs: 'HAMMER', freq: atcFreq('LIZZ_JTA_CTR') || '136.160' },
+  RCC: () => ({ role: 'Rescue coordination (CSAR) (LIVK_RCC_CTR)', cs: 'KINGPIN', freq: atcFreq('LIVK_RCC_CTR') || '123.100' }),
+  AAR: () => ({ role: 'AAR coordination (LIZZ_AAR_CTR)', cs: 'LIZZ_AAR_CTR', freq: atcFreq('LIZZ_AAR_CTR') || '136.430' }),
+  NVY: () => ({ role: 'Naval control (LIZZ_NVY_CTR)', cs: 'LIZZ_NVY_CTR', freq: atcFreq('LIZZ_NVY_CTR') || '136.225' }),
   GCI2: () => gciNorth() ? { role: 'GCI #2 – Licola (LIRO_CRC_CTR)', cs: 'BARCA RADAR', freq: '136.250' } : { role: 'GCI #2 – Poggio Renatico (LIVK_CRC_CTR)', cs: 'PIOPPO RADAR', freq: '136.200' },
   TWR2: m => m.sec ? { role: `Tower – ${m.sec}`, cs: `${m.sec}_TWR` } : null,
   RCCS: () => ({ role: 'Rescue Coordination Centre (SAR)', cs: 'RESCUE CTR' }),
@@ -1354,25 +1383,82 @@ function parsePositions(src) {
     const m = cs.match(/^([A-Z]{4})(?:_[A-Z0-9]+)?_([A-Z]+)$/); const type = String(p.type ?? p.position ?? (m ? m[2] : '')).toUpperCase();
     return { cs, name: String(p.name ?? p.label ?? ''), freq: String(p.freq ?? p.frequency ?? ''), type, icao: String(p.icao ?? p.airport ?? (m ? m[1] : '')).toUpperCase(), fir: String(p.fir ?? '').toUpperCase() }; }).filter(Boolean);
 }
-const POS = () => S.positions || [];
-const realPos = (kind, icao) => POS().filter(p => kind === 'CTR' ? (p.type === 'CTR' && (!p.fir || p.fir === theatre().fir || p.icao === theatre().fir)) : (p.icao === icao && p.type === kind));
+// real positions: the IVAO Italy sector file (data/navdb.json "atc", staff 21 Nov) plus a file imported by the staff (the imported one wins)
+const ATCDB = () => (NAV && NAV.atc) || [];
+const POS = () => { const imp = (S && S.positions) || [], have = new Set(imp.map(p => p.cs)); return imp.concat(ATCDB().filter(p => !have.has(p.cs))); };
+const atcGet = cs => cs ? POS().find(p => p.cs === cs) || null : null;
+const atcFreq = cs => { const p = atcGet(cs); return p ? p.freq : ''; };
+const realPos = (kind, icao) => POS().filter(p => p.icao === icao && p.type === kind);
+// ACC containing a point (data/acc.json from FRA.artcc): LIPP / LIBB / LIMM polygons, LIRR the rest – ACC boundaries differ from the FIRs (staff 21 Nov)
+function accOf(pos) { const A = NAV && NAV.acc; if (!A || !pos) return null; for (const k of ['LIPP', 'LIBB', 'LIMM']) if (A.acc[k] && pip(pos, A.acc[k])) return k; return A.rest || 'LIRR'; }
+const baseAcc = icao => (ADEP[icao] && ADEP[icao].acc) || accOf(ap(icao)) || theatre().fir;
+const milCtr = acc => `${acc}_MIL_CTR`; // MIL sectors come first, then the civil CTR sectors of the same ACC (staff 21 Nov)
+// approach unit of an aerodrome: from the dependency table, never from the ACC
+function baseApp(icao) { const d = ADEP[icao];
+  if (d) { const l = d.app || []; if (d.appAny) return { cs: l.join(' / '), freq: l.map(atcFreq).filter(Boolean).join(' / '), note: 'whichever is online' };
+    const c = l[0], alt = l.slice(1); return { cs: c, freq: atcFreq(c), note: alt.length ? (d.appIf && d.appIf[alt[0]] ? `${alt[0]} ${atcFreq(alt[0])} only when ${d.appIf[alt[0]]} is online` : `or ${alt.map(a => `${a} ${atcFreq(a)}`.trim()).join(' / ')}`) : '' }; }
+  const r = realPos('APP', icao)[0]; return { cs: r ? r.cs : '', freq: r ? r.freq : '', note: '' }; }
+function baseTwr(icao) { const d = ADEP[icao]; if (d && d.twr === null) return null; const cs = d && d.twr ? d.twr : ((realPos('TWR', icao)[0] || {}).cs || ''); return { cs, freq: atcFreq(cs) }; }
+function baseGca(icao) { const d = ADEP[icao], cs = (d && d.gca) || `${icao}_G_APP`, p = atcGet(cs); return { cs, freq: p ? p.freq : '', known: !!(d && d.gca && p) }; }
+// ATS unit responsible for an area (AIP Remarks; "SCCAM" / "SCC" = the 4 military units) mapped to the IVAO position; fallback = MIL sector of the ACC containing the area
+const UNIT_ACC = { Milano: 'LIMM', Padova: 'LIPP', Roma: 'LIRR', Brindisi: 'LIBB' };
+let CITY_ICAO = null;
+const cityIcao = c => { if (!CITY_ICAO) { CITY_ICAO = { Frosinone: 'LIRH', Cagliari: 'LIEE', Torino: 'LIMF', Lucca: 'LIQL', Rieti: 'LIQN' }; Object.entries(AIRPORTS).forEach(([k, a]) => { const w = a[0].split(' ')[0]; if (!(w in CITY_ICAO)) CITY_ICAO[w] = k; }); } return CITY_ICAO[c] || null; };
+function zoneAts(z) { if (!z) return null; const u = z.unit || '', m = u.match(/^(.+?) (SCCAM|SCC|ACC|APP|TWR|AFIU|FIC|CRC|RAC)$/);
+  const fb = () => { const acc = (z.poly && accOf(centroid(z.poly))) || theatre().fir; return { unit: u || `${ACC_NAME[acc] || acc} SCCAM`, cs: milCtr(acc), freq: atcFreq(milCtr(acc)), aip: !!u }; };
+  if (!m) return fb(); const [, city, kind] = m;
+  if (kind === 'SCCAM' || kind === 'SCC') { const a = UNIT_ACC[city]; return a ? { unit: u, cs: milCtr(a), freq: atcFreq(milCtr(a)), aip: true } : fb(); }
+  if (kind === 'ACC') { const a = UNIT_ACC[city]; return a ? { unit: u, cs: milCtr(a), freq: atcFreq(milCtr(a)), civ: `${a} civil sector`, aip: true } : fb(); }
+  if (kind === 'FIC') { const a = UNIT_ACC[city]; return a ? { unit: u, cs: `${a}_FSS`, freq: atcFreq(`${a}_FSS`), aip: true } : fb(); }
+  const ic = cityIcao(city); if (ic && (kind === 'APP' || kind === 'TWR')) { const b = kind === 'APP' ? baseApp(ic) : baseTwr(ic); if (b && b.cs) return { unit: u, cs: b.cs, freq: b.freq, aip: true }; }
+  const f = fb(); f.unit = u; return f; }
+const zoneAtsTxt = z => { const a = zoneAts(z); return a ? `${a.unit} – ${a.cs}${a.freq ? ' ' + a.freq : ''}${a.civ ? ` (then the ${a.civ})` : ''}` : ''; };
+// GCA (PAR / SRA): complementary to the APP – it only gives the final talk-down (staff 21 Nov)
+const gcaOn = () => !!(S && S.gca && S.gca.on);
+const GCA_MODE = { ANY: ['PAR / SRA a scelta del GCA', 'PAR or SRA at the GCA\'s choice'], PAR: ['PAR', 'PAR'], SRA: ['SRA', 'SRA'] };
+const gcaMode = f => ((S.gcaFl || {})[f.cs]) || 'ANY';
+const gcaBases = () => { const t = S.t, l = t && t.flights ? t.flights.filter(f => f.task !== 'STANDBY').map(f => f.base) : []; return [...new Set([S.blueBases[0], ...l].filter(b => b && AIRPORTS[b]))]; };
+function recChain(icao) { const a = baseApp(icao), g = baseGca(icao), t = baseTwr(icao);
+  return { app: a, gca: g, twr: t, txt: `${a.cs || icao + '_APP (TBC)'} → ${g.cs}${g.known ? '' : ' (TBC)'} final talk-down → ${t ? t.cs : 'no TWR – APP to landing'}` }; }
+const recTxt = f => { if (!gcaOn() || !f || !f.base || f.task === 'STANDBY') return ''; return `Recovery to ${f.base}: ${GCA_MODE[gcaMode(f)][1]} – ${recChain(f.base).txt}`; };
+function gcaApply(t) { if (!t || !t.flights) return;
+  const ctl = new Map((t.c2 || []).filter(c => c.key === 'GCA').map(c => [c.cs, c.controller]));
+  t.serials = (t.serials || []).filter(x => x.kind !== 'GCA'); t.timeline = (t.timeline || []).filter(x => !/^Recovery – /.test(x[1])); t.spins = (t.spins || []).filter(x => !/^Recovery \(GCA\)/.test(x));
+  t.c2 = (t.c2 || []).filter(c => c.key !== 'GCA'); t.flights.forEach(f => { const r = recTxt(f); if (r) f.rec = r; else delete f.rec; });
+  if (!gcaOn()) return;
+  const byB = {}; t.flights.filter(f => f.rec).forEach(f => (byB[f.base] = byB[f.base] || []).push(f));
+  Object.entries(byB).forEach(([b, fs]) => { const c = recChain(b), gf = c.gca.freq || 'TBC';
+    t.serials.push({ id: 'S' + (t.serials.length + 1), kind: 'GCA', title: `Recovery ${b} – GCA talk-down (PAR / SRA)`, flights: fs.map(f => f.id),
+      text: `${fs.map(f => `${f.cs} (${GCA_MODE[gcaMode(f)][1]})`).join(', ')}: at the end of the mission contact ${c.app.cs || b + '_APP (TBC)'}${c.app.freq ? ' ' + c.app.freq : ''} for the approach and the vectors to final, then ${c.gca.cs} ${gf} for the final talk-down to minima. ${c.twr ? `Landing clearance from ${c.twr.cs}${c.twr.freq ? ' ' + c.twr.freq : ''} as instructed by the GCA.` : 'No TWR: the APP issues the landing information.'} The GCA only gives the final approach: approach control stays with the APP.`,
+      success: 'Approach flown on the GCA instructions to minima; heading and glide path corrections followed; landing or low approach as briefed.' });
+    t.c2.push({ key: 'GCA', role: `GCA – PAR / SRA final talk-down ${b} (complementary to the APP)`, cs: c.gca.cs, freq: gf, fixed: !!c.gca.freq, real: true, controller: ctl.get(c.gca.cs) || '— not staffed —' }); });
+  const tl = t.timeline, last = tl.length ? timeKey(tl[tl.length - 1][0]) : 90, k = last - 10;
+  tl.splice(Math.max(0, tl.length - 1), 0, [`H${k >= 0 ? '+' : ''}${k}`, `Recovery – PAR / SRA approaches with the GCA (APP → GCA final → TWR)`]);
+  t.spins.push(`Recovery (GCA): every flight ends with a ${[...new Set(t.flights.filter(f => f.rec).map(f => GCA_MODE[gcaMode(f)][1]))].join(' / ')} approach – ${Object.keys(byB).map(b => `${b}: ${recChain(b).txt}`).join('; ')}. The flight plan does not change.`); }
 function proposeC2() {
   const P = PROF(), main = S.blueBases[0], sec = S.blueBases[1];
   let keys = [];
   if (P.all) keys = ['GCI', 'AEW', 'APP', 'CTR', 'GCI2', 'TWR2']; else P.list.forEach(e => (e.c2 || []).forEach(k => { if (!keys.includes(k)) keys.push(k); }));
   if (reqTasks().includes('CAS') && !offT('CAS') && !keys.includes('JTAC')) keys.splice(1, 0, 'JTAC');
   if (reqTasks().includes('CSAR') && !offT('CSAR') && !keys.includes('RCC')) keys.push('RCC');
+  if (reqTasks().some(t => ['AAR', 'HAAR'].includes(t) && !offT(t)) && !keys.includes('AAR')) keys.push('AAR');
+  if (reqTasks().some(t => ['ANTISHIP', 'MPA'].includes(t) && !offT(t)) && !keys.includes('NVY')) keys.push('NVY');
   if (!REL().bull) keys = keys.filter(k => k !== 'GCI2');
   if (keys.includes('AEW') && (!reqTasks().includes('AEW') || offT('AEW'))) keys = keys.filter(k => k !== 'AEW'); // the AEW position goes with an AEW asset
-  const rows = [];
+  if (keys.includes('APP') && !keys.includes('TWR')) keys.splice(keys.indexOf('APP') + 1, 0, 'TWR');
+  const rows = [], have = new Set();
+  const push = r => { if (r.cs && have.has(r.cs)) return; if (r.cs) have.add(r.cs); rows.push({ id: uid(), on: true, freq: '', ...r }); };
   for (const k of keys) {
-    if (['APP', 'TWR2', 'CTR'].includes(k)) {
-      const icao = k === 'APP' ? main : k === 'TWR2' ? sec : null; if (k !== 'CTR' && !icao) continue;
-      const kind = k === 'APP' ? 'APP' : k === 'TWR2' ? 'TWR' : 'CTR';
-      const r = realPos(kind, icao)[0] || (kind === 'APP' ? realPos('TWR', icao)[0] : null);
-      rows.push({ id: uid(), key: k, real: true, on: true, icao, kind, role: kind === 'CTR' ? `Area control – ${theatre().fir} FIR` : `${kind === 'APP' ? 'Approach' : 'Tower'} – ${icao}`, cs: r ? r.cs : '', freq: r ? r.freq : '' });
-    } else { const d = C2DEF[k]({ main, sec }); if (d) rows.push({ id: uid(), key: k, real: false, on: true, role: d.role, cs: d.cs, freq: d.freq || '' }); }
+    if (k === 'APP') { if (!main) continue; const a = baseApp(main); push({ key: 'APP', real: true, icao: main, kind: 'APP', role: `Approach – ${main}${a.note ? ` (${a.note})` : ''}`, cs: a.cs, freq: a.freq }); }
+    else if (k === 'TWR') { if (!main) continue; const t = baseTwr(main); if (t) push({ key: 'TWR', real: true, icao: main, kind: 'TWR', role: `Tower – ${main}`, cs: t.cs, freq: t.freq }); }
+    else if (k === 'TWR2') { if (!sec) continue; const t = baseTwr(sec); if (t) push({ key: 'TWR2', real: true, icao: sec, kind: 'TWR', role: `Tower – ${sec}`, cs: t.cs, freq: t.freq }); }
+    else if (k === 'CTR') { const accs = [...new Set([main && baseAcc(main), accOf(geom().front), ...RES().map(z => (zoneAts(z) || {}).cs).filter(c => /_MIL_CTR$/.test(c || '')).map(c => c.slice(0, 4))].filter(Boolean))];
+      accs.forEach(acc => push({ key: 'CTR', real: true, icao: acc, kind: 'CTR', role: `Military area control – ${ACC_NAME[acc] || acc} ACC (MIL sector first, then the ${acc} civil sectors)`, cs: milCtr(acc), freq: atcFreq(milCtr(acc)) })); }
+    else { const d = C2DEF[k]({ main, sec }); if (d) push({ key: k, real: false, role: d.role, cs: d.cs, freq: d.freq || '' }); }
   }
+  if (keys.includes('CTR')) RES().forEach(z => { const a = zoneAts(z); if (a && a.cs && !have.has(a.cs)) { const names = RES().filter(q => (zoneAts(q) || {}).cs === a.cs).map(q => q.name);
+    push({ key: 'AREA', real: true, kind: /_MIL_CTR$/.test(a.cs) ? 'CTR' : /_APP$/.test(a.cs) ? 'APP' : /_TWR$/.test(a.cs) ? 'TWR' : '', role: `Area ATS unit – ${a.unit} (${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''})`, cs: a.cs, freq: a.freq }); } });
+  if (gcaOn()) gcaBases().forEach(b => { const g = baseGca(b); push({ key: 'GCA', real: true, icao: b, kind: 'GCA', role: `GCA – PAR / SRA final talk-down ${b} (complementary to the APP)`, cs: g.cs, freq: g.freq, warn: g.known ? '' : `${b}: nessuna postazione GCA nel sector file – da confermare (TBC)` }); });
   return rows;
 }
 const c2Sel = () => { if (!S.c2sel) S.c2sel = proposeC2(); return S.c2sel; };
@@ -1418,13 +1504,13 @@ function genZones() {
 // default bases: one BLUE and one RED; for military / training events civil airports are excluded (the staff can add more by hand)
 function defaultBases(th = theatre()) {
   const milEv = !PROF().civil, isMil = k => AIRPORTS[k] && AIRPORTS[k][3] !== 'CIV', pos = k => [AIRPORTS[k][1], AIRPORTS[k][2]], rc = th.red.center;
-  let bp = milEv ? th.blue.filter(isMil) : th.blue.filter(k => AIRPORTS[k]);
+  let bp = (milEv ? th.blue.filter(isMil) : th.blue.filter(k => AIRPORTS[k])).filter(k => !noProp(k));
   if (!bp.length) bp = th.blue.filter(k => AIRPORTS[k]);
   const blue = milEv && th.main && AIRPORTS[th.main] ? [th.main] : bp.sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b))).slice(0, 1); // main BLUE base of the theatre (staff choice) for military events
   S.blueBases = blue;
-  let red = th.red.bases.filter(k => AIRPORTS[k] && !blue.includes(k));
+  let red = th.red.bases.filter(k => AIRPORTS[k] && !blue.includes(k) && !noProp(k));
   if (milEv) { const g = geom(), toB = dest(g.front, g.dir, 50), toR = dest(g.front, g.dir + 180, 50);
-    const m = Object.keys(AIRPORTS).filter(k => isMil(k) && !blue.includes(k) && dist(pos(k), rc) < th.red.r * 1.5 && dist(pos(k), toR) < dist(pos(k), toB)).sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b)));
+    const m = Object.keys(AIRPORTS).filter(k => isMil(k) && !noProp(k) && !blue.includes(k) && dist(pos(k), rc) < th.red.r * 1.5 && dist(pos(k), toR) < dist(pos(k), toB)).sort((a, b) => dist(rc, pos(a)) - dist(rc, pos(b)));
     if (m.length) red = m; }
   S.redBases = red.slice(0, 1);
 }
@@ -1517,8 +1603,10 @@ const ROLE_GROUPS = [
 const grpOf = task => ROLE_GROUPS.find(g => g.tasks.includes(task));
 const isCivAp = icao => AIRPORTS[icao] && AIRPORTS[icao][3] === 'CIV';
 const baseInfo = icao => (S.bases && S.bases[icao]) || { side: (RB().includes(icao) ? 'HELD' : 'BLUE'), roles: ['ALL'], rroles: ['ALL'] };
-const baseGroups = icao => ROLE_GROUPS.filter(g => !isCivAp(icao) || g.civ); // civil airfields: civil purposes only
-function baseOk(icao, task) { if (task === 'STANDBY') return true; const g = grpOf(task); if (!g) return true; if (isCivAp(icao) && !g.civ) return false; const r = baseInfo(icao).roles || ['ALL']; return r.includes('ALL') || r.includes(g.k); }
+const baseGroups = icao => ROLE_GROUPS.filter(g => SCHOOL[icao] ? SCHOOL_GRP.includes(g.k) : (!isCivAp(icao) || g.civ)); // civil airfields: civil purposes only; schools: basic navigation only
+const schoolAcOk = (icao, f) => { const s = SCHOOL[icao]; if (!s || !f) return true; return s.types ? s.types.includes(f.type) : (s.cats || []).includes(f.cat); };
+function baseOk(icao, task, f) { if (task === 'STANDBY') return true; const g = grpOf(task); if (!g) return true; if (isCivAp(icao) && !g.civ) return false;
+  if (SCHOOL[icao] && (!SCHOOL_GRP.includes(g.k) || !schoolAcOk(icao, f))) return false; const r = baseInfo(icao).roles || ['ALL']; return r.includes('ALL') || r.includes(g.k); }
 function syncBases() { S.bases = S.bases || {}; S.basesSet = true; const ord = (S.baseOrd || []).filter(k => S.bases[k]); Object.keys(S.bases).forEach(k => { if (!ord.includes(k)) ord.push(k); }); S.baseOrd = ord;
   S.blueBases = ord.filter(k => ['BLUE', 'BOTH'].includes(S.bases[k].side)); S.c2sel = null; }
 function basesFromList() { S.bases = {}; S.baseOrd = []; S.blueBases.forEach(k => { S.bases[k] = { side: 'BLUE', roles: ['ALL'], rroles: ['ALL'] }; S.baseOrd.push(k); }); }
@@ -1528,7 +1616,7 @@ function assignBases(flights, g) {
   const near = arr => [...arr].sort((a, b) => dist(ap(a), g.front) - dist(ap(b), g.front)), allAll = bases.every(b => (baseInfo(b).roles || ['ALL']).includes('ALL'));
   let i = 0, j = 0;
   for (const f of flights) {
-    const ok = bases.filter(b => baseOk(b, f.task));
+    const ok = bases.filter(b => baseOk(b, f.task, f));
     if (!ok.length) { const mil = bases.filter(b => !isCivAp(b)); f.base = near(mil.length ? mil : bases)[0]; warn.push(`${f.cs} (${ROLES[f.task] || f.task}): nessuna base con questo ruolo${grpOf(f.task) && !grpOf(f.task).civ && bases.every(isCivAp) ? ' (gli aeroporti civili sono solo per scopi civili)' : ''} – messo a ${f.base}.`); continue; }
     if (!allAll) { f.base = near(ok)[0]; continue; } // roles set by the staff: nearest base with the role
     const mil = ok.filter(b => !isCivAp(b)); // all bases "Tutti i ruoli": previous spreading
@@ -2701,7 +2789,8 @@ function notamList() {
   const one = (z, body) => { const ctr = centroid(z.poly), rad = Math.min(999, Math.ceil(Math.max(...z.poly.map(p => dist(ctr, p))) / 1.852) + 1);
     let lo = z.custom ? limNorm(z.lower) : z.lower, up = z.custom ? limNorm(z.upper) : z.upper; if (z.blocks && z.blocks.length) { const b = (used.get(z.id) || '').match(/FL\d+/g); const bl = b ? z.blocks.find(x => x[0] === b[0]) || z.blocks[0] : z.blocks[0]; lo = bl[0]; up = bl[1]; }
     const q = z.custom ? 'QRTCA' : QCODE[z.type] || 'QRTCA', n = `${cfg.series}${String(+cfg.num + out.length).padStart(4, '0')}/${yr}`;
-    out.push({ id: z.id, name: z.name, text: [`(${n} NOTAMN`, `Q) ${fir}/${q}/IV/BO/W/${qLev(lo)}/${qLev(up, true)}/${nLL(ctr).replace(/(\d{4})\d{2}([NS])(\d{5})\d{2}([EW])/, '$1$2$3$4')}${String(rad).padStart(3, '0')}`,
+    const ats = zoneAts(z); if (ats && ats.unit) body += ` ATS UNIT: ${ats.unit.toUpperCase()}.`;
+    out.push({ id: z.id, name: z.name, ats: ats ? zoneAtsTxt(z) : '', text: [`(${n} NOTAMN`, `Q) ${fir}/${q}/IV/BO/W/${qLev(lo)}/${qLev(up, true)}/${nLL(ctr).replace(/(\d{4})\d{2}([NS])(\d{5})\d{2}([EW])/, '$1$2$3$4')}${String(rad).padStart(3, '0')}`,
       `A) ${fir} B) ${B ? B.code : 'YYMMDDHHMM'} C) ${C ? C.code : 'YYMMDDHHMM'}`, `E) ${body}`, `F) ${nLim(lo)} G) ${nLim(up)})`].join('\n') }); };
   for (const z of areas) {
     const avoid = z.type === 'D' ? 'NON-PARTICIPATING ACFT ARE REQUESTED TO AVOID THE AREA.' : 'NON-PARTICIPATING ACFT SHALL AVOID THE AREA.';
@@ -2926,7 +3015,7 @@ function tailor() {
   if (unknown.length) el.warnings.unshift(`${unknown.length} pilota/i con tipo velivolo non riconosciuto: definiscilo nella scheda Partecipanti.`);
   if (!flights.length) el.warnings.unshift('Nessun pilota valido nel roster.');
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Scenario adattato ai partecipanti');
 }
 function regenFromTasks() { // keep flights/tasks edited by the user, rebuild threats & texts
@@ -2935,7 +3024,7 @@ function regenFromTasks() { // keep flights/tasks edited by the user, rebuild th
   flights.forEach(f => { assigned[f.task] = (assigned[f.task] || 0) + 1; f.pkg = PKG_OF[f.task] || 'S'; });
   const el = generateElements(flights);
   S.t = { ...S.t, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  assignFreqs(true); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   save(); renderAll(true); toast('Minacce rigenerate dai task');
 }
 
@@ -3353,7 +3442,7 @@ function zoneTableHtml(near, res) {
     <div style="flex:1 1 120px"><label>Elenco</label><select id="zfall">${opt('', 'Vicino al teatro', ZF.all ? 'x' : '')}${opt('1', 'Tutta Italia', ZF.all ? '1' : '')}</select></div></div>
   <div class="row" style="flex-wrap:wrap;align-items:center;margin-top:4px"><span class="muted" style="font-size:12px" id="zfcount">${shown} di ${list.length} mostrate</span>
     <button class="b sm shrink" id="zfon">Seleziona le mostrate</button><button class="b sm shrink" id="zfoff">Deseleziona le mostrate</button>${ZF.q || ZF.type || ZF.sel ? '<button class="b sm shrink" id="zfreset">Togli filtri</button>' : ''}</div>
-  ${list.length ? `<div data-keep="zlist" id="zlist" style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}${/TBC|TBD/i.test(String(z.upper)) ? '<div style="font-size:11px">quota da confermare</div>' : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
+  ${list.length ? `<div data-keep="zlist" id="zlist" style="max-height:420px;overflow:auto;margin-top:6px"><table><tr><th></th><th>Tipo</th><th>Zona</th><th>Limiti</th></tr>${list.map(z => `<tr data-zrow="${esc(z.id)}" ${zfMatch(z, res) ? '' : 'hidden'}><td style="width:24px"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"></td><td><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span>${z.custom ? 'Custom' : z.type}</td><td>${esc(z.name)}${z.activity ? `<div class="muted" style="font-size:11px">${esc(z.activity)}</div>` : ''}${z.poly ? `<div class="muted" style="font-size:11px">Ente ATS: ${esc(zoneAtsTxt(z))}${z.unit ? '' : ' (dedotto dall\'ACC)'}</div>` : ''}</td><td class="muted">${esc(z.lower)} – ${esc(z.upper)}${/TBC|TBD/i.test(String(z.upper)) ? '<div style="font-size:11px">quota da confermare</div>' : ''}</td></tr>`).join('')}</table></div>` : '<p class="muted">Nessuna zona caricata vicino al teatro.</p>'}`;
 }
 function aspCard() {
   if (lowNav() && S.resMode === 'manual' && !cusLocked()) { const sig = (S.meta.theatre || '') + '|' + (S.meta.events || []).join(','); if (S.atSig !== sig) { S.atSig = sig; const ids = atAreas().map(z => z.id); if (ids.length) { S.reserved = fixConfigs([...new Set([...(S.reserved || []), ...ids])]); save(); setTimeout(() => { drawMap(); toast(`Navigazione a bassa quota: accese le aree tattiche ${atAreas().map(z => z.name).join(', ')}`); }, 0); } } }
@@ -3395,12 +3484,19 @@ function reqCard() {
     return `<tr><td><input type="checkbox" data-req="${t}" ${offT(t) ? '' : 'checked'} style="width:auto"></td><td><b>${esc(ROLES[t])}</b></td><td class="muted" style="font-size:12px">${esc(a.slice(0, 6).join(', ') + (a.length > 6 ? '…' : ''))}</td></tr>`; }).join('')}</table>`;
 }
 function c2Card() {
-  const rows = c2Sel(), np = POS().length;
-  const opts = (r) => { const list = r.kind ? POS().filter(p => p.type === r.kind || (r.kind === 'APP' && p.type === 'TWR')) : []; return list.length ? `<select data-c2="${r.id}" data-f="pos" style="min-width:120px"><option value="">— scegli —</option>${list.map(p => `<option value="${esc(p.cs)}" ${p.cs === r.cs ? 'selected' : ''}>${esc(p.cs)}${p.freq ? ' · ' + esc(p.freq) : ''}</option>`).join('')}</select>` : `<input data-c2="${r.id}" data-f="cs" value="${esc(r.cs)}" placeholder="${r.real ? 'dal database' : ''}">`; };
-  return `<p class="muted">Postazioni proposte per i tipi di evento scelti. Le postazioni ATC reali (APP, TWR, CTR) arrivano dal database o da un file importato: non vengono inventate. I ruoli di evento (GCI, RCC, dispatch, DOS…) hanno un callsign di esercitazione modificabile.</p>
-  <div class="muted" style="font-size:12px">Postazioni reali caricate: <b>${np}</b>${np ? '' : ' – importa un file per sceglierle dall\'elenco'}</div>
+  const rows = c2Sel(), np = POS().length, imp = ((S && S.positions) || []).length;
+  const kindOk = (r, p) => r.kind === 'CTR' ? ['CTR', 'MIL'].includes(p.type) : r.kind === 'APP' ? ['APP', 'MIL', 'TWR'].includes(p.type) : p.type === r.kind;
+  const opts = (r) => { const list = r.kind ? POS().filter(p => kindOk(r, p)) : [];
+    return list.length ? `<select data-c2="${r.id}" data-f="pos" style="min-width:120px"><option value="">— scegli —</option>${list.some(p => p.cs === r.cs) || !r.cs ? '' : `<option value="${esc(r.cs)}" selected>${esc(r.cs)}</option>`}${list.map(p => `<option value="${esc(p.cs)}" ${p.cs === r.cs ? 'selected' : ''}>${esc(p.cs)}${p.freq ? ' · ' + esc(p.freq) : ''}</option>`).join('')}</select>` : `<input data-c2="${r.id}" data-f="cs" value="${esc(r.cs)}" placeholder="${r.real ? 'dal database' : ''}">`; };
+  const g = S.gca || {}, gb = gcaOn() ? gcaBases() : [];
+  return `<p class="muted">Postazioni proposte per i tipi di evento scelti. Le postazioni ATC reali (APP, TWR, settori MIL / CTR, GCA) e le loro frequenze arrivano dal sector file IVAO Italy o da un file importato: non vengono inventate. Il settore MIL dell'ACC (LIMM / LIPP / LIRR / LIBB_MIL_CTR) ha la priorità sui settori civili. I ruoli di evento (GCI, RCC, dispatch, DOS…) hanno un callsign di esercitazione modificabile.</p>
+  <div class="muted" style="font-size:12px">Postazioni reali disponibili: <b>${np}</b>${imp ? ` (di cui ${imp} importate)` : ''}${np ? '' : ' – importa un file per sceglierle dall\'elenco'}</div>
+  <div class="card" style="margin:8px 0;padding:8px 10px"><label style="display:flex;gap:8px;align-items:center;margin:0;cursor:pointer"><input type="checkbox" id="gcaon" style="width:auto;margin:0" ${gcaOn() ? 'checked' : ''}><b>Serve il GCA</b></label>
+    <div class="muted" style="font-size:12px;margin-top:2px">Le missioni finiscono con un avvicinamento PAR / SRA: APP → GCA (solo il finale) → TWR. Il GCA è complementare all'APP, non lo sostituisce. Il piano di volo non cambia.</div>
+    ${gcaOn() ? `<div style="font-size:12px;margin-top:6px">${gb.map(b => { const c = recChain(b); return `<div><b>${b}</b>: ${esc(c.txt)}${c.gca.known ? '' : ' <span style="color:#b45309">⚠ GCA non presente nel sector file (TBC)</span>'}</div>`; }).join('')}</div>
+    ${S.t && S.t.flights.length ? `<div class="tgrid" style="margin-top:6px">${S.t.flights.filter(f => f.task !== 'STANDBY').map(f => `<div><label>${esc(f.cs)}</label><select data-gcafl="${esc(f.cs)}">${Object.entries(GCA_MODE).map(([k, l]) => `<option value="${k}" ${gcaMode(f) === k ? 'selected' : ''}>${esc(l[0])}</option>`).join('')}</select></div>`).join('')}</div>` : '<div class="muted" style="font-size:11px;margin-top:4px">PAR o SRA si sceglie per ogni flight dopo aver generato i flight (predefinito: a scelta del GCA).</div>'}` : ''}</div>
   <table><tr><th style="width:24px"></th><th>Postazione</th><th>Callsign</th><th style="width:90px">Freq.</th><th></th></tr>
-  ${rows.map(r => `<tr><td><input type="checkbox" data-c2="${r.id}" data-f="on" ${r.on ? 'checked' : ''} style="width:auto"></td><td><input data-c2="${r.id}" data-f="role" value="${esc(r.role)}">${r.real ? '<span class="muted" style="font-size:11px">ATC reale</span>' : '<span class="muted" style="font-size:11px">ruolo evento</span>'}</td><td>${opts(r)}${r.real && !r.cs ? '<div class="muted" style="font-size:11px;color:#b45309">da confermare</div>' : ''}</td><td><input data-c2="${r.id}" data-f="freq" value="${esc(r.freq)}" placeholder="DB"></td><td><button class="b sm danger" data-c2del="${r.id}">✕</button></td></tr>`).join('')}</table>
+  ${rows.map(r => `<tr><td><input type="checkbox" data-c2="${r.id}" data-f="on" ${r.on ? 'checked' : ''} style="width:auto"></td><td><input data-c2="${r.id}" data-f="role" value="${esc(r.role)}">${r.real ? '<span class="muted" style="font-size:11px">ATC reale</span>' : '<span class="muted" style="font-size:11px">ruolo evento</span>'}${r.warn ? `<div style="font-size:11px;color:#b45309">⚠ ${esc(r.warn)}</div>` : ''}</td><td>${opts(r)}${r.real && !r.cs ? '<div class="muted" style="font-size:11px;color:#b45309">da confermare</div>' : ''}</td><td><input data-c2="${r.id}" data-f="freq" value="${esc(r.freq)}" placeholder="${r.real ? 'TBC' : 'DB'}"></td><td><button class="b sm danger" data-c2del="${r.id}">✕</button></td></tr>`).join('')}</table>
   <div class="row" style="margin-top:6px;flex-wrap:wrap"><button class="b sm shrink" id="c2add">+ Postazione</button><button class="b sm shrink" id="c2reset">Riproponi</button><label class="b sm shrink">Importa postazioni (JSON / CSV)<input type="file" id="posfile" accept=".json,.csv,.txt" hidden></label></div>`;
 }
 // ---- phase 1 as a step-by-step wizard: one step open, the others folded into a summary line ----
@@ -3469,6 +3565,7 @@ function genAskHtml() {
   return `<p class="muted" style="margin-top:0">${cusLocked() ? 'Ci sono aree custom: tutta l\'esercitazione sarà dentro di esse.' : 'Ultima domanda: le aree riservate le propongo io in base a teatro ed evento, oppure uso solo quelle che hai spuntato nel passo "Spazio aereo riservato"?'}</p>
     <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" id="genauto">Proponile tu e genera</button><button class="b shrink" id="genman">Uso le mie (${RES().length}) e genera</button></div>`;
 }
+const baseWarn = k => NOBASE.includes(k) ? 'Non proposto come base dallo staff: usalo solo se serve davvero.' : SCHOOL[k] ? `Base scuola (${SCHOOL[k].it}): pista corta, solo addestramento basico di navigazione.` : '';
 function basePickHtml() { if (!S.bases) basesFromList(); const g = geom(), all = !!S.baseAll;
   const cand = Object.keys(AIRPORTS).map(k => [k, dist(ap(k), g.front)]).filter(([k, d]) => S.bases[k] || d < (all ? 450 : 220)).sort((a, b) => (!!S.bases[b[0]] - !!S.bases[a[0]]) || a[1] - b[1]).slice(0, all ? 80 : 24);
   const tag = k => ({ MIL: 'MIL', CIV: 'CIV', JOINT: 'MIL/CIV' })[AIRPORTS[k][3]] || AIRPORTS[k][3];
@@ -3476,7 +3573,7 @@ function basePickHtml() { if (!S.bases) basesFromList(); const g = geom(), all =
   const sum = (k, r) => (r || ['ALL']).includes('ALL') ? (isCivAp(k) ? 'tutti i ruoli civili' : 'tutti i ruoli') : r.map(x => (ROLE_GROUPS.find(g => g.k === x) || {}).it || x).join(', ');
   return `<div class="card" style="margin-top:10px"><b style="font-size:13px">Basi di partenza e arrivo</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Per ogni aeroporto scegli chi lo usa (BLUE, giocatori RED o entrambi) e i ruoli. Una sola base con "Tutti i ruoli" va bene per tutto l'evento. Gli aeroporti civili sono solo per scopi civili. La prima base BLUE (★) è la principale.</p>
     ${cand.map(([k, d]) => { const b = S.bases[k], side = b ? b.side : '';
-      return `<div style="border-top:1px solid var(--line);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:150px"><b>${k}</b> ${S.blueBases[0] === k ? '★' : ''} <span class="muted" style="font-size:11px">${esc(AIRPORTS[k][0])} · ${tag(k)} · ${Math.round(d / 1.852)} NM dal fronte</span></div>
+      return `<div style="border-top:1px solid var(--line);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:150px"><b>${k}</b> ${S.blueBases[0] === k ? '★' : ''} <span class="muted" style="font-size:11px">${esc(AIRPORTS[k][0])} · ${tag(k)} · ${Math.round(d / 1.852)} NM dal fronte</span>${baseWarn(k) ? `<div class="warnline" style="font-size:11px;color:#b45309">⚠ ${esc(baseWarn(k))}</div>` : ''}</div>
         ${b && ['BLUE', 'BOTH'].includes(side) && S.blueBases[0] !== k ? `<button class="b sm shrink" data-bmain="${k}">★ Principale</button>` : ''}<select data-bside="${k}" style="width:140px">${[['', '— non usata'], ['BLUE', 'BLUE'], ['RED', 'RED (giocatori)'], ['BOTH', 'BLUE + RED']].map(([v, l]) => `<option value="${v}" ${side === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
         ${b && ['BLUE', 'BOTH'].includes(side) ? `<details${(S.bOpen || '') === k + 'roles' ? ' open' : ''} data-bopen="${k}roles"><summary style="font-size:12px;cursor:pointer">BLUE: ${esc(sum(k, b.roles))}</summary>${chips(k, 'roles', b.roles)}</details>` : ''}
         ${b && ['RED', 'BOTH'].includes(side) ? `<details${(S.bOpen || '') === k + 'rroles' ? ' open' : ''} data-bopen="${k}rroles"><summary style="font-size:12px;cursor:pointer;color:#b91c1c">RED (giocatori): ${esc(sum(k, b.rroles))}</summary>${chips(k, 'rroles', b.rroles)}</details>` : ''}</div>`; }).join('')}
@@ -3668,9 +3765,9 @@ function renderTailor() {
   h += asgHtml(t);
   h += aspIssuesHtml();
   h += `<div class="card" style="font-size:12.5px"><b>Revisione:</b> ${esc(revLabel())}${curRev() ? ' del ' + esc(curRev().date) : ''}. Quando il tabellone è definitivo emetti una nuova revisione nella scheda Export: il masterplan riporterà lo storico.</div>`;
-  h += `<h2>Flight BLUE (${t.flights.length})</h2><table><tr><th>Callsign</th><th>Tipo</th><th>#</th><th>Base</th><th>Task</th><th>Freq</th></tr>
+  h += `<h2>Flight BLUE (${t.flights.length})</h2><table><tr><th>Callsign</th><th>Tipo</th><th>#</th><th>Base</th><th>Task</th><th>Freq</th>${gcaOn() ? '<th>Recupero</th>' : ''}</tr>
   ${t.flights.map(f => `<tr><td class="blue">${esc(f.cs)}</td><td>${esc(f.type)}</td><td>${f.size}</td><td style="width:70px"><input data-edit="flight" data-id="${f.id}" data-f="base" value="${esc(f.base || '')}"></td>
-   <td><select data-edit="flight" data-id="${f.id}" data-f="task">${taskOpts(f.task)}</select></td><td style="width:78px"><input data-edit="flight" data-id="${f.id}" data-f="freq" value="${esc(f.freq || 'TBD')}"></td></tr>`).join('')}</table>
+   <td><select data-edit="flight" data-id="${f.id}" data-f="task">${taskOpts(f.task)}</select></td><td style="width:78px"><input data-edit="flight" data-id="${f.id}" data-f="freq" value="${esc(f.freq || 'TBD')}"></td>${gcaOn() ? `<td style="width:120px">${f.task === 'STANDBY' ? '' : `<select data-gcafl="${esc(f.cs)}">${Object.entries(GCA_MODE).map(([k, l]) => `<option value="${k}" ${gcaMode(f) === k ? 'selected' : ''}>${esc(l[0])}</option>`).join('')}</select>`}</td>` : ''}</tr>`).join('')}</table>
   <p class="muted">Se cambi un task premi "Rigenera minacce dai task".</p>
   <h2>Minacce RED (${t.threats.length})</h2><table><tr><th>ID</th><th>Minaccia</th><th>Risposta</th><th>Stato</th><th></th></tr>
   ${t.threats.map(x => `<tr><td class="red">${x.id}</td><td><input data-edit="threat" data-id="${x.id}" data-f="name" value="${esc(x.name)}"></td><td>${esc(x.resp)}</td><td class="${x.status === 'AVOID' ? 'amber' : 'red'}">${x.status}</td><td><button class="b sm danger" data-del="threat" data-id="${x.id}">✕</button></td></tr>`).join('')}</table>
@@ -3745,7 +3842,10 @@ let NAV = null, NAVG = null, NAVL = null; // navigation database (data/navdb.jso
 async function navInit() { try { const r = await fetch('data/navdb.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json();
   const pts = j.pts.map(([id, la, lo, k, x], i) => ({ id, pos: [la, lo], k, x: x || '', i })), by = {};
   pts.forEach(p => (by[p.id] = by[p.id] || []).push(p));
-  NAV = { pts, by, awy: j.awy || {}, manual: j.manual || [], airac: j.airac || '', src: j.src || '' }; NAVG = null; } catch (e) { } }
+  NAV = { pts, by, awy: j.awy || {}, manual: j.manual || [], airac: j.airac || '', src: j.src || '', acc: j.acc || null,
+    atc: (j.atc || []).map(([cs, freq, icao, kind]) => ({ cs, freq, icao, type: kind, name: '', fir: '', db: true })) }; NAVG = null;
+  if (S && !S.c2edit) S.c2sel = null; // positions proposed before the ATC data arrived are proposed again (unless edited by the staff)
+  } catch (e) { } }
 const NAVK = { V: 'VOR / TACAN', N: 'NDB', F: 'fix', A: 'fix', R: 'VRP (AIP)', M: 'military procedure point (unpublished)', G: 'military gate (unpublished)' };
 const navPub = p => 'VNFAR'.includes(p.k) && !(p.k === 'F' && p.x[0] === 'H'); // published in the AIP
 const navFra = p => p.k === 'F' && p.x.includes('*');
@@ -3960,7 +4060,7 @@ function drawFplRoute(add) { const f = S.t && S.t.flights.find(x => x.id === S.f
 const NAVC = { VOR: ['vor', 'VOR', '#0f5fa8'], VORDME: ['vor', 'VOR-DME', '#0f5fa8'], VORTAC: ['vortac', 'VORTAC', '#0f5fa8'], TACAN: ['tacan', 'TACAN', '#0f5fa8'], DME: ['tacan', 'DME', '#0f5fa8'],
   NDB: ['ndb', 'NDB', '#7e22ce'], FE: ['fe', 'Fix en-route', '#1e293b'], FT: ['ft', 'Fix terminale', '#64748b'], FRA: ['fra', 'Punto FRA', '#1e293b'], VRP: ['vrp', 'VRP (AIP)', '#9333ea'],
   MIL: ['mil', 'Punto militare (non pubblicato)', '#b45309'], GATE: ['gate', 'Gate militare (non pubblicato)', '#b45309'] };
-const NAVL_KEYS = [['vor', 'VOR / VOR-DME', 'VOR'], ['vortac', 'VORTAC', 'VORTAC'], ['tacan', 'TACAN / DME', 'TACAN'], ['ndb', 'NDB', 'NDB'], ['fe', 'Fix en-route', 'FE'], ['ft', 'Fix terminali', 'FT'], ['fra', 'Punti FRA pieni', 'FRA'],
+const NAVL_KEYS = [['vor', 'VOR / VOR-DME', 'VOR'], ['vortac', 'VORTAC', 'VORTAC'], ['tacan', 'TACAN / DME', 'TACAN'], ['ndb', 'NDB', 'NDB'], ['fe', 'Fix en-route', 'FE'], ['ft', 'Fix terminali', 'FT'], ['fra', 'Punti di interesse FRA', 'FRA'],
   ['vrp', 'VRP (AIP)', 'VRP'], ['mil', 'Punti militari', 'MIL'], ['gate', 'Gate militari', 'GATE'], ['awy', 'Aerovie basse', null], ['lbl', 'Nomi dei punti', null]];
 const NAVL_DEF = { vor: 1, vortac: 1, tacan: 1, ndb: 1, fe: 1, ft: 0, fra: 1, vrp: 1, mil: 1, gate: 1, awy: 0, lbl: 1 };
 const navLay = () => { if (!S.navL) S.navL = { ...NAVL_DEF }; return S.navL; };
@@ -3993,7 +4093,7 @@ function navPanelHtml() { const L0 = navLay(), on = !!(S && S.navOn);
     <label style="display:flex;gap:6px;align-items:center;margin:0 0 4px;font-weight:700"><input type="checkbox" id="navon" style="width:auto" ${on ? 'checked' : ''}> Mostra i dati di navigazione</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;${on ? '' : 'opacity:.45'}">${NAVL_KEYS.map(([k, l, c]) => `<label style="display:flex;gap:5px;align-items:center;margin:0;font-weight:400;white-space:nowrap"><input type="checkbox" data-navl="${k}" style="width:auto" ${L0[k] ? 'checked' : ''} ${on ? '' : 'disabled'}>${c ? navSvg(c, 16) : k === 'awy' ? '<svg width="16" height="16"><line x1="1" y1="12" x2="15" y2="4" stroke="#64748b" stroke-width="1.5"/></svg>' : '<b style="width:16px;text-align:center">Aa</b>'}${l}</label>`).join('')}</div>
     <div class="muted" id="navcount" style="font-size:11.5px;margin-top:4px">${on ? '' : 'Spento.'}</div>
-    <div class="muted" style="font-size:11px">Simboli ICAO (Annesso 4). "Punti FRA pieni" cambia solo il simbolo: un fix che è anche punto FRA diventa un triangolo pieno. Zoomando compaiono più punti: VOR / TACAN subito, NDB e FRA, poi fix, VRP e punti militari. Con un piano di volo aperto, clic su un punto → "Aggiungi alla rotta".</div></div>`; }
+    <div class="muted" style="font-size:11px">Simboli ICAO (Annesso 4). "Punti di interesse FRA" cambia solo il simbolo: un fix che è anche punto FRA diventa un triangolo pieno. Zoomando compaiono più punti: VOR / TACAN subito, NDB e FRA, poi fix, VRP e punti militari. Con un piano di volo aperto, clic su un punto → "Aggiungi alla rotta".</div></div>`; }
 function drawNav() { if (!MAP || typeof L === 'undefined') return; if (!NAVL) NAVL = L.layerGroup().addTo(MAP); NAVL.clearLayers(); const cnt = document.getElementById('navcount');
   if (!S || !S.navOn || !NAV || MODE !== 'staff') { if (cnt && S && S.navOn && !NAV) cnt.textContent = 'Dati di navigazione in caricamento…'; return; }
   const L0 = navLay(), z = MAP.getZoom ? MAP.getZoom() : 8, bb = MAP.getBounds ? MAP.getBounds() : null, inB = p => !bb || bb.contains(p), add = l => l.addTo(NAVL);
@@ -4135,7 +4235,7 @@ document.addEventListener('change', e => {
   if (t.dataset.aartrk && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aartrk); if (f) { f.trkSel = t.value || ''; asgApply(); } return; }
   if (t.dataset.aarwin && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarwin); if (f) { f.win = t.value === '' ? '' : Math.max(3, Math.min(30, Math.round(+t.value))); asgApply(); } return; }
   if (t.dataset.aarrcv && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarrcv); if (f) { f.tanker = t.value; f.tankerMan = true; asgApply(); } return; }
-  if (t.dataset.bside) { const k = t.dataset.bside; S.bases = S.bases || {}; if (!t.value) delete S.bases[k]; else S.bases[k] = Object.assign({ roles: ['ALL'], rroles: ['ALL'] }, S.bases[k] || {}, { side: t.value }); syncBases(); save(); renderAll(); return; }
+  if (t.dataset.bside) { const k = t.dataset.bside; S.bases = S.bases || {}; if (!t.value) delete S.bases[k]; else S.bases[k] = Object.assign({ roles: ['ALL'], rroles: ['ALL'] }, S.bases[k] || {}, { side: t.value }); syncBases(); save(); renderAll(); if (t.value && baseWarn(k)) toast(k + ': ' + baseWarn(k)); return; }
   if (t.dataset.brole) { const [k, key, gr] = t.dataset.brole.split(':'), b = S.bases && S.bases[k]; if (!b) return; S.bOpen = k + key; let r = (b[key] || ['ALL']).filter(x => x !== 'ALL');
     if (gr === 'ALL') r = t.checked ? ['ALL'] : []; else r = t.checked ? [...new Set([...r, gr])] : r.filter(x => x !== gr); b[key] = r.length ? r : ['ALL']; syncBases(); save(); renderAll(); return; }
   if (t.dataset.rheld) { const k = t.dataset.rheld; S.basesSet = true; S.redBases = t.checked ? [...new Set([...S.redBases, k])] : S.redBases.filter(x => x !== k); save(); renderAll(); return; }
@@ -4154,7 +4254,9 @@ document.addEventListener('change', e => {
     T[f] = ['control', 'tot'].includes(f) ? +t.value : t.value; if (f === 'wpn') T.wpnMan = true; if (f === 'tot') T.totMan = true; if (f === 'block') { T.blockMan = !!t.value; if (!t.value) { T.above = 'x'; casDeconf(J); } } if (f === 'method' && t.value === 'BOC') { T.control = Math.max(2, T.control); const fl = casFlight(T); if (fl) { const w = wpnOf(fl); T.wpn = w.find(x => GPS_WPN.test(x)) || T.wpn; } else if (!T.rw) T.wpn = 'GBU-38'; }
     save(); renderPanel(); drawMap(); return; }
   if (t.dataset.req) { const set = new Set(S.off || []); t.checked ? set.delete(t.dataset.req) : set.add(t.dataset.req); S.off = [...set]; S.c2sel = proposeC2(); save(); renderPanel(); return; }
-  if (t.dataset.c2) { const r = c2Sel().find(x => x.id === t.dataset.c2); if (!r) return; const f = t.dataset.f;
+  if (t.id === 'gcaon') { S.gca = Object.assign({}, S.gca, { on: t.checked }); S.c2sel = c2Sel().filter(r => r.key !== 'GCA').concat(t.checked ? proposeC2().filter(r => r.key === 'GCA') : []); if (S.t) gcaApply(S.t); save(); renderPanel(); return; }
+  if (t.dataset.gcafl) { S.gcaFl = Object.assign({}, S.gcaFl, { [t.dataset.gcafl]: t.value }); if (S.t) gcaApply(S.t); save(); return; }
+  if (t.dataset.c2) { const r = c2Sel().find(x => x.id === t.dataset.c2); if (!r) return; const f = t.dataset.f; S.c2edit = true;
     if (f === 'on') r.on = t.checked; else if (f === 'pos') { const q = POS().find(x => x.cs === t.value); r.cs = t.value; if (q && q.freq) r.freq = q.freq; renderPanel(); } else r[f] = t.value; save(); return; }
   if (t.dataset.mps) { S.mpSec = S.mpSec || {}; S.mpSec[t.dataset.mps] = t.checked; save(); return; }
   if (t.dataset.mpt) { S.mpTxt = S.mpTxt || {}; S.mpTxt[t.dataset.mpt] = t.value; save(); return; }
@@ -4217,7 +4319,7 @@ document.addEventListener('click', e => {
   if (t.dataset.aibpack) { exportAibPack(t.dataset.aibpack, t); return; }
   if (t.id === 'gcipack') { exportGciPack(t); return; }
   if (t.id === 'aarpack') { exportAarPack(t); return; }
-  if (t.dataset.c2del) { S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
+  if (t.dataset.c2del) { S.c2edit = true; S.c2sel = c2Sel().filter(r => r.id !== t.dataset.c2del); save(); renderPanel(); return; }
   if (t.dataset.del) {
     const k = t.dataset.del, id = t.dataset.id;
     if (k === 'zone') S.zones = S.zones.filter(x => x.id !== id);
@@ -4257,8 +4359,8 @@ document.addEventListener('click', e => {
     case 'sarregen': genSAR(); if (S.t) applySAR(S.t); save(); renderAll(true); toast('Scenari SAR generati'); return;
     case 'prregen': genPR(); if (S.t) applyPR(S.t); save(); renderAll(); toast('Scenari CSAR / MEDEVAC generati'); return;
     case 'casregen': genCAS(); if (S.t) applyCAS(S.t); save(); renderAll(); toast('Scenari CAS generati'); return;
-    case 'c2add': c2Sel().push({ id: uid(), key: 'X', real: false, on: true, role: 'Nuova postazione', cs: '', freq: '' }); save(); renderPanel(); return;
-    case 'c2reset': S.c2sel = proposeC2(); save(); renderPanel(); return;
+    case 'c2add': S.c2edit = true; c2Sel().push({ id: uid(), key: 'X', real: false, on: true, role: 'Nuova postazione', cs: '', freq: '' }); save(); renderPanel(); return;
+    case 'c2reset': S.c2edit = false; S.c2sel = proposeC2(); save(); renderPanel(); return;
     case 'ptsclear': POINTS = { source: '', items: [] }; try { localStorage.removeItem('ivao-so-points'); } catch (e) { } renderAll(); return;
     case 'ptsapi': { const url = v('ptsurl').trim(); if (!url) return toast("Inserisci l'URL"); lsSet('ivao-so-pts-url', url);
       loadPointsApi(url, '').then(it => { if (!it.length) throw new Error('nessun punto'); setPoints(it, url); renderAll(); toast(`Punti: ${it.length}`); }).catch(e => toast('Collegamento fallito: ' + e.message + ' (CORS o formato)')); return; }
@@ -4517,7 +4619,7 @@ async function deckGeneric() {
     .concat(S.zones.map(z => [z.side === 'BLUE' ? K.BLUE : K.RED, CATS[z.cat].label])));
   addLibSlides(p);
   if (RES().length) { s = slideT(p, 'Reserved airspace', 'The whole exercise is contained in these areas – deconfliction with civil traffic');
-    table(s, ['Area', 'Type', 'Lower', 'Upper', 'Notes'], RES().map(z => [{ text: z.name, options: { bold: true } }, ZTYPES[z.type] || z.type, z.lower, z.upper, z.notes || '']), { colW: [2.0, 2.3, 1.0, 1.0, 2.7] }); }
+    table(s, ['Area', 'Type', 'Lower', 'Upper', 'ATS unit'], RES().map(z => [{ text: z.name, options: { bold: true } }, ZTYPES[z.type] || z.type, z.lower, z.upper, zoneAtsTxt(z)]), { colW: [2.0, 2.0, 0.9, 0.9, 3.2] }); }
   // Threat assessment cards (max 6 per slide)
   if (PROF().sober) chunk(PROF().list, 6).forEach((grp, gi) => {
     s = slideT(p, 'Event types & objectives' + (gi ? ' (cont.)' : ''), 'What the exercise trains');
@@ -4592,6 +4694,7 @@ async function deckBrief() {
     const lines = [];
     fs.forEach(f => { lines.push({ text: `${f.cs}  ·  ${f.size} × ${f.type}  ·  ${f.base || ''}`, options: { bold: true, color: K.BLUEL, fontSize: 12.5, breakLine: true } });
       lines.push({ text: `Task: ${ROLES[f.task] || f.task}`, options: { fontSize: 11.5, breakLine: true } });
+      if (f.rec) lines.push({ text: f.rec, options: { fontSize: 10.5, color: K.CYAN, breakLine: true } });
       t.threats.filter(x => x.flight === f.id).forEach(x => lines.push({ text: `→ ${x.id} ${x.name} · BULLS ${bref(x.pos)}`, options: { fontSize: 11, color: K.REDL, breakLine: true } }));
       t.objectives.filter(o => o.flight === f.id).forEach(o => lines.push({ text: `→ ${o.id} ${o.name} · ${fmtLL(o.pos)}`, options: { fontSize: 11, color: K.BLUEL, breakLine: true } }));
       t.airspace.filter(a => a.flight === f.id).forEach(a => lines.push({ text: `→ ${AST[a.type]}: ${a.name}${a.alt ? ' · ' + a.alt : ''}`, options: { fontSize: 11, color: K.CYAN, breakLine: true } }));
@@ -4625,7 +4728,7 @@ async function deckBrief() {
   table(s, ['Measure', 'Name', 'Position', 'BULLS', 'Notes'], t.airspace.map(a => [AST[a.type], a.name, a.pts.map(fmtLL).join('\n'), a.type === 'BULLSEYE' ? '—' : bref(a.pts[0]), [a.alt, a.type === 'KILLBOX' ? `${a.size} km square` : '', fl(a.flight) ? fl(a.flight).cs : ''].filter(Boolean).join(' · ')]), { colW: [1.6, 1.8, 2.6, 0.8, 2.2], fontSize: 10 });
   addLibSlides(p);
   if (RES().length) { s = slideT(p, 'Reserved airspace', 'All exercise activity stays inside these areas – deconfliction with civil traffic');
-    table(s, ['Area', 'Type', 'Lower', 'Upper', 'Notes'], RES().map(z => [{ text: z.name, options: { bold: true } }, ZTYPES[z.type] || z.type, z.lower, z.upper, z.notes || '']), { colW: [2.0, 2.3, 1.0, 1.0, 2.7] }); }
+    table(s, ['Area', 'Type', 'Lower', 'Upper', 'ATS unit'], RES().map(z => [{ text: z.name, options: { bold: true } }, ZTYPES[z.type] || z.type, z.lower, z.upper, zoneAtsTxt(z)]), { colW: [2.0, 2.0, 0.9, 0.9, 3.2] }); }
   // C2 & comms
   s = slideT(p, 'C2 & communications plan', 'Frequencies assigned according to mission type and available controllers');
   const stat = c => /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) || !c.controller ? 'Open' : 'Assigned';
@@ -5063,7 +5166,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const rz = RES();
   if (!mpOn('res')) { } else if (rz.length) { h6('Reserved airspace (deconfliction)');
     para('All exercise activity is contained inside the following reserved areas and within their vertical limits. Outside them normal GAT rules apply and exercise aircraft transit as regular traffic.');
-    table([{ h: 'Area', w: .24 }, { h: 'Type', w: .24 }, { h: 'Lower', w: .12 }, { h: 'Upper', w: .12 }, { h: 'Notes', w: .28 }], rz.map(z => [{ t: z.name, bold: true }, ZTYPES[z.type] || z.type, z.lower, z.upper, z.notes || '']));
+    table([{ h: 'Area', w: .2 }, { h: 'Type', w: .18 }, { h: 'Lower', w: .1 }, { h: 'Upper', w: .1 }, { h: 'ATS unit', w: .2 }, { h: 'Notes', w: .22 }], rz.map(z => [{ t: z.name, bold: true }, ZTYPES[z.type] || z.type, z.lower, z.upper, zoneAtsTxt(z), z.notes || '']));
     { const cs = CORSEL(); if (cs.length) { h6('OAT corridors (transit)'); para('Exercise aircraft use these corridors to transit between the bases and the areas, or as an airway-like reservation along their route. Fly the centre line; contact the unit listed.');
       table([{ h: 'Corridor', w: .2 }, { h: 'Route', w: .34 }, { h: 'Width', w: .1 }, { h: 'Levels', w: .18 }, { h: 'Radio', w: .18 }], cs.map(z => [{ t: z.name.replace(/^OAT corridor /, ''), bold: true }, z.axis.map((p, k) => z.wpt && z.wpt[k] ? `${z.wpt[k]} (${fmtLL(p)})` : fmtLL(p)).join(' – '), `${2 * z.half} NM`, corLevels(z), z.radio || '-']), { size: 7.5 }); } }
     { const ac = activeConfigs(); if (ac.length) para(`Simultaneous activation (AIP ENR 5.1.4 configurations): ${ac.map(c => `${c.id} (${c.zones.map(z => z.replace('LI-', '')).join(' + ')})${c.sup ? ' – requires a specific AIP Supplement' : ''}`).join('; ')}.`, { size: 8 }); }
@@ -5107,7 +5210,8 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   if (t) {
     if (mpOn('flights')) { para('Participants are grouped into flights. Each flight has one primary task' + (PROF().sober ? ' (see the task allocation in the Briefing section).' : ' linked to a RED threat or a BLUE objective.') + '');
     table([{ h: 'Callsign', w: .16 }, { h: 'Aircraft', w: .26 }, { h: 'Base', w: .1 }, { h: 'Task', w: .3 }, { h: 'Frequency', w: .18 }],
-      t.flights.map(f => [{ t: f.cs, bold: true }, `${f.size} x ${f.type}`, f.base || '-', ROLES[f.task] || f.task, f.freq || 'TBD'])); }
+      t.flights.map(f => [{ t: f.cs, bold: true }, `${f.size} x ${f.type}`, f.base || '-', ROLES[f.task] || f.task, f.freq || 'TBD']));
+    if (t.flights.some(f => f.rec)) { h6('Recovery – GCA (PAR / SRA)'); para('Every flight ends with a radar approach. The APP gives the approach and the vectors to final; the GCA gives only the final talk-down; the TWR clears the landing. The flight plan does not change.'); t.flights.filter(f => f.rec).forEach(f => para(`${f.cs}: ${f.rec.replace(/^Recovery to /, 'to ')}`, { size: 8 })); } }
     if (mpOn('airframes')) { h6('Roles and allowed airframes');
     const tasks = [...new Set(t.flights.map(f => f.task))];
     table([{ h: 'Role', w: .2 }, { h: 'Responsibilities', w: .45 }, { h: 'Allowed airframes (type)', w: .35 }],
@@ -5463,7 +5567,7 @@ function renderPublic() {
       <div class="fac red-f"><b class="red">● ${esc(S.factions.red)}</b>RED – hostile forces · holding ${esc(RB().join(', ') || '—')}</div></div>`}</section>
     <section class="pcard"><h2>Area of operations</h2><div class="pmapwrap"><div id="pmap"></div></div>
       <div class="legend">${legend.concat(RES().length ? [['#0F766E', 'Reserved airspace']] : []).map(([c, l]) => `<span><i style="background:${c}"></i>${esc(l)}</span>`).join('')}</div>
-      ${RES().length ? `<h3 style="margin:14px 0 6px;color:var(--ivao)">Reserved airspace</h3><p class="muted" style="margin:0 0 6px">The whole exercise stays inside these areas (deconfliction with civil traffic).</p>${tbl(['Area', 'Type', 'Lower', 'Upper'], RES().map(z => [`<b>${esc(z.name)}</b>`, esc(ZTYPES[z.type] || z.type), esc(z.lower), esc(z.upper)]))}` : ''}</section>
+      ${RES().length ? `<h3 style="margin:14px 0 6px;color:var(--ivao)">Reserved airspace</h3><p class="muted" style="margin:0 0 6px">The whole exercise stays inside these areas (deconfliction with civil traffic).</p>${tbl(['Area', 'Type', 'Lower', 'Upper', 'ATS unit'], RES().map(z => [`<b>${esc(z.name)}</b>`, esc(ZTYPES[z.type] || z.type), esc(z.lower), esc(z.upper), esc(zoneAtsTxt(z))]))}` : ''}</section>
     ${t ? brief : announce}
     <section class="pcard"><h2>${[mpOn('bull') && 'Bullseye', (mpOn('aew') || mpOn('aar')) && 'tracks'].filter(Boolean).join(' &amp; ') || 'Charts'}</h2>
       ${mpOn('bull') ? `<p class="muted">Mission bullseye: <b>${esc(String(S.meta.bullseye || '').toUpperCase())}</b>.</p>` : ''}
@@ -5651,7 +5755,7 @@ route();
 navInit().then(() => { NAVG = null; if (MAP && S && S.navOn) drawNav(); if (TAB === 'fpl' && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, fplInsert, fplInsAt, navLay, fplEditorHtml, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
