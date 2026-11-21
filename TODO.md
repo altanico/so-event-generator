@@ -1,6 +1,11 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Route planner and navigation layer, easier** (staff 21 Nov: "non è molto intuitivo, serve un sistema diverso, scegliere cosa accendere, simboli reali AIP"):
+  - Layer panel on the map (button "Navigazione ▾"): one switch per kind – VOR / VOR-DME / VORTAC / TACAN / DME, NDB, en-route fixes, terminal fixes, FRA points, VRP (AIP), military procedure points, military gates (unpublished), lower airways – plus "nomi dei punti" on/off; the choice is remembered; points still thinned by zoom, a counter says how many are shown / hidden by zoom.
+  - Real chart symbols (ICAO Annex 4 / AIP Italia GEN 2.3 legend) drawn as SVG: VOR hexagon, VOR-DME hexagon in a square, VORTAC hexagon with three blocks, TACAN, DME square, NDB stippled circle, significant point triangle (filled compulsory / open on request – only where the data says it; the sector file has no compulsory flag), FRA point triangle with the FRA mark, VRP flag / triangle as in the AIP VFR charts; military points and gates (not in the AIP) with a distinct symbol and the note "unpublished". The same symbols in the PDF / slide maps and a legend on the map.
+  - Route editor in the flight plan card: a list of the route points (symbol, name, type, coordinates, airway to the next point) with ▲ ▼ ✕ per row and a search box "Aggiungi punto" (type RIS… -> RISOM, VRP code / name, coordinates 4530N01230E); map and list stay in sync. On the map: click a navigation point -> popup "Aggiungi alla rotta" / "Sostituisci il punto n"; drag and insert on a leg stay; the route text (field 15) rebuilt from the list.
+  - To agree with the staff: AIP GEN 2.3 legend (page / PDF) to copy the symbols exactly.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
