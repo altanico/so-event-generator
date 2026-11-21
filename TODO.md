@@ -1,9 +1,12 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
-- [ ] **Simpler generation** (staff 21 Nov, proposal – waiting for the staff's OK):
+- [ ] **Simpler generation** (staff 21 Nov; staff 21 Nov 23:55: "vorrei che fosse tutto già implementato" – in the next build):
   - Step "Punti di navigazione (sectorfile)" removed: it dates from before the built-in navigation database; IFR and low-level routes now use data/navdb.json (fixes, VOR / NDB, VRP, military points) and, for low level, the AT areas; the import of another sectorfile / API stays only under "Avanzate" in Export (or is removed – ask).
   - Step "Nome e teatro" becomes "Teatro": the event name is generated automatically (as today) and no longer asked in the wizard; it can be changed from the event header / Export ("Nome evento" + 🎲). In the future single-user mode it is never asked (default "TRAINING MISSION <date>").
+- [ ] **Missione libera** – as in the proposal section below and the mockup canvas "Mockup – missione libera" (staff 21 Nov 23:55: implement it so it can be evaluated).
+- [ ] **Loadouts per flight** – as in the proposal section below.
+- [ ] **Official vs internal events** – as in the proposal section below.
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
