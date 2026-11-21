@@ -67,6 +67,11 @@
 - Data: the compatibility catalogue per type is prepared by Claude from public sources and checked by the staff; chaff / flare quantities not invented: "standard" unless the staff gives numbers.
 - Same for events and missione libera.
 
+## Proposal: official vs unofficial events (staff 21 Nov evening – to discuss)
+- First screen with 3 choices: "Evento ufficiale della divisione" (staff, today's flow), "Evento tra amici" (same engine: BLUE / RED scenario, roster, tailoring, CAS / AAR / CSAR…), "Missione libera" (short flow).
+- Evento tra amici differs only in what leaves the app: no "Pubblica" on the division page (share the event file and the downloads); documents titled "Mission pack" instead of "Masterplan", without the official division parts (division contacts / forum / Discord, official NOTAM numbering, "IVAO Italy Special Operations" as organiser), with a notice "Unofficial community event – not organised by IVAO Italy"; area booking = the same 48 h reminder e-mail as the missione libera; ATC positions: friends as controllers or none (no official positions); IVAO R&R notice (interceptions, consent) in the briefing.
+- Open points: may unofficial events use the IVAO / SO branding? Should "ufficiale" be reserved to the staff (staff profile check) or just a choice?
+
 ## Proposal: "missione libera" (not an event) – staff 21 Nov evening, refines the three kinds of use
 - First screen: "È un evento della divisione?" Yes -> today's flow (phases 1-5). No -> a separate short flow (4 steps), reusing areas, CAS geometry, nav database, FPL:
   1. Cosa voglio volare: training AND light operational missions (staff: both), e.g. CAS, low-level nav, IFR nav, AAR (tanker flying the track or receiver), AEW orbit, intercept, SAR, firefighting, strike with a fictional target.
