@@ -1,6 +1,9 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Simpler generation** (staff 21 Nov, proposal – waiting for the staff's OK):
+  - Step "Punti di navigazione (sectorfile)" removed: it dates from before the built-in navigation database; IFR and low-level routes now use data/navdb.json (fixes, VOR / NDB, VRP, military points) and, for low level, the AT areas; the import of another sectorfile / API stays only under "Avanzate" in Export (or is removed – ask).
+  - Step "Nome e teatro" becomes "Teatro": the event name is generated automatically (as today) and no longer asked in the wizard; it can be changed from the event header / Export ("Nome evento" + 🎲). In the future single-user mode it is never asked (default "TRAINING MISSION <date>").
 - [ ] Rename the layer switch "Punti FRA pieni" -> "Punti di interesse FRA" (staff 21 Nov; also the panel note and the legend text that quote it).
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
