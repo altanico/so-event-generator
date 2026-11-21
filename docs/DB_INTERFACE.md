@@ -233,3 +233,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 ## v1.21 additions
 
 * `S.bases = { <ICAO>: { side: 'BLUE' | 'RED' | 'BOTH', roles: ['ALL'] | [group keys], rroles: [...] } }`, `S.baseOrd` (order, first BLUE = main base), `S.basesSet` (chosen by the staff: kept when generating). Group keys: FTR, ATK, CAS, TKR, AEW, TRN, HEL, ISR, NAVM (military) and SAR, AIB, HUM, IFR (civil purposes, the only ones allowed on CIV airfields). `S.blueBases` is derived (BLUE / BOTH). `S.redBases` stays the list of RED-held airfields of the scenario (no players).
+
+## v1.22 additions
+
+* `S.fpl = { icao: false, man: { <flight id>: { cs, f7, f8, f9, f10, f13, f15, f16, f18, pts } } }` – suggested flight plans: `icao` = "OAT ICAO Format" (off = Italian format, RMK/OAT in field 18); `man` = the staff's manual edits per flight (a field present overrides the suggestion; `pts` = route points dragged / inserted on the map `{ id, name, pos, k, x, role, aw }`); edits follow the callsign when flights are regenerated. `S.fplSel` = open card, `S.navOn` = map layer "Navigazione".
+* Public payload (with the briefing): `scenario.fplTxt = [{ cs, txt }]` (ICAO text of each plan, no names) and `scenario.fplFmt` ('IT' | 'ICAO').
+* Navigation data: `data/navdb.json` built by `tools/navdb_build.py` from `data/nav.json` (sector file VOR / NDB / fixes, FRA flag), `data/vrp.json` (AIP ENR 6.3.1), `data/mil_fix.json` (MIL.fix, unpublished military procedure points), `data/mil_vfr.json` (military aerodrome gates, .vfi) and `data/awy.json` (lower airways). Point kinds: V, N, F, A, R, M, G (see the tool).

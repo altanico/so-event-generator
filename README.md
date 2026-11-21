@@ -69,3 +69,7 @@ Version 0.8. Open work and assumptions to verify: [`TODO.md`](TODO.md).
 ## Terrain data
 
 Relief, elevations and run-in headings use the Copernicus DEM GLO-90 (© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA), resampled to ~250 m tiles in `data/dem` by the GitHub Actions workflow `dem.yml` (`tools/dem_build.py`).
+
+## Navigation data
+
+Flight plans and the map layer "Navigazione" use `data/navdb.json` (`tools/navdb_build.py`), built from the IVAO Italy sector files (AIRAC 2612: VOR / NDB / fixes with the FRA flag, lower airways, military procedure points and gates – the last two unpublished) and the AIP Italia ENR 6.3.1 list of VFR reporting points. To update for a new AIRAC: replace the files in `data/nav_src`, run `tools/nav_build.py`, `vrp_build.py`, `mil_build.py`, `vfi_build.py`, `awy_build.py`, then `navdb_build.py`.

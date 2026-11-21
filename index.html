@@ -177,7 +177,8 @@ details summary{cursor:pointer;margin:6px 0}
     <button data-tab="aib" id="tabaib" hidden>AIB</button>
     <button data-tab="roster">2 · Partecipanti</button>
     <button data-tab="tailor">3 · Adattamento</button>
-    <button data-tab="export">4 · Export</button>
+    <button data-tab="fpl">4 · Piani di volo</button>
+    <button data-tab="export">5 · Export</button>
   </nav>
 </header>
 <main>
@@ -1313,7 +1314,7 @@ const MPSEC = [ // fixed template structure; each item can be switched off (empt
     ['map', 'Mappa', () => true], ['acm', 'Misure di controllo dello spazio aereo', () => true], ['routes', 'Rotte di navigazione', () => REL().routes], ['threats', 'Aree di minaccia', () => REL().threats]]],
   ['Timeline', [['tl', 'Timeline', () => true]]],
   ['Roles', [['flights', 'Flight e task', () => true], ['airframes', 'Ruoli e velivoli ammessi', () => true], ['c2', 'Postazioni ATC / C2', () => true]]],
-  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Task allocation', () => true], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['sar', 'SAR civile – procedura, nominativi e piano di volo', () => REL().sar], ['aib', 'AIB – incendi, DOS, fonti idriche e procedura', () => REL().aib], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
+  ['Briefing', [['btext', 'Testo del briefing', () => true], ['serials', 'Task allocation', () => true], ['fpl', 'Piani di volo suggeriti', () => !!S.t], ['cas', 'CAS – JTAC, CP/IP e check-in', () => REL().cas], ['pr', 'CSAR / MEDEVAC – RV, SARDOT e frequenze', () => REL().pr], ['sar', 'SAR civile – procedura, nominativi e piano di volo', () => REL().sar], ['aib', 'AIB – incendi, DOS, fonti idriche e procedura', () => REL().aib], ['rules', 'ROE / regole', () => true], ['spins', 'SPINS', () => true], ['words', 'Code words', () => true]]],
   ['Resources', [['resources', 'Risorse e link', () => true]]],
   ['Contact', [['contact', 'Contatti', () => true]]],
 ];
@@ -1796,6 +1797,7 @@ function genCAS() {
     jtacs.push(J);
   }
   let m = 0; jtacs.forEach(J => J.tasks.forEach(T => { T.missionNo = String(1010 + 10 * m); T.codes = [`15${(m % 8) + 1}1`, `15${(m % 8) + 1}2`]; m++; }));
+  jtacs.forEach(casSnapPub); // IP / CP on a published point when one is close (staff 21 Nov)
   S.cas = { jtacs, made: Date.now() }; casDeconfAll();
   return S.cas;
 }
@@ -3006,7 +3008,7 @@ function initMap() {
   MAP.createPane('land'); MAP.getPane('land').style.zIndex = 350;
   MAP.createPane('bulls'); MAP.getPane('bulls').style.zIndex = 450; // bullseyes above the areas (overlay pane 400) so they can be clicked
   MAP.attributionControl.addAttribution('Map data: amCharts geodata / Natural Earth · relief: Copernicus DEM GLO-90');
-  MAP.on('moveend', () => drawRelief(MAP));
+  MAP.on('moveend', () => { drawRelief(MAP); if (S && S.navOn) drawNav(); });
   if (LAND) drawLandLayer();
   LAYERS = L.layerGroup().addTo(MAP);
   MAP.on('click', e => onMapClick([+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5)]));
@@ -3097,6 +3099,7 @@ function drawMap(fit) {
     if (bd.own) add(L.polyline(bd.ext, { color: '#7f1d1d', weight: 1.5, dashArray: '4 8', opacity: .6, interactive: false })); drawBorderEdit(add);
     add(L.marker(bd.blueLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#1d4ed8;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">BLUE · ${esc(S.factions.blue)}</div>` }) }));
     add(L.marker(bd.redLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#b91c1c;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">RED · ${esc(S.factions.red)}</div>` }) })); } }
+  if (TAB === 'fpl' && S.t) drawFplRoute(add); drawNav();
   // bases
   S.blueBases.forEach(i => { const p = ap(i); if (p) add(L.marker(p, { icon: icon('#2563eb', '', i, 'square', 12) })).bindTooltip(AIRPORTS[i][0]); });
   RB().forEach(i => { const p = ap(i); if (p) add(L.marker(p, { icon: icon('#dc2626', '', i, 'square', 12) })).bindTooltip(AIRPORTS[i][0] + ' (RED-held)'); });
@@ -3213,6 +3216,7 @@ function renderMapTools() {
     opts += '<optgroup label="Aggiungi obiettivo BLUE">' + Object.entries(OBJT).map(([k, v]) => `<option value="obj:${k}">${esc(v.label)}</option>`).join('') + '</optgroup>';
   }
   el.innerHTML = `<select id="addmode" style="width:280px">${opts}</select><select id="mapstyle" title="Sfondo della mappa (vale anche per le mappe di PDF e slide)" style="width:150px">${MSTYLES.map(([k, l]) => `<option value="${k}" ${mapStyle() === k ? 'selected' : ''} ${k !== 'clean' && k !== 'dark' && !DEM.on ? 'disabled' : ''}>${l}</option>`).join('')}</select><span class="muted" style="font-size:11px">Trascina i marker per spostarli · clic per modificarli</span>`;
+  el.insertAdjacentHTML('beforeend', `<label class="chip" title="VOR / NDB, fix (FRA), VRP, punti e gate militari, aerovie basse – compaiono zoomando" style="margin-left:6px"><input type="checkbox" id="navon" ${S && S.navOn ? 'checked' : ''}> Navigazione</label>`);
   $('#mapstyle').onchange = e => { S.mapStyle = e.target.value; save(); applyMapStyle(); };
   $('#addmode').value = ADDMODE;
   $('#addmode').onchange = e => ADDMODE = e.target.value;
@@ -3634,12 +3638,12 @@ function renderTailor() {
   <h2>SPINS</h2><textarea data-list="spins">${esc(t.spins.join('\n'))}</textarea>
   <h2>Code words</h2><textarea data-list="codewords">${esc(t.codewords.map(c => c.join(' = ')).join('\n'))}</textarea>
   <h2>Timeline</h2><textarea data-list="timeline">${esc(t.timeline.map(c => c.join(' = ')).join('\n'))}</textarea>
-  <div class="row" style="margin-top:10px"><button class="b primary" id="goexp">Vai all'export →</button></div>`;
+  <div class="row" style="margin-top:10px"><button class="b primary" data-tab="fpl">Avanti: Piani di volo →</button><button class="b" id="goexp">Vai all'export →</button></div>`;
   return h;
 }
 function renderExport() {
   const saved = lsGet('ivao-so-saved', []); const mp = mpGet();
-  return `<h2>Fase 4 · Export</h2>
+  return `<h2>Fase 5 · Export</h2>
   <div class="card"><b>PowerPoint</b>
   <p class="muted" style="margin:4px 0">Il deck generico serve per annunciare l'evento; il briefing richiede la fase 3.</p>
   <div class="row"><button class="b primary" id="pptgen" ${GEN() ? '' : 'disabled'}>Deck scenario generico</button><button class="b primary" id="pptbrief" ${S.t ? '' : 'disabled'}>Deck briefing missione</button></div>
@@ -3649,6 +3653,7 @@ function renderExport() {
   <p class="muted" style="margin:4px 0;font-size:12.5px">Rev. 0 = masterplan pubblicato prima delle adesioni. Quando il tabellone dei piloti è pronto: fase 3 (adattamento) → nuova revisione. I documenti pubblici non riportano mai nomi o VID.</p>
   ${(S.revs || []).length ? `<table><tr><th>Rev.</th><th>Data</th><th>Descrizione</th></tr>${S.revs.map(r => `<tr><td><b>${r.rev}</b></td><td>${esc(r.date)}</td><td>${esc(r.note)}</td></tr>`).join('')}</table>` : '<p class="muted" style="margin:4px 0">Nessuna revisione emessa: i documenti escono come "Draft".</p>'}
   <div class="row" style="margin-top:6px"><div><label>Nota della prossima revisione (facoltativa)</label><input id="revnote" placeholder="${(S.revs || []).length ? (S.t ? 'Adattata al tabellone piloti' : 'Aggiornamento scenario') : 'Prima emissione – prima delle adesioni'}"></div><button class="b primary shrink" id="issuerev">Emetti Rev. ${(S.revs || []).length}</button></div></div>
+  ${S.t ? `<div class="card"><b>Piani di volo suggeriti</b><p class="muted" style="margin:4px 0">Un piano ICAO per ogni flight (modificabili nella linguetta 4 · Piani di volo). Escono anche nel deck briefing, nel masterplan (sezione "Piani di volo suggeriti") e nella pagina pubblica con il briefing.</p><div class="row"><button class="b shrink" id="fpldl">Scarica i piani di volo (testo)</button><button class="b shrink" data-tab="fpl">Apri i piani di volo</button></div></div>` : ''}
   <div class="card"><b>Masterplan PDF</b> <span class="muted">– impaginato come il template IVAO SO</span>
   <div class="row"><div><label>Divisione</label><input data-mp="division" value="${esc(mp.division)}"></div><div><label>Email contatto</label><input data-mp="email" value="${esc(mp.email)}"></div></div>
   <div class="row"><div><label>Forum</label><input data-mp="forum" value="${esc(mp.forum)}"></div><div><label>Discord</label><input data-mp="discord" value="${esc(mp.discord)}"></div></div>
@@ -3684,9 +3689,237 @@ function renderExport() {
     <div class="row" style="flex-wrap:wrap">${!casDone().ok ? `<span class="muted" style="font-size:12px">Disponibile a scenario completato: ${esc(casDone().why)}.</span>` : S.cas.jtacs.map(J => `<button class="b shrink" data-jpack="${J.id}">${esc(J.cs)}</button>`).join('') + '<button class="b primary shrink" data-jpack="ALL">Tutti i JTAC</button>'}</div></div>` : ''}
   <div class="card"><b>Salvare e riaprire l'evento</b><p class="muted" style="margin:4px 0">Usa <b>📁 Eventi salvati</b> in alto: salva, riapri, duplica, esporta o importa un evento.</p><button class="b" id="evbtn2">📁 Apri eventi salvati</button></div>`;
 }
+/* =====================================================================
+   FLIGHT PLANS (v1.22) – suggested ICAO flight plan for every flight
+   Rules (IVAO Italy SO, staff 21 Nov): OAT flights DCT between any points (no airways); GAT IFR on airways at FL195 and below,
+   DCT between FRA points above; VFR OAT up to FL285, VFR GAT up to FL195; OAT work area = AIP identifier in field 15 + OPAREA/ in field 18;
+   GAT special activity = STAYn/hhmm + STAYINFOn/; STS/STATE always on military flights, MARSA for formations / missions sharing an area;
+   no SID / STAR in Italian flight plans. Italian OAT format (default): RMK/OAT or RMK/OAT GAT; "OAT ICAO Format": OAT / GAT in field 15.
+   The plan is a starting point: every field can be edited, a manual edit is kept, "Ripristina suggerito" goes back.
+   ===================================================================== */
+let NAV = null, NAVG = null, NAVL = null; // navigation database (data/navdb.json), airway graph, map layer
+async function navInit() { try { const r = await fetch('data/navdb.json', { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json();
+  const pts = j.pts.map(([id, la, lo, k, x]) => ({ id, pos: [la, lo], k, x: x || '' })), by = {};
+  pts.forEach(p => (by[p.id] = by[p.id] || []).push(p));
+  NAV = { pts, by, awy: j.awy || {}, manual: j.manual || [], airac: j.airac || '', src: j.src || '' }; NAVG = null; } catch (e) { } }
+const NAVK = { V: 'VOR / TACAN', N: 'NDB', F: 'fix', A: 'fix', R: 'VRP (AIP)', M: 'military procedure point (unpublished)', G: 'military gate (unpublished)' };
+const navPub = p => 'VNFAR'.includes(p.k) && !(p.k === 'F' && p.x[0] === 'H'); // published in the AIP
+const navFra = p => p.k === 'F' && p.x.includes('*');
+const navName = p => p.k === 'G' ? p.x.split('|')[1] : p.k === 'R' ? `${p.id} ${p.x}` : p.id;
+function navNear(pos, maxNm, filt) { if (!NAV || !pos) return null; let b = null, bd = maxNm * NMK; for (const p of NAV.pts) { if (filt && !filt(p)) continue; const d = dist(pos, p.pos); if (d < bd) { bd = d; b = p; } } return b; }
+function navRes(id, near) { if (!NAV) return null; const c = NAV.by[String(id).toUpperCase()]; if (!c) return null; return near ? c.slice().sort((a, b) => dist(a.pos, near) - dist(b.pos, near))[0] : c[0]; }
+// published point an IP / CP corresponds to (staff 21 Nov: the name stays tactical) – "IP LANCIA (corresponds to RISOM)"
+const pubRef = pos => { const p = navNear(pos, 1, navPub); return p ? (p.k === 'R' ? `VRP ${p.id} ${p.x}` : p.k === 'V' ? `${p.id} ${/TACAN/.test(p.x) ? 'TACAN' : 'VOR'}` : p.k === 'N' ? `${p.id} NDB` : p.id) : null; };
+const pubCor = c => { const r = c && c.pos ? pubRef(c.pos) : null; return r ? ` (corresponds to ${r})` : ''; };
+// CAS points generated near a published point move onto it (within 2 NM, same reserved-area status, not for wheel IPs)
+function casSnapPub(J) { if (!NAV) return; const inRes = p => RES().some(z => z.poly && pip(p, z.poly));
+  const snap = c => { if (c.man || c.heli) return; const p = navNear(c.pos, 2, navPub); if (p && inRes(p) === inRes(c.pos)) c.pos = p.pos.slice(); };
+  J.cps.forEach(snap); if (J.hold !== 'WHEEL') J.ips.forEach(snap); }
+const icaoLL = p => { const f = (v, w, h) => { const a = Math.abs(v); let d = Math.floor(a), m = Math.round((a - d) * 60); if (m === 60) { d++; m = 0; } return String(d).padStart(w, '0') + String(m).padStart(2, '0') + h; };
+  return f(p[0], 2, p[0] >= 0 ? 'N' : 'S') + f(p[1], 3, p[1] >= 0 ? 'E' : 'W'); };
+// field 15 token of a route point: published / valid ident, otherwise coordinates (military gates and long names)
+const fplTok = p => p.id && p.k !== 'G' && /^[A-Z][A-Z0-9]{1,4}$/.test(p.id) ? p.id : icaoLL(p.pos);
+const hhmm = min => { min = Math.max(0, Math.round(min)); return String(Math.floor(min / 60) % 100).padStart(2, '0') + String(min % 60).padStart(2, '0'); };
+const fplH = () => { const m = String(S.meta.hHour || '').match(/(\d{1,2})[:.]?(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; };
+const fplClock = off => { const h = fplH(); return hhmm((((h == null ? 0 : h) + off) % 1440 + 1440) % 1440); };
+// aircraft: ICAO designator (null = ZZZZ + TYP/), wake, cruise TAS kt, cruise level (FL; negative = altitude in hundreds of ft)
+const FPLAC = { 'F-35A': ['F35', 'M', 420, 250], 'F-35B': ['F35', 'M', 420, 250], 'EF-2000 Typhoon': ['EUFI', 'M', 420, 270], 'F-16': ['F16', 'M', 420, 250], 'F/A-18': ['F18H', 'M', 420, 250],
+  'EA-18G Growler': ['F18H', 'M', 420, 250], 'F-15E': ['F15', 'M', 420, 250], 'F-15C': ['F15', 'M', 420, 270], 'F-22': ['F22', 'M', 450, 300], 'Rafale': ['RFAL', 'M', 420, 250], 'Gripen': [null, 'M', 420, 250],
+  'Tornado ECR': ['TOR', 'M', 420, 230], 'Tornado IDS': ['TOR', 'M', 420, 230], 'AMX': ['AMX', 'M', 380, 200], 'A-10': ['A10', 'M', 300, 150], 'AV-8B Harrier': [null, 'M', 400, 200], 'M-346': ['M346', 'M', 380, 200], 'MB-339': ['M339', 'L', 300, 150],
+  'HH-101': ['EH10', 'M', 130, -15], 'HH-139': ['A139', 'L', 130, -15], 'NH90': ['NH90', 'M', 130, -15], 'CH-47 Chinook': ['H47', 'M', 130, -15], 'UH-60 Black Hawk': ['H60', 'L', 130, -15], 'HH-60G Pave Hawk': ['H60', 'L', 130, -15],
+  'HH-60W Jolly Green II': ['H60', 'L', 130, -15], 'MH-60M Black Hawk (SOAR)': ['H60', 'L', 130, -15], 'MH-47G Chinook (SOAR)': ['H47', 'M', 130, -15], 'CH-53E / CH-53K': ['H53', 'M', 130, -15], 'MV-22 / CV-22 Osprey': ['V22', 'M', 240, 120],
+  'AW169': ['A169', 'L', 130, -15], 'AH-129 Mangusta': ['A129', 'L', 120, -15], 'AH-64 Apache': ['H64', 'L', 120, -15], 'A400M': ['A400', 'H', 330, 240], 'C-130J': ['C30J', 'M', 300, 200], 'C-27J': ['C27J', 'M', 280, 180], 'C-17': ['C17', 'H', 420, 300],
+  'KC-767': [null, 'H', 430, 260], 'A330 MRTT': ['A332', 'H', 430, 260], 'KC-46': [null, 'H', 430, 260], 'KC-135': ['K35R', 'H', 420, 260], 'KC-130J': ['C30J', 'M', 290, 200], 'HC-130J Combat King II': ['C30J', 'M', 290, 200], 'MC-130J Commando II': ['C30J', 'M', 290, 200],
+  'E-3 Sentry': ['E3CF', 'H', 360, 290], 'E-2 Hawkeye': ['E2', 'M', 280, 250], 'G550 CAEW': ['GLF5', 'M', 430, 300], 'P-72A': [null, 'M', 250, 170], 'P-8 Poseidon': ['P8', 'M', 400, 250], 'MQ-9 Reaper': [null, 'M', 170, 180],
+  'AW109 / H145 / H135 (light twin helo)': ['A109', 'L', 130, -15], 'AS350 / H125 (light single helo)': ['AS50', 'L', 110, -15], 'AW189 / S-92 / H175 (heavy SAR helo)': ['A189', 'M', 140, -15], 'Bell 412 / UH-1 (utility helo)': ['B412', 'L', 120, -15],
+  'S-64 Skycrane / heavy firefighting helo': ['S64', 'M', 90, -15], 'CL-415 Canadair': ['CL2T', 'M', 180, -40], 'AT-802 Fire Boss': ['AT8T', 'L', 160, -30], 'PC-12 / King Air (light utility)': ['PC12', 'L', 260, 150],
+  'Air ambulance jet (Learjet / PC-24)': ['LJ35', 'M', 430, 350], 'ATR 72 / Dash 8 (regional transport)': ['AT72', 'M', 270, 200] };
+const FPL_CIV = new Set(['AW109 / H145 / H135 (light twin helo)', 'AS350 / H125 (light single helo)', 'AW189 / S-92 / H175 (heavy SAR helo)', 'Bell 412 / UH-1 (utility helo)', 'S-64 Skycrane / heavy firefighting helo', 'CL-415 Canadair', 'AT-802 Fire Boss', 'PC-12 / King Air (light utility)', 'Air ambulance jet (Learjet / PC-24)', 'ATR 72 / Dash 8 (regional transport)']);
+const fplAc = f => { const a = resolveType(f.type) || AC.find(x => x.type === f.type) || { type: f.type, cat: 'FIGHTER' }; const d = FPLAC[a.type] || (a.cat === 'HELO' ? [null, 'L', 120, -15] : [null, 'M', 360, 200]); return { a, desig: d[0], wake: d[1], tas: d[2], lvl: d[3] }; };
+const FPL_STS = { SAR: 'SAR', MEDEVAC: 'MEDEVAC', HEMS: 'HOSP', HOSPITAL: 'HOSP', AIB: 'FFR', HUMAN: 'HUM' };
+const lvlTok = l => l < 0 ? 'A' + String(-l).padStart(3, '0') : 'F' + String(l).padStart(3, '0');
+const lvlParse = s => { const u = String(s || '').toUpperCase(), m = u.match(/FL\s?(\d{2,3})/); if (m) return +m[1]; const a = u.match(/(\d{3,5})\s?FT/); return a ? -Math.max(5, Math.round(+a[1] / 100)) : null; };
+const fplArea = z => z && /^LI-[A-Z]{1,3}\d/i.test(z.id) && z.type !== 'IND' ? z.id.replace(/^LI-/, 'LI').replace(/[^A-Z0-9/]/gi, '').toUpperCase().slice(0, 11) : null;
+// where a flight works: points, name, level, window (minutes from H), the reserved area, who shares it
+function fplWork(f) { const t = S.t, w = tl(); let pts = [], name = '', alt = '', kind = 'AREA', win = [w.on0, w.on1], shared = false;
+  const as = t.airspace.filter(a => a.flight === f.id && a.type !== 'BULLSEYE' && (a.pts || []).length), tk = f.tanker && t.airspace.find(a => a.flight === f.tanker && a.type === 'TRACK');
+  const cas = (f.casTasks || []).map(casTaskById).filter(Boolean);
+  if (as.length) { const a = as.find(x => ['TRACK', 'CAP', 'ORBIT', 'ROUTE', 'HOLD', 'IP', 'CP', 'KILLBOX'].includes(x.type)) || as[0]; pts = a.pts.slice(0, a.type === 'ROUTE' ? 12 : 4); name = a.name; alt = a.alt || ''; kind = a.type;
+    shared = a.type === 'TRACK' && t.flights.some(x => x.tanker === f.id); }
+  else if (tk) { pts = tk.pts.slice(); name = tk.name; alt = tk.alt || ''; kind = 'TRACK'; shared = true; if (f.arct != null) win = [f.arct, f.arct + (f.arWin || 5)]; }
+  else if (cas.length) { const [J, T] = cas[0], ip = casIP(J, T); pts = [holdAnchor(J, T).pos].concat(ip ? [ip.pos] : []); name = `${J.cs} (CAS)`; kind = 'CAS';
+    alt = T.block ? T.block.split('-').map(x => 'FL' + String(Math.round(+x * 10)).padStart(3, '0')).join('-') : ''; shared = J.tasks.filter(x => x.flight).length > 1 || cas.length > 1; }
+  else { const th = t.threats.filter(x => x.flight === f.id), ob = t.objectives.filter(o => o.flight === f.id);
+    if (th.length) { pts = th.slice(0, 3).map(x => x.pos); name = th.map(x => x.id).join(' / '); kind = 'TGT'; }
+    else if (ob.length) { pts = ob.slice(0, 3).map(o => o.pos); name = ob.map(o => o.id).join(' / '); kind = 'OBJ'; } }
+  if (!pts.length && S.aib) { const sc = S.aib.list.find(s => (s.flights || []).includes(f.id)); if (sc) { pts = [sc.pos]; name = `Fire ${sc.id}`; kind = 'AIB'; shared = sc.flights.length > 1; } }
+  if (!pts.length && S.sar) { const sc = S.sar.list.find(s => (s.flights || []).includes(f.id)); if (sc) { pts = [sc.datum]; name = `SAR ${sc.id}`; kind = 'SAR'; shared = sc.flights.length > 1; } }
+  if (!pts.length && S.pr) { const c = S.pr.csar.find(x => [...(x.rescue || []), ...(x.rescort || [])].includes(f.id)), m = S.pr.med.find(x => x.flight === f.id);
+    if (c) { pts = [c.rv, c.lz]; name = `CSAR ${c.id}`; kind = 'CSAR'; shared = true; } else if (m) { pts = [m.poi, m.mtf.pos]; name = `MEDEVAC ${m.id}`; kind = 'MED'; } }
+  pts = pts.filter(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]));
+  if (!pts.length) { pts = [geom().front]; name = 'Exercise area'; }
+  if (!shared) shared = t.flights.some(x => x !== f && x.pkg && x.pkg === f.pkg && x.task === 'ESCORT') || (f.task === 'ESCORT');
+  const res = RES().filter(z => z.poly && pts.some(p => pip(p, z.poly)));
+  return { pts, name, alt, kind, win, shared, area: res[0] || null, areas: res }; }
+// procedure point / gate of a military aerodrome on the way to (or from) a position (MIL.fix, .vfi; staff 21 Nov: only for THEIR aerodrome)
+function fplProc(icao, toward, vfr) { if (!NAV || !icao) return null; const b = ap(icao); if (!b) return null; let best = null, bs = 1e9;
+  for (const p of NAV.pts) { const mine = (p.k === 'M' && p.x === icao) || (p.k === 'G' && p.x.startsWith(icao + '|')); if (!mine) continue; const d = dist(b, p.pos); if (d > 30 * NMK || d < 3) continue;
+    const s = d + dist(p.pos, toward) - dist(b, toward) * 0.98 + ((p.k === 'G') === !!vfr ? 0 : 6) + (/^(IAF|HTAC|HI-TAC|TAC|VOR|ILS)/.test(p.id) && vfr ? 20 : 0); if (s < bs) { bs = s; best = p; } }
+  return best && bs < 25 ? best : null; }
+// published point to enter / leave the work area: on the way, close to the work point
+function fplEntry(from, work, vfr) { if (!NAV) return null; let best = null, bs = 1e9;
+  for (const p of NAV.pts) { if (!navPub(p) || p.k === 'A') continue; const d = dist(p.pos, work); if (d > 12 * NMK) continue; const s = dist(from, p.pos) + d * 1.3 + (vfr ? (p.k === 'R' ? 0 : 4) : (p.k === 'R' ? 8 : 0)); if (s < bs) { bs = s; best = p; } }
+  return best; }
+// lower airway graph (sector file) and shortest path
+function navGraph() { if (NAVG || !NAV) return NAVG; const g = {}, pos = {};
+  for (const [aw, segs] of Object.entries(NAV.awy)) { if ((NAV.manual || []).includes(aw)) continue; for (const sg of segs) { let prev = null;
+    for (const id of sg) { const p = navRes(id, prev ? pos[prev] : [42, 12.5]); if (!p) { prev = null; continue; } pos[id] = pos[id] || p.pos;
+      if (prev) { const d = dist(pos[prev], pos[id]); (g[prev] = g[prev] || []).push({ to: id, aw, d }); (g[id] = g[id] || []).push({ to: prev, aw, d }); } prev = id; } } }
+  return (NAVG = { g, pos }); }
+function awyPath(a, b) { const G = navGraph(); if (!G) return null; const ids = Object.keys(G.pos), near = p => ids.map(id => [id, dist(p, G.pos[id])]).filter(x => x[1] < 45 * NMK).sort((x, y) => x[1] - y[1]).slice(0, 4);
+  const st = near(a), en = new Map(near(b)); if (!st.length || !en.size) return null; const D = {}, P = {}, done = new Set(); st.forEach(([id, d]) => { D[id] = d * 1.3; P[id] = null; });
+  let best = null, bd = 1e9;
+  for (let k = 0; k < 4000; k++) { let u = null, ud = 1e9; for (const id in D) if (!done.has(id) && D[id] < ud) { ud = D[id]; u = id; } if (!u || ud >= bd) break; done.add(u);
+    if (en.has(u) && ud + en.get(u) * 1.3 < bd) { bd = ud + en.get(u) * 1.3; best = u; }
+    for (const e of G.g[u] || []) { const nd = ud + e.d; if (D[e.to] == null || nd < D[e.to]) { D[e.to] = nd; P[e.to] = { from: u, aw: e.aw }; } } }
+  if (!best) return null; const out = []; let u = best; while (u) { out.unshift({ id: u, pos: G.pos[u], aw: P[u] ? P[u].aw : null }); u = P[u] ? P[u].from : null; }
+  return out.length > 1 && bd < dist(a, b) * 1.8 + 60 ? out : null; }
+const fplPt = (p, role) => p && p.pos ? { id: p.id || '', name: p.id ? navName(p) : (p.name || icaoLL(p.pos)), pos: p.pos.slice(), k: p.k || '', x: p.x || '', role } : null;
+const fplCoord = (pos, role, name) => ({ id: '', name: name || icaoLL(pos), pos: pos.slice(), k: '', role });
+// suggested flight plan of a flight
+function fplSuggest(f) { const A = fplAc(f), W = fplWork(f), warn = [], civil = FPL_CIV.has(A.a.type), oat = !civil, base = f.base && AIRPORTS[f.base] ? f.base : null;
+  const dep = base ? ap(base) : geom().front, baseCiv = base && AIRPORTS[base][3] === 'CIV', mixed = oat && baseCiv;
+  const vfr = ['HELO', 'WATERBOMBER'].includes(A.a.cat) || f.task === 'LOWNAV' || (A.a.cat === 'LIGHT' && A.tas < 300);
+  let lvl = lvlParse(W.alt) ?? A.lvl; if (vfr && lvl > 0 && lvl > (oat ? 285 : 195) && lvlParse(W.alt) == null) lvl = oat ? 145 : 115;
+  if (!vfr && lvl < 0) lvl = 100;
+  { const L0 = lvl > 0 ? lvl : -lvl / 10, fit = W.areas.filter(z => zFit(z, [L0, L0])); W.areas = fit.length ? fit : W.areas.slice(0, 1); W.area = W.areas[0] || null; } // only the areas at the flight's level
+  const pts = [], w0 = W.pts[0], wl = W.pts[W.pts.length - 1];
+  const exit = base && AIRPORTS[base][3] !== 'CIV' ? fplProc(base, w0, vfr) : null, arr = base && AIRPORTS[base][3] !== 'CIV' ? fplProc(base, wl, vfr) : null;
+  if (exit) pts.push(fplPt(exit, 'exit'));
+  const ent = fplEntry(exit ? exit.pos : dep, w0, vfr), ex2 = fplEntry(dep, wl, vfr);
+  const gat = !oat || mixed, ifrGat = gat && !vfr;
+  // GAT IFR leg: airways at FL195 and below, FRA points (DCT) above
+  const gatLeg = (a, b, role) => { if (!ifrGat) return []; if (lvl > 195) { const fa = navNear(a, 60, navFra), fb = navNear(b, 60, navFra); return [fa, fb].filter(Boolean).filter((p, i, x) => x.findIndex(q => q.id === p.id) === i).map(p => fplPt(p, role)); }
+    const path = awyPath(a, b); if (!path) { warn.push('Nessuna aerovia trovata per il tratto GAT: rotta DCT'); return []; } return path.map(s => ({ ...fplPt(navRes(s.id, s.pos), role), aw: s.aw })); };
+  if (gat) pts.push(...gatLeg(exit ? exit.pos : dep, ent ? ent.pos : w0, oat ? 'gat' : 'en'));
+  const aids = [...new Set(W.areas.map(fplArea).filter(Boolean))], aid = aids.join(' '), wName = i => `${W.name}${W.pts.length > 1 ? ' ' + (i + 1) : ''}`;
+  const stayGat = !oat && !vfr && W.win[1] > W.win[0]; // GAT IFR special activity: entry STAYn/hhmm exit, no work points
+  pts.push(ent ? fplPt(ent, 'entry') : fplCoord(w0, 'entry', wName(0)));
+  if (!(oat && aid) && !stayGat) W.pts.forEach((p, i) => { if (i || ent) pts.push(fplCoord(p, 'work', wName(i))); });
+  const exitPt = ex2 || ent; pts.push(exitPt ? fplPt(exitPt, 'leave') : fplCoord(wl, 'leave', wName(W.pts.length - 1)));
+  if (gat) pts.push(...gatLeg(exitPt ? exitPt.pos : wl, arr ? arr.pos : dep, oat ? 'gat' : 'en'));
+  if (arr) pts.push(fplPt(arr, 'arr'));
+  // long DCT legs without airways: an intermediate published point near the middle
+  if (!ifrGat) for (let i = 0; i <= pts.length; i++) { const prev = i ? pts[i - 1].pos : dep, cur = i < pts.length ? pts[i].pos : dep, d = dist(prev, cur);
+    if (d > 150 * NMK) { const m = navNear(dest(prev, bearing(prev, cur), d / 2), 20, p => p.k === 'V' || (p.k === 'F' && p.x[0] !== 'H')); if (m) { pts.splice(i, 0, fplPt(m, 'en')); i++; } } }
+  for (let i = 1; i < pts.length; i++) if (pts[i] && pts[i - 1] && pts[i].name === pts[i - 1].name && dist(pts[i].pos, pts[i - 1].pos) < 0.5 && !(pts[i - 1].role === 'entry' && pts[i].role === 'leave')) { // same point twice in a row (airway end = area entry)
+    const keep = ['entry', 'leave', 'exit', 'arr'].includes(pts[i].role) ? i : i - 1, drop = keep === i ? i - 1 : i; if (keep === i && pts[drop].aw) pts[i].aw = pts[drop].aw; pts.splice(drop, 1); i--; }
+  const stay = Math.max(0, W.win[1] - W.win[0]);
+  const s = { f, A, W, oat, mixed, vfr, lvl, spd: A.tas, dep: base || 'ZZZZ', dest: base || 'ZZZZ', pts: pts.filter(Boolean), aid, stay, warn };
+  // alternate: nearest other BLUE base, otherwise the nearest military / joint aerodrome
+  const cand = (S.blueBases || []).filter(i => i !== base && ap(i)).concat(Object.keys(AIRPORTS).filter(i => i !== base && AIRPORTS[i][3] !== 'CIV'));
+  s.altn = base ? (cand.sort((a, b) => dist(dep, ap(a)) - dist(dep, ap(b)))[0] || '') : '';
+  if (!NAV) warn.push('Database di navigazione non ancora caricato: rotta con sole coordinate');
+  if (RES().length && !W.area && !['TRACK', 'CAP', 'ORBIT'].includes(W.kind)) warn.push(`Il punto di lavoro (${W.name}) non è dentro un'area riservata`);
+  return s; }
+const fplStore = () => (S.fpl = S.fpl || { icao: false, man: {} });
+const fplMan = f => { const m = fplStore().man; if (m[f.id]) return m[f.id]; const k = Object.keys(m).find(k => m[k].cs && m[k].cs === f.cs); if (!k) return null; m[f.id] = m[k]; delete m[k]; return m[f.id]; }; // manual edits follow the callsign when the flights are regenerated
+// complete plan: suggestion + manual edits (fields and / or route points dragged on the map)
+function fplBuild(f) { const s = fplSuggest(f), M = fplMan(f) || {}, w = s.W, icao = !!fplStore().icao, warn = s.warn.slice();
+  const pts = (M.pts || s.pts).map(p => ({ ...p })), lvl = s.lvl;
+  const dep = s.f.base && ap(s.f.base) ? ap(s.f.base) : geom().front, seq = [dep, ...pts.map(p => p.pos), dep];
+  const legs = []; let tot = 0; const mv = +casCfg().magvar || 0;
+  for (let i = 1; i < seq.length; i++) { const d = dist(seq[i - 1], seq[i]) / NMK, mn = d / s.spd * 60; tot += mn;
+    legs.push({ from: i === 1 ? s.dep : pts[i - 2].name, to: i === seq.length - 1 ? s.dest : pts[i - 1].name, trk: Math.round(((bearing(seq[i - 1], seq[i]) - mv) % 360 + 360) % 360) || 360, nm: Math.round(d), min: Math.round(mn) }); }
+  const eet = tot + (w.kind === 'ROUTE' ? 0 : s.stay);
+  // field 15 (mixed plans: points with role 'gat' are the GAT part; OAT / GAT markers only with "OAT ICAO Format")
+  const oi = pts.map((p, i) => p.role !== 'gat' ? i : -1).filter(i => i >= 0), oS = oi.length ? oi[0] : 0, oE = oi.length ? oi[oi.length - 1] : -1;
+  const tok = []; let lastAw = null, stayN = 0;
+  let noDct = false; // after an area identifier or STAYn/hhmm the exit point follows directly (IVAO examples)
+  pts.forEach((p, i) => { if (i) { if (p.aw && p.aw === lastAw) tok.pop(); else if (!noDct || p.aw) tok.push(p.aw || 'DCT'); } noDct = false;
+    tok.push(fplTok(p)); lastAw = p.aw || null;
+    if (s.mixed && icao && i === oS && oS > 0) tok.push('OAT');
+    if (p.role === 'entry') { if (s.oat && s.aid) { tok.push(s.aid); noDct = true; } else if (!s.oat && !s.vfr && s.stay) { stayN++; tok.push(`STAY${stayN}/${hhmm(s.stay)}`); noDct = true; } }
+    if (s.mixed && icao && i === oE && oE < pts.length - 1) { tok.push('GAT'); lastAw = null; } });
+  if (s.oat && icao && !(s.mixed && oS > 0)) tok.unshift('OAT');
+  const route = tok.join(' ').trim() || 'DCT';
+  const f15 = `N${String(s.spd).padStart(4, '0')}${lvlTok(lvl)} ${route}`;
+  // field 18
+  const mil = s.oat, sts = []; if (mil) sts.push('STATE'); if (FPL_STS[s.f.task]) sts.push(FPL_STS[s.f.task]); if (mil && (s.f.size > 1 || w.shared)) sts.push('MARSA');
+  const r18 = []; if (sts.length) r18.push('STS/' + [...new Set(sts)].join(' '));
+  if (!s.A.desig) r18.push('TYP/' + (s.f.size > 1 ? s.f.size : '') + String(s.A.a.type).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12));
+  const d = evDate(); if (d != null) { const dt = new Date(d); r18.push('DOF/' + String(dt.getUTCFullYear()).slice(2) + String(dt.getUTCMonth() + 1).padStart(2, '0') + String(dt.getUTCDate()).padStart(2, '0')); }
+  if (s.oat && w.areas.length) r18.push('OPAREA/' + w.areas.map(z => `${fplArea(z) || String(z.name).toUpperCase()} FROM ${fplClock(w.win[0])} TO ${fplClock(w.win[1])}`).join(' '));
+  if (stayN) r18.push(`STAYINFO1/${(w.kind === 'TRACK' ? 'AIR REFUELLING' : (ROLES[s.f.task] || s.f.task) + ' TRAINING').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()}`);
+  if (s.oat && !icao) r18.push(s.mixed ? 'RMK/OAT GAT' : 'RMK/OAT');
+  const cs = String(s.f.cs || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const sug = { f7: cs, f8: `${s.vfr ? 'V' : 'I'}${mil ? 'M' : 'G'}`, f9: `${s.f.size > 1 ? s.f.size : ''}${s.A.desig || 'ZZZZ'}/${s.A.wake}`, f10: s.vfr ? 'SY/S' : ['TANKER', 'AEW', 'TRANSPORT', 'MPA'].includes(s.A.a.cat) ? 'SDFGHIRWY/S' : 'SDFGRY/S',
+    f13: `${s.dep}${fplClock(0)}`, f15, f16: `${s.dest}${hhmm(eet)}${s.altn ? ' ' + s.altn : ''}`, f18: r18.join(' ') || '0' };
+  const out = {}; Object.keys(sug).forEach(k => { out[k] = M[k] != null && M[k] !== '' ? M[k] : sug[k]; });
+  // checks (warnings, never blocking)
+  const f8 = out.f8.toUpperCase(), lvT = (out.f15.match(/^N\d{4}([FA])(\d{3})/) || []), lvN = lvT[1] === 'F' ? +lvT[2] : 0, vf = /^[VZ]/.test(f8);
+  if (vf && lvN > (s.oat ? 285 : 195)) warn.push(`VFR ${s.oat ? 'OAT' : 'GAT'} sopra FL${s.oat ? 285 : 195}: oltre questo livello il volo deve essere IFR`);
+  if (out.f7.length > 7) warn.push(`Nominativo "${out.f7}" oltre 7 caratteri (campo 7)`);
+  if (fplH() == null) warn.push('H-hour non impostata (fase 3): EOBT provvisorio 0000');
+  if (/STAY\d/.test(out.f15) && (vf || s.oat)) warn.push('STAY solo per voli IFR GAT: non serve su piani VFR o OAT');
+  if (s.oat && icao && /RMK\/OAT/.test(out.f18)) warn.push('OAT ICAO Format attivo: RMK/OAT nel campo 18 non serve');
+  return { s, pts, legs, eet, out, sug, warn, man: !!fplMan(f), icaoTxt: `(FPL-${out.f7}-${out.f8}\n-${out.f9}-${out.f10}\n-${out.f13}\n-${out.f15}\n-${out.f16}\n-${out.f18})` }; }
+const fplAll = () => S.t ? S.t.flights.map(f => ({ f, p: fplBuild(f) })) : [];
+// plans for the documents: computed in the staff app, taken from the published payload on the public page
+const fplDocs = () => MODE !== 'staff' ? (S.fplTxt || []).map(x => ({ cs: x.cs, size: x.size || '', type: x.type || '', txt: x.txt })) : fplAll().map(({ f, p }) => ({ cs: f.cs, size: f.size, type: f.type, txt: p.icaoTxt }));
+const fplIcao = () => MODE !== 'staff' && S.fplTxt ? S.fplFmt === 'ICAO' : !!fplStore().icao;
+function fplTextFile() { const L = [`${S.meta.op} – suggested flight plans`, `${S.meta.date || 'Date TBD'} · H-hour ${S.meta.hHour || 'TBD'} · ${fplStore().icao ? 'OAT in ICAO format (field 15)' : 'Italian OAT format (field 18 RMK/OAT)'}`, `Navigation data: ${NAV ? NAV.src : 'not loaded'}. Suggested plans: check and adapt before filing.`, ''];
+  fplAll().forEach(({ f, p }) => { L.push(`${f.cs} – ${f.size} × ${f.type} – ${ROLES[f.task] || f.task}`, p.icaoTxt, 'Route: ' + [p.s.dep, ...p.pts.map(x => x.name + (x.k && !navPub(x) ? ' (unpublished)' : '')), p.s.dest].join(' – '), ''); });
+  return L.join('\n'); }
+// ---------- UI: tab "4 · Piani di volo" ----------
+const FPLF = [['f7', '7 · Nominativo'], ['f8', '8 · Regole / tipo'], ['f9', '9 · Tipo / scia'], ['f10', '10 · Equipaggiamento'], ['f13', '13 · Partenza, EOBT'], ['f16', '16 · Dest., EET, altn']];
+function renderFpl() {
+  if (!S.t) return `<h2>Fase 4 · Piani di volo</h2><div class="warn">Prima adatta lo scenario ai partecipanti (fase 3).</div>`;
+  const st = fplStore(), all = fplAll(), nW = all.reduce((a, x) => a + x.p.warn.length, 0), sel = S.fplSel;
+  let h = `<h2>Fase 4 · Piani di volo</h2>
+  <p class="muted">Un piano di volo suggerito per ogni flight: è un punto di partenza, ogni campo si può modificare e le modifiche restano anche se rigeneri lo scenario. Rotta: voli OAT in DCT tra punti qualsiasi, voli GAT IFR su aerovia fino a FL195 e DCT tra punti FRA sopra; niente SID / STAR.</p>
+  <div class="card" style="margin:6px 0;padding:8px 10px"><label style="display:flex;gap:8px;align-items:center;margin:0;font-weight:600"><input type="checkbox" id="fploat" style="width:auto" ${st.icao ? 'checked' : ''}> OAT ICAO Format</label><div class="muted" style="font-size:12px;margin-top:2px">Spento (default) = formato italiano: niente nel campo 15, RMK/OAT (o RMK/OAT GAT) nel campo 18. Acceso = OAT / GAT nel campo 15 dove inizia e finisce la parte OAT.</div></div>
+  <div class="muted" style="font-size:12px;margin:4px 0">Dati di navigazione: ${NAV ? `${esc(NAV.src)} – ${NAV.pts.length} punti, ${Object.keys(NAV.awy).length} aerovie basse` : 'in caricamento…'} · livello "Navigazione" sulla mappa dal menu in alto.</div>
+  ${nW ? `<div class="warn">${nW} avvisi in ${all.filter(x => x.p.warn.length).length} piani (non bloccano: correggi dove serve).</div>` : '<div class="ok">Nessun avviso sui piani di volo.</div>'}
+  <div class="row" style="margin:6px 0"><button class="b sm shrink" id="fpldl">Scarica tutti i piani (testo)</button><button class="b sm shrink" id="fplresetall">Ripristina tutti i suggeriti</button></div>`;
+  all.forEach(({ f, p }) => { const open = sel === f.id;
+    h += `<div class="card" style="margin-top:8px"><div data-fplsel="${f.id}" style="display:flex;gap:8px;align-items:baseline;cursor:pointer"><b class="blue">${esc(f.cs)}</b><span>${f.size} × ${esc(f.type)} · ${esc(f.base || '-')} → ${esc(p.s.W.name)}</span>
+      <span class="muted" style="flex:1;text-align:right;font-size:12px">${esc(p.out.f8)} · ${p.s.oat ? (p.s.mixed ? 'OAT / GAT' : 'OAT') : 'GAT'}${p.man ? ' · <b>modificato</b>' : ''}${p.warn.length ? ` · <span class="amber">⚠ ${p.warn.length}</span>` : ''} ${open ? '▾' : '▸'}</span></div>`;
+    if (open) { h += `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 8px;margin-top:6px">${FPLF.map(([k, l]) => `<div><label style="white-space:nowrap">${l}</label><input data-fpl="${f.id}:${k}" value="${esc(p.out[k])}" style="font-family:monospace"></div>`).join('')}</div>
+      <label>15 · Velocità, livello e rotta</label><textarea data-fpl="${f.id}:f15" style="min-height:54px;font-family:monospace">${esc(p.out.f15)}</textarea>
+      <label>18 · Altre informazioni</label><textarea data-fpl="${f.id}:f18" style="min-height:40px;font-family:monospace">${esc(p.out.f18)}</textarea>
+      ${p.warn.map(x => `<div class="warn" style="font-size:12px">${esc(x)}</div>`).join('')}
+      <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:12px;white-space:pre-wrap;margin:6px 0" data-fpltxt="${f.id}">${esc(p.icaoTxt)}</pre>
+      <div class="row"><button class="b sm shrink" data-fplcopy="${f.id}">Copia testo ICAO</button><button class="b sm shrink" data-fplreset="${f.id}" ${p.man ? '' : 'disabled'}>Ripristina suggerito</button><span class="muted" style="font-size:12px;flex:1">Sulla mappa: trascina un punto (si aggancia a fix / VOR / VRP / punti militari vicini), clic su una tratta per aggiungere un punto, doppio clic su un punto per toglierlo.</span></div>
+      <table style="font-size:12px;margin-top:6px"><tr><th>Da</th><th>A</th><th>Rotta °M</th><th>NM</th><th>Min</th></tr>${p.legs.map(l => `<tr><td>${esc(l.from)}</td><td>${esc(l.to)}</td><td>${String(l.trk).padStart(3, '0')}</td><td>${l.nm}</td><td>${l.min}</td></tr>`).join('')}
+      <tr><td colspan="3"><b>Totale</b> (con ${p.s.stay} min in area)</td><td>${p.legs.reduce((a, l) => a + l.nm, 0)}</td><td>${Math.round(p.eet)}</td></tr></table>
+      <p class="muted" style="font-size:11.5px;margin:4px 0">Rotta magnetica con declinazione ${casCfg().magvar}° E (impostazione CAS). Punti: ${p.pts.map(x => `${esc(x.name)}${x.k ? ' – ' + esc(NAVK[x.k]) : ' – coordinate'}`).join(' · ') || '—'}</p>`; }
+    h += '</div>'; });
+  h += `<div class="row" style="margin-top:10px"><button class="b primary" data-tab="export">Avanti: Export →</button></div>`;
+  return h; }
+function fplSet(id, k, v) { const m = fplStore().man, f = S.t && S.t.flights.find(x => x.id === id); m[id] = m[id] || {}; m[id][k] = v; if (f) m[id].cs = f.cs; save(); }
+function fplRefresh(id) { const f = S.t && S.t.flights.find(x => x.id === id); if (!f) return; const p = fplBuild(f), el = document.querySelector(`[data-fpltxt="${id}"]`); if (el) el.textContent = p.icaoTxt; }
+// route points dragged / inserted / removed on the map: the field 15 follows (a hand-written field 15 is replaced)
+function fplPts(f) { const M = fplStore().man[f.id] = fplMan(f) || {}; M.cs = f.cs; if (!M.pts) M.pts = fplSuggest(f).pts.map(p => ({ ...p })); delete M.f15; return M.pts; }
+function fplSnap(pos) { const z = MAP && MAP.getZoom ? MAP.getZoom() : 8, r = z >= 10 ? 1.5 : z >= 8 ? 3 : 6, p = navNear(pos, r, x => x.k !== 'A' && !(x.k === 'F' && x.x[0] === 'H'));
+  return p ? fplPt(p, 'en') : fplCoord(pos, 'en'); }
+function drawFplRoute(add) { const f = S.t && S.t.flights.find(x => x.id === S.fplSel); if (!f) return; const p = fplBuild(f), dep = f.base && ap(f.base) ? ap(f.base) : geom().front, line = [dep, ...p.pts.map(x => x.pos), dep];
+  const pl = add(L.polyline(line, { color: '#7c3aed', weight: 3, dashArray: '8 5' })).bindTooltip(`${f.cs} – rotta del piano di volo (clic su una tratta per aggiungere un punto)`, { sticky: true });
+  pl.on('click', e => { const ll = [+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5)]; let bi = 0, bd = 1e9; for (let i = 1; i < line.length; i++) { const d = dist(line[i - 1], ll) + dist(ll, line[i]) - dist(line[i - 1], line[i]); if (d < bd) { bd = d; bi = i - 1; } }
+    const P = fplPts(f), nw = fplSnap(ll); nw.role = (P[bi] || P[bi - 1] || {}).role === 'gat' ? 'gat' : 'en'; P.splice(bi, 0, nw); if (P[bi + 1]) delete P[bi + 1].aw; save(); renderPanel(); drawMap(); });
+  p.pts.forEach((x, i) => { const m = add(L.marker(x.pos, { draggable: true, icon: icon(x.k && navPub(x) ? '#7c3aed' : '#a855f7', String(i + 1), x.name, 'circle', 14) })).bindTooltip(`${x.name}${x.k ? ' – ' + NAVK[x.k] : ' – coordinate'} · trascina per spostarlo, doppio clic per toglierlo`);
+    m.on('dragend', e => { const ll = e.target.getLatLng(), P = fplPts(f), sn = fplSnap([+ll.lat.toFixed(5), +ll.lng.toFixed(5)]); sn.role = P[i].role; P[i] = sn; if (P[i + 1]) delete P[i + 1].aw; save(); renderPanel(); drawMap(); });
+    m.on('dblclick', () => { const P = fplPts(f); P.splice(i, 1); if (P[i]) delete P[i].aw; save(); renderPanel(); drawMap(); }); }); }
+// map layer "Navigazione": navaids, fixes (FRA marked), VRP, military points and gates, lower airways – shown by zoom
+function drawNav() { if (!MAP || typeof L === 'undefined') return; if (!NAVL) NAVL = L.layerGroup().addTo(MAP); NAVL.clearLayers(); if (!S || !S.navOn || !NAV || MODE !== 'staff') return;
+  const z = MAP.getZoom ? MAP.getZoom() : 8, bb = MAP.getBounds ? MAP.getBounds() : null, inB = p => !bb || bb.contains(p), add = l => l.addTo(NAVL);
+  if (z >= 7) { const G = navGraph(); if (G) for (const [aw, segs] of Object.entries(NAV.awy)) for (const sg of segs) { const ll = sg.map(id => G.pos[id]).filter(Boolean); if (ll.length > 1 && ll.some(inB)) add(L.polyline(ll, { color: '#64748b', weight: 1, opacity: .55, interactive: z >= 9 })).bindTooltip(aw, { sticky: true }); } }
+  const col = { V: '#0f766e', N: '#9333ea', F: '#334155', A: '#334155', R: '#15803d', M: '#b45309', G: '#b45309' }, minZ = { V: 6, N: 7, F: 9, A: 9, R: 9, M: 9, G: 9 };
+  for (const p of NAV.pts) { if (z < minZ[p.k] || (p.k === 'F' && p.x[0] === 'H') || !inB(p.pos)) continue; if (p.k === 'F' && z < 10 && !navFra(p) && p.x[0] !== 'E' && p.x[0] !== 'B') continue;
+    add(L.circleMarker(p.pos, { radius: p.k === 'V' ? 5 : 3, color: col[p.k], weight: navFra(p) ? 2 : 1, fillColor: p.k === 'V' ? '#fff' : col[p.k], fillOpacity: .9 })).bindTooltip(`${navName(p)} – ${NAVK[p.k]}${navFra(p) ? ' · FRA' : ''}${p.k === 'V' ? ' · ' + p.x : ''}${p.k === 'M' ? ' · ' + p.x : ''}`); } }
 function renderPanel() {
   const p = $('#panel'), top = p.scrollTop, wy = window.scrollY, keep = {}; p.querySelectorAll('[data-keep]').forEach(el => keep[el.dataset.keep] = el.scrollTop);
-  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, export: renderExport }[TAB] || renderScenario)() +
+  p.innerHTML = ({ scenario: renderScenario, cas: renderCas, pr: renderPR, sar: renderSAR, aib: renderAIB, roster: renderRoster, tailor: renderTailor, fpl: renderFpl, export: renderExport }[TAB] || renderScenario)() +
     `<datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist>`;
   p.scrollTop = top; p.querySelectorAll('[data-keep]').forEach(el => { if (keep[el.dataset.keep] != null) el.scrollTop = keep[el.dataset.keep]; }); if (window.scrollY !== wy) window.scrollTo(0, wy);
 }
@@ -3716,6 +3949,17 @@ function facEdit(t, end) {
   S.factions[k] = nv; if (end) FAC_ED = null; save(); clearTimeout(facEdit._t); facEdit._t = setTimeout(() => drawMap(), 120);
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+// flight plans tab (v1.22)
+document.addEventListener('click', e => { const t = e.target.closest('[data-fplsel],[data-fplcopy],[data-fplreset],#fpldl,#fplresetall'); if (!t || !S.t) return;
+  if (t.dataset.fplsel) { S.fplSel = S.fplSel === t.dataset.fplsel ? null : t.dataset.fplsel; save(); renderPanel(); drawMap(); return; }
+  if (t.dataset.fplcopy) { const f = S.t.flights.find(x => x.id === t.dataset.fplcopy); if (!f) return; const txt = fplBuild(f).icaoTxt;
+    (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Piano di volo copiato'), () => toast('Copia non disponibile: seleziona il testo e copialo')); return; }
+  if (t.dataset.fplreset) { delete fplStore().man[t.dataset.fplreset]; save(); renderPanel(); drawMap(); toast('Piano di volo suggerito ripristinato'); return; }
+  if (t.id === 'fplresetall') { fplStore().man = {}; save(); renderPanel(); drawMap(); toast('Tutti i piani suggeriti ripristinati'); return; }
+  if (t.id === 'fpldl') download(`${String(S.meta.op || 'event').replace(/[^A-Za-z0-9]+/g, '_')}_flight_plans.txt`, new Blob([fplTextFile()], { type: 'text/plain' })); });
+document.addEventListener('input', e => { const d = e.target.dataset && e.target.dataset.fpl; if (!d) return; const [id, k] = d.split(':'); fplSet(id, k, e.target.value); fplRefresh(id); });
+document.addEventListener('change', e => { if (e.target.id === 'fploat') { fplStore().icao = e.target.checked; save(); renderPanel(); return; } if (e.target.id === 'navon') { S.navOn = e.target.checked; save(); drawNav(); return; }
+  if (e.target.dataset && e.target.dataset.fpl) { renderPanel(); drawMap(); } });
 document.addEventListener('input', e => { if (e.target.id === 'fblue' || e.target.id === 'fred') facEdit(e.target); if (e.target.id === 'zfq') { ZF.q = e.target.value; zfApply(); zfMapLater(); } if (e.target.id === 'zlvlo' || e.target.id === 'zlvhi') lvInput(e.target); });
 document.addEventListener('change', e => {
   const t = e.target;
@@ -4240,12 +4484,15 @@ async function deckBrief() {
     table(s, ['Scenario', 'CSAR RV', 'SARDOT', 'Assets'], S.pr.csar.map(c => [{ text: c.id, options: { bold: true, color: K.AMBER } }, prLoc(c.rv), `${c.sardot.name}\n${prLoc(c.sardot.pos)}`, [...c.rescort, ...c.rescue].map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join('\n') || '—']), { colW: [1.1, 2.6, 3.0, 2.3], fontSize: 9 }); }
   // CAS (pilot side)
   if (REL().cas && S.cas && mpOn('cas')) { s = slideT(p, 'Close air support – JTACs & control points', 'Check in at the CP; the 9-line comes from the JTAC on frequency');
-    table(s, ['JTAC', 'Freq', 'Control points', 'IP / BP', 'Flights (mission no. · laser codes)'], casDocJtacs().map(J => [{ text: J.cs, options: { bold: true, color: K.AMBER } }, J.freq || 'TBD', J.cps.map(c => c.name).join('\n'), J.ips.map(c => c.name).join('\n'),
+    table(s, ['JTAC', 'Freq', 'Control points', 'IP / BP', 'Flights (mission no. · laser codes)'], casDocJtacs().map(J => [{ text: J.cs, options: { bold: true, color: K.AMBER } }, J.freq || 'TBD', J.cps.map(c => c.name + pubCor(c)).join('\n'), J.ips.map(c => c.name + pubCor(c)).join('\n'),
       J.tasks.filter(T => T.flight).map(T => `${(t.flights.find(f => f.id === T.flight) || {}).cs} · ${T.missionNo} · ${T.codes.join('/')}`).join('\n') || '—']), { colW: [1.3, 0.9, 1.6, 1.6, 3.6], fontSize: 9 }); }
   // Task allocation (internally: serials)
   chunk(t.serials || [], 4).forEach((rows, i) => {
     s = slideT(p, 'Task allocation' + (i ? ' (cont.)' : ''), 'Each line is one tasked activity: who, what and how it is judged');
     table(s, ['No.', 'Flights', 'Task', 'Success criteria'], rows.map(r => [{ text: r.id + '\n' + r.kind, options: { bold: true, color: K.AMBER } }, r.flights.map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join('\n'), r.title + '\n' + r.text, r.success]), { colW: [0.8, 1.4, 4.4, 2.4], fontSize: 8.5 }); });
+  if (mpOn('fpl')) chunk(fplDocs(), 2).forEach((rows, i) => { s = slideT(p, 'Suggested flight plans' + (i ? ' (cont.)' : ''), (fplIcao() ? 'OAT in ICAO format (field 15)' : 'Italian OAT format – field 18 RMK/OAT') + ' · check and adapt before filing');
+    rows.forEach((q, k) => { card(s, 0.5 + k * 4.55, 1.2, 4.4, 3.9, q.type ? `${q.cs} · ${q.size} × ${q.type}` : q.cs, null, K.BLUE);
+      s.addText(q.txt, { x: 0.65 + k * 4.55, y: 1.72, w: 4.1, h: 3.25, fontSize: 10, fontFace: 'Courier New', color: K.TEXT, valign: 'top', margin: 0, isTextBox: true, fit: 'shrink' }); }); });
   if (routesOf(t).length) chunk(routesOf(t), 5).forEach((rows, i) => { s = slideT(p, 'Navigation routes' + (i ? ' (cont.)' : ''), 'Reference points inside the reserved areas');
     table(s, ['Flight', 'Route', 'Level', 'Points (coordinates)'], rows.map(a => [(t.flights.find(f => f.id === a.flight) || {}).cs || '', a.kind === 'LOW' ? 'Low level' : 'IFR', a.alt || '', (a.names || []).map((n, k) => `${n} ${fmtLL(a.pts[k])}`).join('\n')]), { colW: [1.2, 1.0, 1.4, 5.4], fontSize: 8.5 }); });
   // Airspace control measures
@@ -4599,7 +4846,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
       para(`CAS sector ${J.id.slice(1)} · frequency ${J.freq || 'TBD'} · controller ${J.controller || 'not staffed'} · JTAC laser code ${J.laser} · AA threat ${J.threat.toLowerCase()} · holding ${J.hold === 'WHEEL' ? 'wheel' : J.hold === 'FIGURE8' ? 'figure eight' : 'racetrack'}${casNorm(J).ref === 'KEYHOLE' ? ' on the keyhole' : ''}${(J.tasks.find(T => T.above) || {}).above ? ` (blocks above the ${J.tasks.find(T => T.above).above} threat)` : ''}${J.night ? ' · night (IR)' : ''}.`);
       para(`ECHO point ${casLoc(J.echo)} · JTAC position ${casLoc(J.jtacPos)} · line 6 format: ${CAS_FMT_LBL[casCfg().fmt]} · magnetic variation ${casCfg().magvar}° E.`);
       const png = jsel.maps[J.id]; if (png) { try { const img = await pdf.embedPng(png); const w = CW, h = w * img.height / img.width; ensure(h + 8); page.drawImage(img, { x: ML, y: PH - y - h, width: w, height: h }); y += h + 8; } catch (e) { } }
-      h6('Control points and initial points'); table([{ h: 'Name', w: .22 }, { h: 'Type', w: .18 }, { h: 'Location', w: .6 }], [...J.cps.map(c => [{ t: c.name, bold: true }, 'Control point', `${casLoc(c.pos)}   ${fmtLL(c.pos)}`]), ...J.ips.map(c => [{ t: c.name, bold: true }, c.heli ? 'Battle position' : 'Initial point', `${casLoc(c.pos)}   ${fmtLL(c.pos)}`])], { size: 7.5 });
+      h6('Control points and initial points'); table([{ h: 'Name', w: .22 }, { h: 'Type', w: .18 }, { h: 'Location', w: .6 }], [...J.cps.map(c => [{ t: c.name, bold: true }, 'Control point', `${casLoc(c.pos)}   ${fmtLL(c.pos)}${pubCor(c)}`]), ...J.ips.map(c => [{ t: c.name, bold: true }, c.heli ? 'Battle position' : 'Initial point', `${casLoc(c.pos)}   ${fmtLL(c.pos)}${pubCor(c)}`])], { size: 7.5 });
       h6('Targets'); table([{ h: 'ID', w: .08 }, { h: 'Description', w: .42 }, { h: 'Location', w: .34 }, { h: 'Elevation', w: .16 }], J.targets.map(x => [{ t: x.id, bold: true }, x.desc, casLoc(x.pos), x.elev ? x.elev + ' ft' : '____ ft']), { size: 7.5 });
       h6('Friendly positions'); table([{ h: 'Unit', w: .4 }, { h: 'Location', w: .4 }, { h: 'Marked by', w: .2 }], J.friendlies.map(x => [x.desc, casLoc(x.pos), x.mark]), { size: 7.5 });
       h1(`Situation update ${J.sit}`); table([{ h: 'Item', w: .26 }, { h: 'Transmit', w: .74 }], casSitUpdate(J, t).map(([a, b]) => [{ t: a, bold: true }, b]), { size: 8 });
@@ -4752,9 +4999,11 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec('Briefing');
   if (mpOn('btext')) para(mp.briefing);
   if (mpOn('serials') && t && (t.serials || []).length) { h6('Task allocation'); table([{ h: 'No.', w: .1 }, { h: 'Flights', w: .18 }, { h: 'Task', w: .44 }, { h: 'Success criteria', w: .28 }], t.serials.map(r => [{ t: r.id, bold: true }, r.flights.map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join(', '), r.title + ' - ' + r.text, r.success]), { size: 7.5 }); }
+  if (mpOn('fpl') && t) { h6('Suggested flight plans'); para(`Starting point for each flight plan: check it and adapt it before filing. ${fplIcao() ? 'OAT in ICAO format: OAT / GAT in field 15.' : 'Italian OAT format: nothing in field 15, field 18 RMK/OAT (RMK/OAT GAT for mixed OAT / GAT plans).'} STS/STATE on military flights, MARSA for formations and missions sharing an area; OAT work areas with their AIP identifier in field 15 and OPAREA/ in field 18. No SID / STAR in Italian flight plans.`);
+    table([{ h: 'Flight', w: .16 }, { h: 'ICAO flight plan', w: .84 }], fplDocs().map(q => [{ t: q.cs, bold: true }, q.txt]), { size: 7 }); }
   if (mpOn('cas') && REL().cas && S.cas) { h6('Close air support – JTACs, control points and check-in');
     para('Contact the JTAC on its frequency at the control point. Check in with mission number, number and type of aircraft, position and block, ordnance and laser codes, playtime and abort code. The JTAC then passes situation update, game plan and the 9-line briefing; read back lines 4, 6, 8 and the restrictions.');
-    table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], casDocJtacs().map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
+    table([{ h: 'JTAC', w: .2 }, { h: 'Frequency', w: .16 }, { h: 'Control points', w: .32 }, { h: 'IP / BP', w: .32 }], casDocJtacs().map(J => [{ t: J.cs, bold: true }, J.freq || 'TBD', J.cps.map(c => `${c.name}${pubCor(c)}  ${fmtLL(c.pos)}`).join('\n'), J.ips.map(c => `${c.name}${pubCor(c)}  ${fmtLL(c.pos)}`).join('\n')]), { size: 7.5 });
     if (t && S.cas.jtacs.some(J => J.tasks.some(T => T.flight))) table([{ h: 'Flight', w: .2 }, { h: 'Mission no.', w: .14 }, { h: 'JTAC', w: .18 }, { h: 'Laser codes', w: .24 }, { h: 'Block', w: .24 }], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [{ t: (t.flights.find(f => f.id === T.flight) || {}).cs || '', bold: true }, T.missionNo, J.cs, T.codes.join(' / '), T.block ? T.block + ' (x1000 ft)' : 'low level'])), { size: 7.5 }); }
   if (mpOn('aib') && REL().aib && S.aib) { const L2 = S.aib.list.filter(sc => sc.flights.length); h6('Aerial firefighting – procedure');
     bullets(['Flight plan VFR, item 18 STS/FFR and OPAREA/ (place of operations); civil-registered aircraft fly as BAT, military aircraft as OAT. Callsigns: CL-415 "CAN" + aircraft number; civil operators the registration + "BAT".', 'Drops only in VMC and daylight, only when cleared by the DOS on TBT. No TBT contact: stay outside the operations area, ask the ATS unit about other AIB traffic, try a radio relay.', 'Report the start of operations to the ATS unit, "operations normal" every 30 minutes, and re-contact it every time you leave the area (e.g. to scoop).']);
@@ -5014,6 +5263,7 @@ function buildPayload(includeBrief) {
   if (sc.meta) { delete sc.meta.ramrod; delete sc.meta.auth; } // authentication material never goes public
   if (sc.t) { delete sc.t.auth; if (sc.t.gci) delete sc.t.gci.auth; sc.t.spins = (sc.t.spins || []).map(x => /^Authentication: REQUIRED/.test(x) ? 'Authentication: REQUIRED (authentication table and RAMROD given at the briefing).' : x); delete sc.t.cas; sc.t.warnings = []; sc.t.flights.forEach(f => f.pilots = []); sc.t.c2.forEach(c => { c.controller = /aircrew/.test(c.controller) ? 'Airborne C2' : /not staffed/.test(c.controller) ? 'Open' : 'Assigned'; }); }
   if (sc.asp) sc.asp = { source: sc.asp.source, loaded: sc.asp.loaded, zones: RES(), freqs: [], bullseyes: bulSel(), tracks: [...pubTracks('AEW'), ...pubTracks('AAR')] }; // only the reserved areas, the event bullseye and the tracks the event uses
+  if (includeBrief && S.t) { try { sc.fplTxt = fplAll().map(({ f, p }) => ({ cs: f.cs, size: f.size, type: f.type, txt: p.icaoTxt })); sc.fplFmt = fplStore().icao ? 'ICAO' : 'IT'; } catch (e) { } }
   if (!includeBrief) sc.t = null;
   mpGet(); sc.mp = JSON.parse(JSON.stringify(S.mp));
   return { v: 1, publishedAt: new Date().toISOString(), scenario: sc };
@@ -5062,9 +5312,10 @@ function renderPublic() {
     ${S.aib && REL().aib ? `<section class="pcard"><h2>Aerial firefighting</h2><p class="muted">Flight plan VFR, item 18 STS/FFR and OPAREA/. CL-415 fly as CAN + number, civil operators as registration + BAT, military aircraft as OAT. Every drop is cleared by the DOS on TBT; report the start of operations to ATS and re-contact ATS when leaving the area.</p></section>` : ''}
     ${S.sar && REL().sar ? `<section class="pcard"><h2>Search and rescue</h2><p class="muted">The RCC passes the search action plan on frequency. Callsign RESCUE INDIA LIMA / MIKE + letter (e.g. RILA), flight plan item 18 STS/SAR. The first unit on scene acts as OSC; monitor 121.500.</p></section>` : ''}
     ${S.pr && REL().pr && S.pr.csar.length ? `<section class="pcard"><h2>Personnel recovery</h2><p class="muted">Isolated crews call MAYDAY on GUARD and then listen on CSAR A. Positions are passed from the SARDOT only.</p>${tbl(['Scenario', 'CSAR RV', 'SARDOT'], S.pr.csar.map(c => [`<b>${esc(c.id)}</b>`, esc(prLoc(c.rv)), esc(c.sardot.name + '  ' + prLoc(c.sardot.pos))]))}</section>` : ''}
-    ${S.cas && REL().cas ? `<section class="pcard"><h2>Close air support</h2><p class="muted">Check in with the JTAC at the control point. Targets and the 9-line are passed on frequency.</p>${tbl(['JTAC', 'Frequency', 'Control points', 'IP / BP'], S.cas.jtacs.map(J => [`<b>${esc(J.cs)}</b>`, esc(J.freq || 'TBD'), J.cps.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>'), J.ips.map(c => esc(c.name + '  ' + fmtLL(c.pos))).join('<br>')]))}
+    ${S.cas && REL().cas ? `<section class="pcard"><h2>Close air support</h2><p class="muted">Check in with the JTAC at the control point. Targets and the 9-line are passed on frequency.</p>${tbl(['JTAC', 'Frequency', 'Control points', 'IP / BP'], S.cas.jtacs.map(J => [`<b>${esc(J.cs)}</b>`, esc(J.freq || 'TBD'), J.cps.map(c => esc(c.name + pubCor(c) + '  ' + fmtLL(c.pos))).join('<br>'), J.ips.map(c => esc(c.name + pubCor(c) + '  ' + fmtLL(c.pos))).join('<br>')]))}
       ${tbl(['Flight', 'Mission no.', 'JTAC', 'Laser codes', 'Block'], S.cas.jtacs.flatMap(J => J.tasks.filter(T => T.flight).map(T => [`<b>${esc((t.flights.find(f => f.id === T.flight) || {}).cs || '')}</b>`, esc(T.missionNo), esc(J.cs), esc(T.codes.join(' / ')), esc(T.block || 'low level')])))}</section>` : ''}
     ${(t.serials || []).length ? `<section class="pcard"><h2>Task allocation</h2>${tbl(['No.', 'Flights', 'Task', 'Success criteria'], t.serials.map(r => [`<b>${esc(r.id)}</b>`, esc(r.flights.map(id => (t.flights.find(f => f.id === id) || {}).cs).filter(Boolean).join(', ')), `<b>${esc(r.title)}</b><br>${esc(r.text)}`, esc(r.success)]))}</section>` : ''}
+    ${(S.fplTxt || []).length ? `<section class="pcard"><h2>Suggested flight plans</h2><p class="muted">Starting point for your flight plan: check it and adapt it before filing. ${S.fplFmt === 'ICAO' ? 'OAT in ICAO format (field 15).' : 'Italian OAT format: field 18 RMK/OAT.'}</p>${S.fplTxt.map(x => `<h3 style="margin:8px 0 2px">${esc(x.cs)}</h3><pre style="white-space:pre-wrap;font-size:12px;background:#f8fafc;padding:6px;border-radius:6px">${esc(x.txt)}</pre>`).join('')}</section>` : ''}
     ${routesOf(t).length ? `<section class="pcard"><h2>Navigation routes</h2>${tbl(['Flight', 'Type / level', 'Points'], routesOf(t).map(a => [`<b>${esc((t.flights.find(f => f.id === a.flight) || {}).cs || '')}</b>`, esc((a.kind === 'LOW' ? 'Low level ' : 'IFR ') + (a.alt || '')), (a.names || []).map((n, k) => esc(n + '  ' + fmtLL(a.pts[k]))).join('<br>')]))}</section>` : ''}
     ${t.threats.length ? `<section class="pcard"><h2>Threats</h2><p class="muted">Positions as BULLSEYE ${esc(S.meta.bullseye)} bearing/range (NM). Rings marked AVOID are no-go below their max altitude.</p>
       ${tbl(['ID', 'Threat', 'BULLS', 'Ring / alt', 'Response', 'Status'], t.threats.map(x => [`<b class="red">${x.id}</b>`, esc(x.name), bref(x.pos), x.r ? `${Math.round(x.r / 1.852)} NM / ${esc(x.alt)}` : esc(x.alt), esc(x.resp), `<b class="${x.status === 'AVOID' ? 'amber' : 'red'}">${x.status}</b>`]))}</section>` : ''}
@@ -5272,9 +5523,10 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
+navInit().then(() => { NAVG = null; if (MAP && S && S.navOn) drawNav(); if (TAB === 'fpl' && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 if (MODE === 'staff') evInit();
-window.APP = { ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

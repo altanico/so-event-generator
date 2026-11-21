@@ -1,0 +1,56 @@
+const ENV = require('./_env.js');
+// v1.22: suggested flight plans (tab 4), navigation database, OAT / GAT rules, outputs
+const { chromium } = require(ENV.PW); const { execSync } = require('child_process');
+(async()=>{const b=await chromium.launch({executablePath:ENV.CHROME,args:['--no-sandbox']});const ctx=await b.newContext({acceptDownloads:true,viewport:{width:1280,height:900}});const page=await ctx.newPage();const errs=[];page.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.includes('pdf-lib.min.js'))return r.fulfill({path:ENV.PDFLIB}); if(u.includes('pptxgen'))return r.fulfill({path:ENV.PPTX}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
+await page.goto(ENV.BASE+'/index.html#staff'); await page.waitForTimeout(1500); const fail=[];
+await page.waitForFunction(()=>!!APP.NAV,{timeout:15000}).catch(()=>fail.push('navdb not loaded'));
+const nav=await page.evaluate(()=>({ n:APP.NAV.pts.length, aw:Object.keys(APP.NAV.awy).length, risom:!!APP.navRes('RISOM'), gate:APP.NAV.pts.some(p=>p.k==='G'&&p.x.startsWith('LIPA|')) }));
+if(nav.n<2000||nav.aw<200||!nav.risom||!nav.gate) fail.push('navdb '+JSON.stringify(nav));
+// airway routing between two areas (GAT IFR): Venezia area to Bologna area
+const aw=await page.evaluate(()=>{ const p=APP.awyPath([45.5,12.35],[44.53,11.29]); return p?p.map(x=>x.id+(x.aw?'/'+x.aw:'')).join(' '):null; }); if(!aw||!/\//.test(aw)) fail.push('no airway path '+aw);
+// scenario: NE theatre, mixed event, roster with fighters, tankers, helos, a civil helo from a civil base
+await page.evaluate(()=>{ APP.S.custom=[]; APP.setTheatre('NE'); APP.S.resMode='auto'; APP.setEvents(['MIX']); APP.generateGeneric(); APP.S.meta.hHour='19:00Z'; APP.S.meta.date='12 DEC 2026';
+  APP.S.roster={pilots:[],controllers:[]}; APP.parseLines('1x KC-767A\n2x EF-2000\n2x AMX\n1x HH-139A\n2x F-35A\n1x AW109'); APP.tailor(); APP.TAB='fpl'; APP.renderAll(); });
+await page.click('[data-tab="fpl"]'); await page.waitForTimeout(300);
+const tabTxt=await page.textContent('#panel'); if(!/Piani di volo/.test(tabTxt)||!/OAT ICAO Format/.test(tabTxt)) fail.push('tab content');
+if(!(await page.$('[data-tab="export"]'))||!/5 · Export/.test(await page.textContent('#tabs'))) fail.push('export tab renamed');
+const r=await page.evaluate(()=>APP.fplAll().map(({f,p})=>({cs:f.cs,type:f.type,task:f.task,size:f.size,base:f.base,o:p.out,warn:p.warn,pts:p.pts.map(x=>x.name),area:p.s.aid,oat:p.s.oat,vfr:p.s.vfr})));
+if(!r.length) fail.push('no plans');
+r.forEach(x=>{ if(!/^N\d{4}[FA]\d{3} /.test(x.o.f15)) fail.push('f15 '+x.cs+' '+x.o.f15); if(!/^[A-Z0-9]{2,7}$/.test(x.o.f7)) fail.push('f7 '+x.o.f7);
+  if(x.oat){ if(!/^[IV]M$/.test(x.o.f8)) fail.push('f8 '+x.cs+' '+x.o.f8); if(!/STS\/STATE/.test(x.o.f18)) fail.push('no STS/STATE '+x.cs); if(!/RMK\/OAT/.test(x.o.f18)) fail.push('no RMK/OAT '+x.cs); if(/\bOAT\b/.test(x.o.f15)) fail.push('OAT in f15 (italian format) '+x.cs); }
+  if(x.size>1&&x.oat&&!/MARSA/.test(x.o.f18)) fail.push('no MARSA for formation '+x.cs);
+  if(/STAY/.test(x.o.f15)&&(x.oat||x.vfr)) fail.push('STAY on OAT/VFR '+x.cs);
+  if(!/DOF\/261212/.test(x.o.f18)) fail.push('DOF '+x.cs+' '+x.o.f18); if(!/1900$/.test(x.o.f13)) fail.push('EOBT '+x.o.f13); });
+const helo=r.find(x=>/HH-139/.test(x.type)); if(!helo||helo.o.f8!=='VM'||!/A\d{3} /.test(helo.o.f15)) fail.push('helo VFR '+JSON.stringify(helo&&helo.o));
+const civ=r.find(x=>/AW109/.test(x.type)); if(civ&&(civ.oat||/STATE/.test(civ.o.f18))) fail.push('civil helo as OAT '+JSON.stringify(civ.o));
+if(!r.some(x=>x.area&&new RegExp(' '+x.area.replace('/','\\/')+'( |$)').test(x.o.f15)&&new RegExp('OPAREA/'+x.area).test(x.o.f18))) fail.push('no AIP area identifier in f15 + OPAREA '+JSON.stringify(r.map(x=>[x.cs,x.area,x.o.f15,x.o.f18])));
+// ICAO OAT format
+await page.check('#fploat'); await page.waitForTimeout(200);
+const r2=await page.evaluate(()=>APP.fplAll().filter(({p})=>p.s.oat).map(({p})=>p.out)); if(r2.some(o=>!/\bOAT\b/.test(o.f15)||/RMK\/OAT/.test(o.f18))) fail.push('ICAO format '+JSON.stringify(r2[0]));
+await page.uncheck('#fploat'); await page.waitForTimeout(200);
+// open a card, edit field 18 by hand, it stays after re-render and after a re-tailor of the same flights; restore
+const fid=await page.evaluate(()=>APP.S.t.flights[0].id); await page.click(`[data-fplsel="${fid}"]`); await page.waitForTimeout(200);
+await page.fill(`[data-fpl="${fid}:f18"]`,'STS/STATE RMK/TEST EDIT'); await page.dispatchEvent(`[data-fpl="${fid}:f18"]`,'change'); await page.waitForTimeout(200);
+const ed=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id); return APP.fplBuild(f).icaoTxt; },fid); if(!/RMK\/TEST EDIT/.test(ed)) fail.push('manual edit not kept');
+if(!(await page.textContent('#panel')).includes('modificato')) fail.push('edited flag');
+const ed2=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id); f.id='NEWID'; const t=APP.fplBuild(f).icaoTxt; f.id=id; APP.fplBuild(f); return t; },fid); if(!/RMK\/TEST EDIT/.test(ed2)) fail.push('manual edit lost when the flight is regenerated (new id, same callsign)');
+// map: drag a point (route points of the open card), insert one, remove one -> field 15 follows
+const mp=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id); const P=APP.fplStore().man[id].pts=APP.fplSuggest(f).pts.map(p=>({...p})); const n0=P.length; P.splice(0,0,{id:'RISOM',name:'RISOM',pos:APP.navRes('RISOM').pos,k:'F',role:'en'}); return { n0, f15:APP.fplBuild(f).out.f15 }; },fid);
+if(!/ RISOM /.test(mp.f15+' ')) fail.push('route point added on the map not in f15 '+mp.f15);
+await page.click(`[data-fplreset="${fid}"]`); await page.waitForTimeout(200);
+const rs=await page.evaluate(id=>({ man:!!APP.fplStore().man[id] }),fid); if(rs.man) fail.push('restore');
+// text file, deck, masterplan, public payload
+const [d1]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.click('#fpldl')]); await d1.saveAs('fpl.txt'); const txt=require('fs').readFileSync('fpl.txt','utf8');
+if((txt.match(/\(FPL-/g)||[]).length!==r.length) fail.push('text file plans'); if(/[Ç-ž]/.test(txt.replace(/[–·×°]/g,''))) fail.push('non English text?');
+const [d2]=await Promise.all([page.waitForEvent('download',{timeout:90000}),page.evaluate(()=>exportMasterplan(document.createElement('button')))]); await d2.saveAs('fpl_mp.pdf');
+const mpt=execSync('pdftotext fpl_mp.pdf -').toString(); if(!/Suggested flight plans/.test(mpt)||!/\(FPL-/.test(mpt)) fail.push('masterplan section');
+const pub=await page.evaluate(()=>{ const pl=APP.buildPayload(true); return { n:(pl.scenario.fplTxt||[]).length, names:JSON.stringify(pl.scenario.fplTxt||[]).includes('Pilot') }; }); if(pub.n!==r.length) fail.push('public payload plans '+pub.n);
+// CAS IP / CP correspondence to published points
+const cor=await page.evaluate(()=>{ const p=APP.navRes('RISOM'); return { a:APP.pubRef(p.pos), b:APP.pubCor({name:'LANCIA',pos:p.pos}), c:APP.pubRef([43.0,15.5]) }; });
+if(cor.a!=='RISOM'||cor.b!==' (corresponds to RISOM)'||cor.c) fail.push('pubRef '+JSON.stringify(cor));
+await page.evaluate(id=>{APP.S.fplSel=id;APP.renderAll();},fid); await page.waitForTimeout(200); await page.screenshot({path:'fpl_tab.png',fullPage:false});
+// navigation layer toggle
+await page.check('#navon'); await page.waitForTimeout(200); if(!(await page.evaluate(()=>APP.S.navOn))) fail.push('nav layer toggle');
+console.log(JSON.stringify(r.map(x=>[x.cs,x.type,x.o.f8,x.o.f15,x.o.f18,x.warn]),null,0).slice(0,3000));
+console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();
