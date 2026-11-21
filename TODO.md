@@ -1,6 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] Rename the layer switch "Punti FRA pieni" -> "Punti di interesse FRA" (staff 21 Nov; also the panel note and the legend text that quote it).
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
