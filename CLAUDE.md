@@ -21,7 +21,8 @@ The tool must work **without a Claude account and without the Claude artifact ru
 
 - One generator, one event: an event created at any level can be saved and opened at any level; **the outputs adapt to the level of whoever opens it** (a `user` opening a staff event gets only the generic briefings; a `staff` member opening a user mission can turn it into a divisional / HQ event).
 - Mapping from the current code: "Missione libera" = `user` simple; "Evento interno" = `user` complex; "Evento ufficiale" with organiser SOG = `sog` (HQ event); "Evento ufficiale" with organiser staff = `staff` (divisional, or HQ). `S.kind` / `S.org` stay as they are; add the event level (`S.level`: user / hq / division) and gate the choices on the viewer level.
-- The viewer level comes from an **auth adapter** (one small module): GitHub Pages = no login, level `user` (a preview switch for sog / staff may be offered while the tool is on GitHub, clearly marked as preview – ask the staff before enabling it); IVAO site = IVAO login (IVAO SSO / OAuth – details to agree with the IVAO web team: staff positions of the Italian division → `staff`, SOG membership → `sog`).
+- The viewer level comes from an **auth adapter** (one small module): IVAO site = IVAO login (IVAO SSO / OAuth – details to agree with the IVAO web team: staff positions of the Italian division → `staff`, SOG membership → `sog`).
+- **While on GitHub (staff decision 22 Nov):** everything is public (public repo, free GitHub Pages, no paid plan). The normal link opens the `user` level. The `sog` and `staff` levels open from **separate links known only to the staff / SOG** (a secret key in the URL fragment, e.g. `#k=<key>`; the code holds only the SHA-256 of each key, never the key itself, so reading the public source does not reveal the links; the key is remembered in that browser's localStorage). This is not real security – the code is public and runs in the browser, anyone who edits it can reach the staff screens – it only keeps the levels out of sight until the IVAO login exists. Never put secrets, participant data or private documents in the repository.
 
 ### Event file (shared by everybody)
 
@@ -43,7 +44,7 @@ The artifact (slug `dac91c44-e1a4-4d49-8bb1-b90380d2de76`) is only the old previ
 ### Hosting on GitHub Pages (step 1)
 
 - Static files only: `index.html`, `data/`, `fonts/`, `img/`, `vendor` libraries already referenced. Terrain tiles: `dist/data/dem/*` (from `python3 tools/dem_pub.py`) must be served as `data/dem/*`.
-- The repository is **private**: GitHub Pages for a private repo needs a paid GitHub plan, otherwise the repo (or a separate public "site" repo) must be public. The owner decides.
+- The repository is made **public** (staff decision 22 Nov: no paid plan) and served with GitHub Pages. Before making it public, check the history and the data files for anything that must not be public (secrets, participant names in fixtures / saved events, files whose licence does not allow publishing, e.g. sector-file or AIP sources in `data/nav_src`, `data/aip_src`) and ask the owner about each doubtful one.
 - Branding assets: IVAO SO logo exists (`img/ivao-so-logo.png`); the IVAO Italy division logo must be supplied by the staff (`img/ivao-it-logo.png`).
 
 ### Old preview (until dropped)

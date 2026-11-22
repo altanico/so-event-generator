@@ -7,7 +7,8 @@
   - event file `.soevent.json` (versioned) import / export for everybody, localStorage autosave, old events still open;
   - privacy (staff 22 Nov): the file holds the mission only – no roster, no pilot / controller names, no VIDs; participants are added locally by each builder and stay in their browser; test that an exported file contains no name from the roster;
   - remove `window.claude` (db, user, artifact, downloads); "Pubblica" → download of the public page / JSON to commit;
-  - GitHub Pages setup (repo is private: owner decides – paid plan, public repo or a public site repo); division logo from the staff.
+  - GitHub Pages setup: repo public (staff 22 Nov), checked first for secrets / names / source files not to publish (list to the owner); normal link = level user; sog and staff = secret links (`#k=<key>`, only the SHA-256 in the code, key kept in localStorage; keys given to the staff in chat, never committed);
+  - division logo from the staff.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
