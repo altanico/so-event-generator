@@ -2,6 +2,8 @@
 
 ## Next build
 
+- [ ] **Airways off by default** (staff 22 Nov, repeated): the airway layer must be off by default everywhere (events, "Piani di volo" tab, simple mission) and switched on automatically only when the navigation has an IGAT leg (IGAT profile or a mixed route with IGAT legs), off again when no IGAT leg is left (unless the user switched it on by hand). Check why it shows on today: the v1.28 automatic layer setting (step 3) and missions saved with the old layer settings – reset `awy` to off on load when it was not chosen by the user. Test.
+
 - [ ] **Navigation legs: traffic type × flight rules** (staff 22 Nov): leg types BOAT (OAT VFR, < 2000 ft AGL, AT areas only), VOAT (OAT VFR, up to FL285), IOAT (OAT IFR), **VGAT** (GAT VFR, up to FL195 – new), **IGAT** (GAT IFR, airways up to FL195, FRA above, EUROCONTROL validation note – today's "GAT"). Profiles BOAT / VOAT / IOAT / VGAT / IGAT / MISTO (any combination in the mixed one). FPL: field 8 rules from the legs (I / V / Y / Z) + M when any leg is OAT, otherwise G; field 15 IFR / VFR and OAT / GAT change points (OAT / GAT markers with the ICAO format, RMK/OAT GAT with the Italian one). Checks: VGAT above FL195, VOAT above FL285. Old routes with "GAT" legs become IGAT. Colours on the map / table for the five types. Tests.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
