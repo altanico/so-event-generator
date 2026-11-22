@@ -26,7 +26,9 @@ const s3=await page.evaluate(()=>({ area:(APP.FREE().areas||[])[0], t:!!APP.S.t,
 if(!s3.t||!s3.area||!s3.res.length||!s3.cas) fail.push('step 3 '+JSON.stringify({...s3,txt:s3.txt.slice(0,300)}));
 if(!/Holding/.test(s3.txt)||!/Bersaglio/.test(s3.txt)) fail.push('step 3 summary');
 await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300);
-const s4=await page.textContent('#panel'); if(!/Mail di prenotazione/.test(s4)||!/it-specialops@ivao\.aero/.test(s4)||!/\(FPL-/.test(s4)||!/Kneeboard/.test(s4)) fail.push('step 4');
+const s4=await page.textContent('#panel'); if(!/\(FPL-/.test(s4)||!/Crea la rotta/.test(s4)||!/Copia il piano/.test(s4)||/Kneeboard/.test(s4)) fail.push('step 4 flight plan');
+await page.click('.b.primary[data-fstep="5"]'); await page.waitForTimeout(300);
+const s5=await page.textContent('#panel'); if(!/Mail di prenotazione/.test(s5)||!/it-specialops@ivao\.aero/.test(s5)||!/Kneeboard/.test(s5)||!/Rotta da creare/.test(s5)) fail.push('step 5 package');
 const [d]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.click('#fknee')]); await d.saveAs('free_knee.pdf');
 const kt=execSync('pdftotext free_knee.pdf -').toString(); if(!/9-line/i.test(kt)||!/Loadout/i.test(kt)||!/FPL-/.test(kt)||!/Nav log/i.test(kt)||!/Check-in/i.test(kt)) fail.push('kneeboard '+kt.slice(0,300));
 if(/\b(della|missione|carico|partenza|Nessun)\b/.test(kt.replace(/R\d+ [^\n(]*/g,''))) fail.push('Italian text in the kneeboard');
@@ -42,7 +44,7 @@ const idr=await page.evaluate(()=>({ t:!!APP.S.t, tasks:APP.S.t?APP.S.t.flights.
 if(!idr.t||!idr.tasks.includes('QRA')) fail.push('interception mission '+JSON.stringify(idr));
 // navigation without area: no booking needed
 await page.evaluate(()=>{ const F=APP.FREE(); F.mis='NAV'; F.prof='IOAT'; F.flights=[]; F.areas=null; F.route=null; F.built=0; F.step=2; APP.renderAll(); });
-await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(800); await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300);
+await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(800); await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300); await page.click('.b.primary[data-fstep="5"]'); await page.waitForTimeout(300);
 if(!/non serve prenotare/.test(await page.textContent('#panel'))) fail.push('nav without areas');
 // internal event: plain mission pack, no publish
 await page.evaluate(()=>{ APP.S.kind=''; APP.renderAll(); }); await page.click('[data-kind="internal"]'); await page.waitForTimeout(200);

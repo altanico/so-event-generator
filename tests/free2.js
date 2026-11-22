@@ -11,36 +11,43 @@ await page.evaluate(()=>{ APP.S=APP.newScenario(); APP.renderAll(); }); await pa
 const cards=await page.evaluate(()=>[...document.querySelectorAll('[data-fmis]')].map(b=>b.textContent.trim()));
 if(cards.filter(c=>/^Navigation/.test(c)).length!==1||cards.some(c=>/Low-Level|bassa quota/.test(c))) fail.push('navigation cards '+cards);
 await page.click('[data-fmis="NAV"]'); const pr=await page.evaluate(()=>[...document.querySelectorAll('[data-fprof]')].map(x=>x.dataset.fprof).join(','));
-if(pr!=='IOAT,VOAT,GAT,BOAT,MIX') fail.push('profiles '+pr);
+if(pr!=='IOAT,VOAT,IGAT,VGAT,BOAT,MIX') fail.push('profiles '+pr);
 if(!(await page.evaluate(()=>[...document.querySelectorAll('[data-fmis]')].every(b=>getComputedStyle(b).whiteSpace!=='nowrap')))) fail.push('mission cards do not wrap');
 await page.click('[data-fprof="MIX"]'); await page.click('.b.primary[data-fstep="2"]'); await page.waitForTimeout(200);
 // compact flight card: 2 rows, ICAO only in the aerodrome fields
 const cc=await page.evaluate(()=>{ const c=document.querySelector('.fcard'), dep=c.querySelector('[data-k="dep"]'); return { grids:c.querySelectorAll(':scope > div[style*="grid"]').length, depTag:dep.tagName, depVal:dep.value, depW:dep.getBoundingClientRect().width, h:c.getBoundingClientRect().height }; });
 if(cc.grids!==2||cc.depTag!=='INPUT'||cc.depVal!=='LIPS'||cc.depW>110) fail.push('compact card '+JSON.stringify(cc));
-// step 3: route by leg
+// step 3: areas only (no route); step 4: the user builds the route (v1.31)
 await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(1200);
-const r3=await page.evaluate(()=>{ const F=APP.FREE(), p=APP.fplAll()[0].p; return { areas:F.areas, n:F.route.pts.length, types:F.route.legs.map(l=>l.type), f8:p.out.f8, f15:p.out.f15, f18:p.out.f18, navOn:APP.S.navOn, rows:document.querySelectorAll('[data-rl][data-k="type"]').length, legs:p.legs.length }; });
-if(!r3.areas.length||!r3.types.includes('BOAT')||!r3.types.includes('IOAT')) fail.push('MIX route '+JSON.stringify(r3));
+const r2=await page.evaluate(()=>({ areas:APP.FREE().areas, at:APP.RES().some(z=>/^AT\s/i.test(z.name)||/^LI-AT/.test(z.id)), rows:document.querySelectorAll('[data-rl]').length }));
+if(!r2.areas.length||!r2.at) fail.push('MIX: AT area '+JSON.stringify(r2)); if(r2.rows) fail.push('route table in step 3');
+await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(600);
+const e0=await page.evaluate(()=>{ const p=APP.fplAll()[0].p; return { no:p.noRoute, f15:p.out.f15, cta:!!document.getElementById('fplcta'), navOn:APP.S.navOn }; });
+if(!e0.no||!/ DCT$/.test(e0.f15)||!e0.cta) fail.push('empty route at first '+JSON.stringify(e0)); if(!e0.navOn) fail.push('navigation points not switched on in step 4');
+const r3=await page.evaluate(()=>{ const f=APP.S.t.flights[0], z=APP.RES().find(z=>/^AT\s/i.test(z.name)||/^LI-AT/.test(z.id)), c=z.poly.reduce((a,p)=>[a[0]+p[0]/z.poly.length,a[1]+p[1]/z.poly.length],[0,0]);
+  const pin=(p,q)=>{let i=false;for(let a=0,b=q.length-1;a<q.length;b=a++){const xi=q[a][0],yi=q[a][1],xj=q[b][0],yj=q[b][1];if(((yi>p[1])!==(yj>p[1]))&&(p[0]<(xj-xi)*(p[1]-yi)/(yj-yi)+xi))i=!i;}return i;};
+  const v=z.poly.map(p=>[p[0]+(c[0]-p[0])*0.3,p[1]+(c[1]-p[1])*0.3]).filter(p=>pin(p,z.poly)).slice(0,2);
+  const R=APP.routeOf(f); R.pts=[c,...v].map(p=>({id:'',name:'P',pos:p,k:''})); R.legs=[{type:'IOAT',lvl:150,agl:1000},{type:'BOAT',lvl:95,agl:1000},{type:'BOAT',lvl:95,agl:1000},{type:'IOAT',lvl:150,agl:1000}];
+  APP.routeSync(); APP.renderAll(); const p=APP.fplAll()[0].p; return { n:R.pts.length, f8:p.out.f8, f15:p.out.f15, f18:p.out.f18, rows:document.querySelectorAll('[data-rl][data-k="type"]').length, legs:p.legs.length }; });
 if(r3.f8!=='YM'||!/ VFR /.test(r3.f15)||!/ IFR$/.test(r3.f15)||!/\/N\d{4}A\d{3}/.test(r3.f15)||!/OPAREA\//.test(r3.f18)) fail.push('MIX flight plan '+JSON.stringify([r3.f8,r3.f15,r3.f18]));
-if(!r3.navOn) fail.push('navigation points not switched on in step 3');
 if(r3.rows!==r3.legs) fail.push('legs table');
-// BOAT above 2000 ft AGL -> warning; GAT leg -> EUROCONTROL note
-const w=await page.evaluate(()=>{ const R=APP.FREE().route, i=R.legs.findIndex(l=>l.type==='BOAT'); R.legs[i].agl=2500; R.legs[0].type='GAT'; const p=APP.fplAll()[0].p; const out={warn:p.warn.join(' | '), f8:p.out.f8}; R.legs[i].agl=1000; R.legs[0].type='IOAT'; return out; });
+// BOAT above 2000 ft AGL -> warning; IGAT leg -> EUROCONTROL note
+const w=await page.evaluate(()=>{ const R=APP.routeOf(APP.S.t.flights[0]), i=R.legs.findIndex(l=>l.type==='BOAT'); R.legs[i].agl=2500; R.legs[0].type='IGAT'; const p=APP.fplAll()[0].p; const out={warn:p.warn.join(' | '), f8:p.out.f8}; R.legs[i].agl=1000; R.legs[0].type='IOAT'; return out; });
 if(!/non è BOAT/.test(w.warn)||!/EUROCONTROL/.test(w.warn)) fail.push('route checks '+w.warn);
 // insert a point by clicking the map (add mode)
-const ins=await page.evaluate(()=>{ const R=APP.FREE().route, n=R.pts.length, a=R.pts[0].pos, b2=R.pts[1].pos; document.getElementById('faddpt').click(); APP.freeMapClick([(a[0]+b2[0])/2+0.01,(a[1]+b2[1])/2]); return { before:n, after:APP.FREE().route.pts.length, man:APP.FREE().route.man }; });
-if(ins.after!==ins.before+1||!ins.man) fail.push('add point '+JSON.stringify(ins));
-// one route only: the engine route of the flight follows the step-3 route; drag a leg = new waypoint
-const one=await page.evaluate(()=>{ const F=APP.FREE(), R=F.route, n=R.pts.length; APP.routeDrop(1,[(R.pts[0].pos[0]+R.pts[1].pos[0])/2-0.05,(R.pts[0].pos[1]+R.pts[1].pos[1])/2]);
-  const eng=APP.S.t.airspace.filter(a=>a.type==='ROUTE'&&APP.S.t.flights.some(f=>f.id===a.flight)); return { n, after:R.pts.length, legs:R.legs.length, same:eng.every(a=>JSON.stringify(a.pts)===JSON.stringify(R.pts.map(p=>p.pos))), eng:eng.length }; });
+const ins=await page.evaluate(()=>{ const f=APP.S.t.flights[0], R=APP.routeOf(f), n=R.pts.length, a=R.pts[0].pos, b2=R.pts[1].pos; document.getElementById('faddpt').click(); APP.routeMapClick([(a[0]+b2[0])/2+0.01,(a[1]+b2[1])/2]); return { before:n, after:APP.routeOf(f).pts.length }; });
+if(ins.after!==ins.before+1) fail.push('add point '+JSON.stringify(ins));
+// one route only: the engine route of the flight follows the flight plan route; drag a leg = new waypoint
+const one=await page.evaluate(()=>{ const f=APP.S.t.flights[0], R=APP.routeOf(f), n=R.pts.length; APP.routeDrop(f,1,[(R.pts[0].pos[0]+R.pts[1].pos[0])/2-0.05,(R.pts[0].pos[1]+R.pts[1].pos[1])/2]); const R2=APP.routeOf(f);
+  const eng=APP.S.t.airspace.filter(a=>a.type==='ROUTE'&&a.flight===f.id); return { n, after:R2.pts.length, legs:R2.legs.length, same:eng.every(a=>JSON.stringify(a.pts.slice(1,-1))===JSON.stringify(R2.pts.map(p=>p.pos))), eng:eng.length }; });
 if(one.after!==one.n+1||one.legs!==one.after+1) fail.push('leg drag insert '+JSON.stringify(one));
-if(!one.same) fail.push('engine route differs from the step-3 route');
+if(!one.same) fail.push('engine route differs from the flight plan route');
 ins.after=one.after;
 // navigation points: no distance filter, radio aids and fixes shown
-const nc=await page.evaluate(()=>{ const b=document.querySelector('[data-mapwin="nav"]'); if(b&&!document.getElementById('navcount')) b.click(); APP.drawNav(); return (document.getElementById('navcount')||{}).textContent||''; });
+const nc=await page.evaluate(()=>{ APP.S.navL.fe=1; const b=document.querySelector('[data-mapwin="nav"]'); if(b&&!document.getElementById('navcount')) b.click(); APP.drawNav(); return (document.getElementById('navcount')||{}).textContent||''; });
 if(!(+((nc.match(/(\d+) punti visibili/)||[])[1]||0) > 500)) fail.push('navigation points '+nc);
 // several areas, search any area, free choice with warnings
-const ar=await page.evaluate(()=>{ const s=APP.freeSearch('R313'); const z=s[0]; APP.freeAreaToggle(z.id); APP.freeBuild(); return { found:s.length, ids:APP.FREE().areas, res:APP.RES().map(x=>x.id), warn:APP.freeAreaWarn(z).join(';'), route:APP.FREE().route.pts.length }; });
+const ar=await page.evaluate(()=>{ const s=APP.freeSearch('R313'); const z=s[0]; APP.freeAreaToggle(z.id); APP.freeBuild(); return { found:s.length, ids:APP.FREE().areas, res:APP.RES().map(x=>x.id), warn:APP.freeAreaWarn(z).join(';'), route:APP.routeOf(APP.S.t.flights[0]).pts.length }; });
 if(!ar.found||ar.ids.length<2||!ar.res.includes('LI-R313')||!/AT/.test(ar.warn)) fail.push('several / searched areas '+JSON.stringify(ar));
 if(ar.route!==ins.after) fail.push('the edited route was lost when regenerating');
 // HAAR only for helicopters
@@ -62,7 +69,7 @@ await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(1200);
 const zz=await page.evaluate(()=>{ const p=APP.fplAll()[0].p; return { f9:p.out.f9, f13:p.out.f13, f16:p.out.f16, f18:p.out.f18 }; });
 if(!/^ZZZZ/.test(zz.f13)||!/^LFMI/.test(zz.f16)||!/DEP\/NAVE CAVOUR 4312N01012E/.test(zz.f18)||!/EMB4\//.test(zz.f9)) fail.push('free aerodromes / aircraft in the FPL '+JSON.stringify(zz));
 // kneeboard with the route legs
-await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300);
+await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300); await page.click('.b.primary[data-fstep="5"]'); await page.waitForTimeout(300);
 const [d]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.click('#fknee')]); await d.saveAs('free2_knee.pdf');
 const kt=execSync('pdftotext free2_knee.pdf -').toString(); if(!/IOAT/.test(kt)||!/FPL-SHARK1/.test(kt)) fail.push('kneeboard route '+kt.slice(0,300));
 console.log(JSON.stringify({f15:r3.f15}));

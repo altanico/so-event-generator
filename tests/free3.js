@@ -32,7 +32,7 @@ for(const [m,sb,ty,dp,ev,task] of cases){ const t2=types.find(x=>x===ty)||types.
   if(['AIRDROP','INSERT'].includes(sb)&&!r.areas.length) fail.push(`${sb}: no PARA / helicopter area proposed`);
   if(['MEDEVAC','HEMS','HOSPITAL','HUMAN'].includes(sb)&&!/STS\//.test(r.f18||'')) fail.push(`${sb}: STS missing in the FPL ${r.f18}`); }
 // kneeboard of a new type
-await page.evaluate(()=>{ const F=APP.FREE(); F.step=4; APP.renderAll(); });
+await page.evaluate(()=>{ const F=APP.FREE(); F.step=5; APP.renderAll(); });
 const [d]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.click('#fknee')]); await d.saveAs('free3_knee.pdf');
 const kt=execSync('pdftotext free3_knee.pdf -').toString(); if(!/Inter-Hospital Transfer/i.test(kt)) fail.push('kneeboard title '+kt.slice(0,200));
 console.log(fail.length?'"err": '+fail.join(' | '):'checks ok'); console.log(errs.join('\n')||'no errors'); await b.close();})();

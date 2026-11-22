@@ -76,7 +76,11 @@ Flight plans and the map layer "Navigazione" use `data/navdb.json` (`tools/navdb
 
 ## Kinds of use
 
-A new event starts from the first screen: "Evento ufficiale della divisione" (division SO staff or an official SOG; only viewers who can edit the page), "Evento interno" (same generator, plain "Mission pack" documents, never published) and "Missione libera" (4 short steps for a mission flown alone or with other participants: flight plan, kneeboard, map and the area booking e-mail).
+A new event starts from the first screen: "Evento ufficiale della divisione" (division SO staff or an official SOG; only viewers who can edit the page), "Evento interno" (same generator, plain "Mission pack" documents, never published) and "Missione libera" (5 short steps for a mission flown alone or with other participants: flight plan, kneeboard, map and the area booking e-mail).
+
+## Flight plans (v1.31)
+
+The generator never proposes a route: every flight plan starts as departure → arrival ("DCT") and the route is built by the user on the map (drag the line, click points, search a point), one flight at a time, in the "Piano di volo" step of the simple mission or the "Piani di volo" tab of events. Each leg has a type: BOAT (OAT VFR below 2000 ft AGL, AT areas only), VOAT (OAT VFR up to FL285), IOAT (OAT IFR), VGAT (GAT VFR up to FL195), IGAT (GAT IFR: airways up to FL195, FRA above, EUROCONTROL validation). Field 8 (I / V / Y / Z + M or G) and the IFR / VFR and OAT / GAT change points of field 15 follow the legs; the other fields are proposed and can be edited. Procedure points (approach IAF / FAF, terminal fixes) are never used to snap a point. A flight without a route shows "Route to be filed by the flight" in the documents.
 
 ## Hosting and access (v1.27)
 
