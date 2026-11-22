@@ -2,7 +2,17 @@
 
 ## Next build
 
-(empty – write the next requests here)
+- [ ] **Aerodrome symbols: civil / military / joint / enemy** (staff 22 Nov, mockup "Mockup – simboli aeroporti" https://claude.ai/artifact/7enY7QWajDiD23dykiWYsb): today every base is a small blue square, easy to confuse with the blue areas and radio aids. New symbols (map of the generator and the exported maps / briefing images), by `AIRPORTS[k][3]`:
+  - CIV: open circle, dark teal `#0f766e`, dot in the centre;
+  - MIL: filled circle, anthracite `#1e293b`, white dot in the centre;
+  - JOINT: the civil symbol inside an anthracite square;
+  - enemy (RED-held) base: its type's symbol in red `#dc2626` with a dashed red ring, label "<ICAO> · RED";
+  - EXT (ship / ZZZZ / not in the list): the anchor of today;
+  - no line through the circle (it looks like a "no entry" sign);
+  - label: ICAO code in bold with the short name below, drawn above the navigation points;
+  - departure / arrival of the mission: bigger symbol on a white disc with a thin anthracite border.
+  - **Colour rule (staff 22 Nov): red is used ONLY for enemy bases** – nowhere else on the map or in the UI symbols.
+  Test.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
