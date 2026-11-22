@@ -10,7 +10,7 @@ Waiting for the data: the staff looks for the list of the Italian HEMS bases and
 - Drop the separate category "Inter-Hospital Transfer" (simple mission Medical options and the event type HOSPITAL): a hospital transfer is an HEMS mission.
 - HEMS mission: the user chooses an **HEMS base** (real, from the list); then two buttons: **"Genera missione per intervento"** (flight to a scene / "target", patient to a hospital helipad) and **"Genera missione di trasporto ospedaliero"** (hospital helipad → hospital helipad).
 - Points: real HEMS bases and real hospital helipads from the list (name, position); nothing invented.
-- Meanwhile `tools/helipad_build.py` / `helipads.yml` stay as they are (they may become the loader of the staff's list); decide then whether to keep the OpenStreetMap download or drop it.
+- `helipads.yml` switched off (staff 22 Nov): manual run only, no monthly / on-push runs. `tools/helipad_build.py` / `helipads.yml` stay (they may become the loader of the staff's list); decide then whether to keep the OpenStreetMap download or drop it.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.

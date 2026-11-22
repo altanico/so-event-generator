@@ -1,11 +1,6 @@
 name: Hospital helipads (OpenStreetMap)
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '17 3 1 * *'   # monthly
-  push:
-    branches: [main]
-    paths: ['tools/helipad_build.py', '.github/workflows/helipads.yml']
+  workflow_dispatch:   # manual only – automatic runs switched off by the staff (22 Nov): OpenStreetMap download failing, waiting for the staff's list
 permissions:
   contents: write
 jobs:
