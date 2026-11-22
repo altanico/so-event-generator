@@ -2,7 +2,15 @@
 
 ## Next build
 
-(empty)
+- [ ] **Missione semplice – every mission type of the generator** (staff 22 Nov: maritime patrol, cargo, airdrop… today only in complex missions). Step 1 cards for all the event types, with the role choice inside the card when it has more than one (as the Navigazione profile):
+  - **Pattugliamento marittimo** (MAR: MPA; option anti-nave / ANTISHIP with simulated surface targets);
+  - **Trasporto / cargo** (AIRMOB: AIRLIFT, also humanitarian HUMAN as an option "aiuti umanitari");
+  - **Aviolancio** (AIRMOB: AIRDROP – drop zone in a PARA area, run-in, drop time);
+  - **Inserzione con elicotteri** (AIRMOB: INSERT – LZ);
+  - **CSAR** (CSAR + RESCORT, survivor / LZ as in the generator);
+  - **Sanitario** (MEDEVAC, HEMS, trasporto interospedaliero – choice inside the card);
+  - existing: CAS, Navigazione, Rifornimento in volo (AAR / HAAR by aircraft), AEW, Intercettazione, Strike, SAR, Antincendio.
+  Each new type: suitable aircraft in the list (free type still allowed), areas proposed for it (PARA areas for airdrop / insertion, sea areas / corridors for maritime patrol, firing areas for anti-ship), step 3 summary, serials, kneeboard section, FPL (STS/ where it applies: SAR, MEDEVAC, HOSP, HUM, FFR), booking e-mail; simulated threats only when ticked. Cards grouped so the grid stays readable (e.g. "Combattimento", "Trasporto e soccorso", "Navigazione e addestramento"). Test per new type (build + FPL + kneeboard).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
