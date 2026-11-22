@@ -10,6 +10,7 @@ Waiting for the data: the staff looks for the list of the Italian HEMS bases and
 - Drop the separate category "Inter-Hospital Transfer" (simple mission Medical options and the event type HOSPITAL): a hospital transfer is an HEMS mission.
 - HEMS mission: the user chooses an **HEMS base** (real, from the list); then two buttons: **"Genera missione per intervento"** (flight to a scene / "target", patient to a hospital helipad) and **"Genera missione di trasporto ospedaliero"** (hospital helipad → hospital helipad).
 - Points: real HEMS bases and real hospital helipads from the list (name, position); nothing invented.
+- Also (staff 22 Nov) **transfer to / from an airport**: a patient or organs to be taken from a hospital helipad to an airport (handed over to an aircraft, e.g. an organ flight or an air ambulance) or collected at an airport and flown to a hospital helipad. Third option next to the two buttons (e.g. "Genera trasporto da / verso aeroporto"); airports from the generator's list (civil and military), real hospital helipads from the staff's list; the briefing says what is carried (patient, organs, blood…), where to hand over (apron / helipad of the airport) and the time limit.
 - `helipads.yml` switched off (staff 22 Nov): manual run only, no monthly / on-push runs. `tools/helipad_build.py` / `helipads.yml` stay (they may become the loader of the staff's list); decide then whether to keep the OpenStreetMap download or drop it.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
