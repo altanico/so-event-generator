@@ -30,7 +30,7 @@ The tool must work **without a Claude account and without the Claude artifact ru
 - The file contains the scenario, not the outputs (outputs are generated when opened, at the viewer level).
 - **Privacy (staff 22 Nov): the file never contains participants.** It holds only the mission itself: theatre, events, areas, bases, flights by callsign / type / task / loadout, scenario, timings, C2 positions and frequencies. Stripped on export: `S.roster` (pilots and controllers), the pilots of each flight (`f.pilots`), the controllers assigned to C2 rows, JTACs, GCI and any other person name or IVAO VID, the author ids of the saved-events list. Participants are added **locally** by each person who builds the mission (roster import / typing in "Partecipanti"), kept only in that browser (localStorage), never uploaded or shared. Opening a file = mission without participants; the generator keeps working (flights without names, "— not staffed —" controllers).
 - Participant names never go into public outputs either (public page, NOTAM, public briefings) – rule unchanged.
-- Old events (saved before the move, without `format`) must still open.
+- Old events saved before the move (artifact database, localStorage without `format`) need not open: the staff will redo them (staff 22 Nov).
 
 ### What has to go (Claude artifact runtime)
 
@@ -46,7 +46,7 @@ The artifact (slug `dac91c44-e1a4-4d49-8bb1-b90380d2de76`) is only the old previ
 - Static files only: `index.html`, `data/`, `fonts/`, `img/`, `vendor` libraries already referenced. Terrain tiles: `dist/data/dem/*` (from `python3 tools/dem_pub.py`) must be served as `data/dem/*`.
 - **Data sources (staff 22 Nov):** the public repository keeps only the processed JSON in `data/` (navdb, atc, acc, vrp, mil_fix, mil_vfr, awy, aip_zones, low-level / AAR / OAT corridors, SUP, configs). The raw sources – IVAO Italy sector-file files (`data/nav_src`: itfix, itvor, itndb, itawlow, itfreq, MIL.fix, FRA.artcc, .vfi) and the AIP / SUP PDFs (`data/aip_src/*.pdf`) – are removed from the repository **and from its history** before it is made public; they stay with the staff, outside git. The `tools/*_build.py` scripts stay and still rebuild the JSON when a source file is given. On the IVAO site the navigation / ATC data will come directly from the Aurora sector file of the division: keep the data loading behind one function (`navInit()` and the JSON fetches) so the source can be swapped.
 - The repository is made **public** (staff decision 22 Nov: no paid plan) and served with GitHub Pages. Before making it public, check the history and the data files for anything that must not be public (secrets, participant names in fixtures / saved events, files whose licence does not allow publishing, e.g. sector-file or AIP sources in `data/nav_src`, `data/aip_src`) and ask the owner about each doubtful one.
-- Branding assets: IVAO SO logo exists (`img/ivao-so-logo.png`); the IVAO Italy division logo must be supplied by the staff (`img/ivao-it-logo.png`).
+- Branding (staff 22 Nov): while on GitHub the tool is **not official** – no division logo and no official division branding; the divisional branding with the IVAO Italy logo (`img/ivao-it-logo.png`) is added only when the tool moves to the IVAO site. The IVAO SO logo (`img/ivao-so-logo.png`) stays for the HQ masterplan template.
 
 ### Old preview (until dropped)
 

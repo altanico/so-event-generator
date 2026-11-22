@@ -4,12 +4,12 @@
 - [ ] **Leave the Claude artifact – GitHub Pages, access levels, event file** (staff 22 Nov, see CLAUDE.md "Target"; waiting for "fai la build"):
   - auth adapter (level user / sog / staff; GitHub Pages = user, no login), first screen by level: user → "Missione semplice" / "Missione con più partecipanti"; sog → + "Evento SO HQ"; staff → + "Evento divisionale";
   - outputs by level: user = generic briefings (mission pack, kneeboard, FPL, map, sheets, booking e-mail), no masterplan; sog = + HQ masterplan; staff = + divisional branding (Italian division logo), public page, NOTAM;
-  - event file `.soevent.json` (versioned) import / export for everybody, localStorage autosave, old events still open;
+  - event file `.soevent.json` (versioned) import / export for everybody, localStorage autosave;
   - privacy (staff 22 Nov): the file holds the mission only – no roster, no pilot / controller names, no VIDs; participants are added locally by each builder and stay in their browser; test that an exported file contains no name from the roster;
   - remove `window.claude` (db, user, artifact, downloads); "Pubblica" → download of the public page / JSON to commit;
   - GitHub Pages setup: repo public (staff 22 Nov), checked first for secrets / names / source files not to publish (list to the owner); normal link = level user; sog and staff = secret links (`#k=<key>`, only the SHA-256 in the code, key kept in localStorage; keys given to the staff in chat, never committed);
   - data: only processed JSON in the public repo; remove `data/nav_src` and `data/aip_src/*.pdf` from the files and from the git history (rewrite + force push, after the owner's OK, with a backup of the sources given to the staff); `.gitignore` for the source folders; build tools keep working with sources passed by path; data loading kept swappable for the Aurora sector file on the IVAO site;
-  - division logo from the staff.
+  - no division logo while on GitHub (tool not official, staff 22 Nov): divisional branding only on the IVAO site; old saved events need not open (they will be redone).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
