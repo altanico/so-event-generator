@@ -2,7 +2,7 @@
 
 ## Next build
 
-(empty – write the next requests here)
+- [ ] **Simple mission Maritime Patrol: P-72A at LICZ by default** (staff 22 Nov, like AIB / AAR / AEW): Maritime Patrol with the option Maritime Patrol (MPA) → the first flight is `P-72A` (role MPA) at **LICZ** Sigonella, departure and arrival LICZ; sea areas sorted from LICZ. The Anti-Surface Warfare option keeps today's default (fighters). Add it to `FREE_FIRST` (keyed by the option); the user can change type and bases. Test in free5.js.
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
