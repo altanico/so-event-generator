@@ -8,7 +8,7 @@ await page.waitForFunction(()=>!!APP.NAV,{timeout:15000}).catch(()=>fail.push('n
 // new event -> first screen with 3 choices
 await page.evaluate(()=>{ APP.S=APP.newScenario?APP.newScenario():APP.S; });
 await page.evaluate(()=>{ APP.S.kind=''; APP.renderAll(); });
-const ch=await page.textContent('#panel'); if(!/Cosa vuoi preparare/.test(ch)||!/Evento ufficiale della divisione/.test(ch)||!/Evento interno/.test(ch)||!/Missione libera/.test(ch)) fail.push('first screen');
+const ch=await page.textContent('#panel'); if(!/Cosa vuoi preparare/.test(ch)||!/Evento divisionale/.test(ch)||!/Missione con più partecipanti/.test(ch)||!/Missione semplice/.test(ch)) fail.push('first screen');
 if(!(await page.evaluate(()=>document.getElementById('tabs').hidden))) fail.push('tabs visible on the first screen');
 // missione libera CAS
 await page.click('[data-kind="free"]'); await page.waitForTimeout(200);
@@ -54,7 +54,7 @@ if(!/MISSION_PACK/.test(d2.suggestedFilename())) fail.push('mission pack file na
 const mpt=execSync('pdftotext free_mp.pdf -').toString(); if(/International Virtual Aviation Organisation|Special Operations Department/.test(mpt)) fail.push('branding in the mission pack');
 if(!/Mission pack/.test(mpt)||!/Rules & Regulations/.test(mpt)||!/Loadout/.test(mpt)) fail.push('mission pack content');
 // SOG official event: organiser line, no publish
-await page.evaluate(()=>{ APP.S.kind='official'; APP.S.org={sog:true,name:'VFS'}; APP.renderAll(); });
+await page.evaluate(()=>{ APP.S.kind='official'; APP.S.level='hq'; APP.S.org={sog:true,name:'VFS'}; APP.renderAll(); });
 const sg=await page.textContent('#panel'); if(/Pubblica sulla pagina pubblica/.test(sg)||!/SOG/.test(sg)) fail.push('SOG export');
 if(!/VFS – IVAO Special Operations Group/.test(await page.evaluate(()=>APP.genIntroTxt?APP.genIntroTxt():''))) fail.push('SOG organiser');
 // wizard: no "Punti di navigazione" step, step "Teatro"; event name in Export; sectorfile under Avanzate

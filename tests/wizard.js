@@ -10,7 +10,7 @@ await page.click('[data-tab="scenario"]'); await page.waitForTimeout(100);
 if(!(await page.$('#gen'))||!(await page.$('#newscn'))) fail.push('generated step: buttons missing');
 // new empty event (press twice: the demo is unsaved)
 await page.click('#newscn'); await page.waitForTimeout(100); if(await page.$('#newscn')) { await page.click('#newscn'); await page.waitForTimeout(150); }
-const pickOfficial=async()=>{ if(!(await page.$('[data-kind="official"]'))) fail.push('no first screen after a new event'); else { await page.click('[data-kind="official"]'); await page.waitForTimeout(100); } };
+const pickOfficial=async()=>{ if(!(await page.$('[data-kind="division"]'))) fail.push('no first screen after a new event'); else { await page.click('[data-kind="division"]'); await page.waitForTimeout(100); } };
 await pickOfficial();
 let r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, checked:document.querySelectorAll('[data-evt]:checked').length}));
 if(r.ev||r.gen||r.checked) fail.push('new event not empty '+JSON.stringify(r));

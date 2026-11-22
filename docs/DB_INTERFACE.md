@@ -259,3 +259,9 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * `S.kind` – `''` (not chosen: first screen), `official`, `internal`, `free`; missing = official (events saved before v1.26). `S.org` – `{ sog: true, name: 'VFS' }` for an official event of a SOG, otherwise null.
 * `S.loMan` – `{ <callsign>: { type, task, lo } }` loadouts edited by hand. Generated flights carry `lo` = `{ items: [[qty, store]], cf: 'standard' | 'none', ecm: 'internal' | 'pod' | 'none' }` and may carry `arr` (arrival aerodrome when different from `base`).
 * `S.free` – missione libera: `{ step, mis, solo, thr, rr, flights: [{ id, cs, type, size, dep, arr, form, task }], date, hh, dur, area, built }`; the generated mission uses the usual fields (`S.t`, `S.cas`, theatre CUSTOM, `S.reserved`).
+
+## v1.27 – no Claude runtime
+
+* No database in the page any more: saved missions are in localStorage (`ivao-so-saved`, current one `ivao-so-current`), shared as files `{ "format": "ivao-so-event", "version": 1, "exportedAt", "event": S }` without participants. A future backend (IVAO site) stores the same `event` object, never the roster.
+* `S.level` – `hq` / `division` for official events (`kind: 'official'`). The viewer level (user / sog / staff) comes from the auth adapter (`levelInit()`), not from the event.
+* Public page data: `published/event.json` = the payload of `buildPayload()` (`{ v, publishedAt, scenario }`), never with participant names.

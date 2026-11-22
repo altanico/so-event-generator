@@ -4,3 +4,9 @@ tests/out/
 /*.png
 *.log
 .DS_Store
+# raw data sources: kept by the staff, never in the public repository (only the processed JSON in data/)
+data/nav_src/
+data/aip_src/*.pdf
+data/aurora_src/
+# access keys of the sog / staff links: never committed
+*.keys.json

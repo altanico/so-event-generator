@@ -77,3 +77,9 @@ Flight plans and the map layer "Navigazione" use `data/navdb.json` (`tools/navdb
 ## Kinds of use
 
 A new event starts from the first screen: "Evento ufficiale della divisione" (division SO staff or an official SOG; only viewers who can edit the page), "Evento interno" (same generator, plain "Mission pack" documents, never published) and "Missione libera" (4 short steps for a mission flown alone or with other participants: flight plan, kneeboard, map and the area booking e-mail).
+
+## Hosting and access (v1.27)
+
+- Static site (GitHub Pages of this repository): open `index.html`; no account, no server. The normal link opens the generator at the `user` level; the `sog` and `staff` levels open from private links (`#k=<key>`; only the SHA-256 of the keys is in the code). The public page of the published event is at `#evento` and reads `published/event.json`.
+- Missions are saved in the browser and shared as `.soevent.json` files (format `ivao-so-event`, version 1) that never contain participants.
+- Raw data sources (sector-file files, AIP / SUP PDFs) are not in the repository: the `tools/*_build.py` scripts rebuild the JSON in `data/` from source files kept by the staff.
