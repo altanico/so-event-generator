@@ -2,6 +2,7 @@
 
 ## Next build
 
+- [ ] **Bug – route points added in the wrong order** (staff 22 Nov): a point added from the map / the navigation popup ("Aggiungi alla rotta") / the search / "+ Punti dalla mappa" is inserted where it adds the least distance (`routeInsertBest`); with departure = arrival (base → base) the second point goes before the first, and the first point ends up always last. New rule: **a new point is appended at the end of the route** (after the last point, before the arrival) – the user builds the route in the order he flies it. Only **dragging a leg** inserts between the two ends of that leg (as today); the popup keeps "Sostituisci il punto N"; the legs table keeps ↑ to reorder. Make the popup clearer: "Aggiungi come punto N+1" / "Sostituisci il punto…". Test: three points added in order → order 1, 2, 3 with dep = arr.
 - [ ] **BLUE / RED border tool more visible** (staff 22 Nov: "quasi non si nota che esiste"): today it is one small line "Confine BLUE / RED (automatico)" with a small "Modifica sulla mappa" button in the scenario step. New:
   - its own card, with a thin blue | red band on top, title "Confine BLUE / RED", one line saying what it is ("La linea che divide il lato BLUE dal lato RED: le minacce stanno sul lato RED, le basi e i punti amici su quello BLUE"), state (automatico / modificato, N punti) and the warnings of `borderIssues()` right there;
   - a **primary** button "Modifica il confine sulla mappa" (and "Fine modifica" in edit mode, with the help line), "Ripristina automatico" when modified;
