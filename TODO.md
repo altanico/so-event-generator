@@ -19,7 +19,7 @@
 - [ ] **Missione semplice – no theatre rectangle on the map** (staff 22 Nov, screenshot): the dashed rectangle is the "theatre" the engine builds around bases and area (free mission = custom theatre, bbox + margin); it means nothing to the user → do not draw the theatre boundary in the simple mission (map and mission map PNG); keep it for events.
 
 - [ ] **Missione semplice – one "Navigazione" card with a profile** (staff 22 Nov, replaces the separate "Navigazione" / "Navigazione BOAT" cards and the "Navigazione BOAT" rename): inside the card the profile is built leg by leg:
-  - leg types: **BOAT** (low-level, VFR only – never IFR), **VOAT** (VFR OAT at altitude), **IOAT** (IFR OAT); a profile is all one type or **MISTO** (several legs of different types, e.g. IOAT transit → BOAT in the AT areas → IOAT back);
+  - leg types: **BOAT** (low-level, VFR only – never IFR; by definition flown **below 2000 ft AGL**: the BOAT leg altitude is set and checked in ft AGL, max 2000 ft AGL, using the terrain data for the minimum safe height and the MSA / obstacles note; a BOAT leg above 2000 ft AGL is not BOAT – the tool warns and proposes VOAT), **VOAT** (VFR OAT at altitude), **IOAT** (IFR OAT); a profile is all one type or **MISTO** (several legs of different types, e.g. IOAT transit → BOAT in the AT areas → IOAT back);
   - flight rules follow from the legs: all IFR = **IFR**, all VFR = **VFR**, both = **MISTO** (FPL field 8 Y or Z, with the IFR / VFR change points in field 15);
   - BOAT legs only inside AT / low-level areas (several areas, check boxes), reserved with their time windows; level / altitude of each leg editable;
   - FPL, nav log, kneeboard, map and booking e-mail per leg.
