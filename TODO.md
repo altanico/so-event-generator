@@ -2,7 +2,7 @@
 
 ## Next build
 
-(empty)
+- [ ] **Bug – missione semplice, Navigazione: second dashed route on the map** (staff 22 Nov, screenshot): the dashed green line with hollow circles is the low-level route the event engine generates for the LOWNAV flight (airspace ROUTE); since v1.28 the mission elements are drawn in the simple mission, so it appears next to the real route (numbered points, used by FPL / nav log / kneeboard). Fix: in the simple Navigazione the route of step 3 replaces the engine route (the engine ROUTE airspace of the flight is set from S.free.route, so map, documents and serials show one route only); test that only one route is drawn / listed.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
