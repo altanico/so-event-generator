@@ -2,6 +2,8 @@
 
 ## Next build
 
+- [ ] **English names for mission / event categories and roles** (staff 22 Nov: "adotta i nomi in inglese, porta tutto in inglese"): event types (event wizard), simple-mission cards and their options, roles / tasks and the "Cosa serve" list use the English military names (e.g. "Air Mobility" instead of "Mobilità aerea", "Close Air Support", "Air-to-Air Refuelling"); the rest of the staff UI stays Italian unless the staff confirms the whole interface should be English (asked 22 Nov). Recap of the names in the chat of 22 Nov.
+
 - [ ] **Missione semplice – every mission type of the generator** (staff 22 Nov: maritime patrol, cargo, airdrop… today only in complex missions). Step 1 cards for all the event types, with the role choice inside the card when it has more than one (as the Navigazione profile):
   - **Pattugliamento marittimo** (MAR: MPA; option anti-nave / ANTISHIP with simulated surface targets);
   - **Trasporto / cargo** (AIRMOB: AIRLIFT, also humanitarian HUMAN as an option "aiuti umanitari");
