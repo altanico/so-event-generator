@@ -4,6 +4,14 @@
 
 (empty – write the next requests here)
 
+## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
+
+Waiting for the data: the staff looks for the list of the Italian HEMS bases and hospital helipads (the OpenStreetMap download by `helipads.yml` failed three times on 22 Nov: Overpass 502 / 504). Start only when the staff gives the list and says so.
+- Drop the separate category "Inter-Hospital Transfer" (simple mission Medical options and the event type HOSPITAL): a hospital transfer is an HEMS mission.
+- HEMS mission: the user chooses an **HEMS base** (real, from the list); then two buttons: **"Genera missione per intervento"** (flight to a scene / "target", patient to a hospital helipad) and **"Genera missione di trasporto ospedaliero"** (hospital helipad → hospital helipad).
+- Points: real HEMS bases and real hospital helipads from the list (name, position); nothing invented.
+- Meanwhile `tools/helipad_build.py` / `helipads.yml` stay as they are (they may become the loader of the staff's list); decide then whether to keep the OpenStreetMap download or drop it.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
