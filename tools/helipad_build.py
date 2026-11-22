@@ -11,7 +11,18 @@ import json, math, sys, time, urllib.parse, urllib.request
 OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
 # Italy in 2-degree tiles (the whole country in one query is refused by the public servers)
 TILES = [(la, lo, la + 2, lo + 2) for la in range(36, 48, 2) for lo in range(6, 20, 2)]
-Q = '[out:json][timeout:120];area["ISO3166-1"="IT"][admin_level=2]->.it;(nwr["aeroway"="helipad"](area.it)({s},{w},{n},{e});nwr["amenity"="hospital"](area.it)({s},{w},{n},{e}););out center tags;'
+Q = '[out:json][timeout:90];(nwr["aeroway"="helipad"]({s},{w},{n},{e});nwr["amenity"="hospital"]({s},{w},{n},{e}););out center tags;'
+# rough outline of Italy (with Sardinia, Sicily, San Marino, Vatican) to drop the neighbours of the border tiles
+ITALY = [(47.1, 6.6), (47.1, 12.2), (46.9, 13.8), (45.6, 13.9), (44.0, 13.0), (41.9, 16.3), (41.6, 18.7), (39.7, 18.7), (37.8, 16.2), (36.6, 15.2), (36.4, 12.3), (37.7, 12.0), (38.4, 12.4),
+          (39.0, 15.5), (40.2, 14.8), (41.2, 13.0), (42.4, 11.0), (43.6, 10.2), (44.1, 9.4), (43.8, 7.5), (44.1, 7.0), (45.1, 6.6), (45.9, 6.8)]
+SARD_SIC = [[(41.35, 9.0), (41.35, 10.0), (38.8, 9.9), (38.8, 8.0), (41.0, 8.0)]]
+def inside(p, poly):
+    x, y, c = p[0], p[1], False
+    for i in range(len(poly)):
+        (a1, b1), (a2, b2) = poly[i], poly[i - 1]
+        if (b1 > y) != (b2 > y) and x < (a2 - a1) * (y - b1) / (b2 - b1) + a1: c = not c
+    return c
+def in_italy(p): return inside(p, ITALY) or any(inside(p, q) for q in SARD_SIC)
 
 def fetch_one(q):
     last = None
@@ -45,8 +56,8 @@ def km(a, b):
 
 def main(dst='data/helipads.json'):
     els = fetch()['elements']
-    heli = [e for e in els if e.get('tags', {}).get('aeroway') == 'helipad' and pos(e)]
-    hosp = [e for e in els if e.get('tags', {}).get('amenity') == 'hospital' and pos(e) and e['tags'].get('name')]
+    heli = [e for e in els if e.get('tags', {}).get('aeroway') == 'helipad' and pos(e) and in_italy(pos(e))]
+    hosp = [e for e in els if e.get('tags', {}).get('amenity') == 'hospital' and pos(e) and e['tags'].get('name') and in_italy(pos(e)) and e['tags'].get('addr:country', 'IT') == 'IT']
     out, used = [], set()
     for h in heli:
         p = pos(h); best = min(hosp, key=lambda o: km(p, pos(o)), default=None)
