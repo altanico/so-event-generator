@@ -1,7 +1,7 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
-- [ ] **Missione semplice, step 1 – mission card label does not fit** (staff 22 Nov, screenshot): "Navigazione a bassa quota" is cut in its button → rename the card "Navigazione BOAT" (staff's suggestion) and let every mission card wrap its text on two lines (no clipping) on narrow panels.
+- [ ] **Missione semplice, step 1 – mission card label does not fit** (staff 22 Nov, screenshot): solved by the single "Navigazione" card below; in any case every mission card wraps its text on two lines (no clipping) on narrow panels.
 
 - [ ] **Missione semplice / user missions – free departure and arrival** (staff 22 Nov): no forced menu. Departure and arrival are free fields with suggestions (ICAO code or name of the Italian aerodromes, as today), plus:
   - any other ICAO code (e.g. a base abroad): accepted; if the tool does not know it, it asks for its position (coordinates or a click on the map) and optionally a name;
@@ -14,11 +14,16 @@
 
 - [ ] **Missione semplice, step 2 – compact flight card** (staff 22 Nov, screenshot): every flight on 2 rows. Row 1: Nominativo (narrow) · Aereo · Numero (narrow). Row 2: Partenza (ICAO only, narrow, 4–5 characters) · Arrivo (ICAO only, narrow) · Ruolo (when the mission has more than one) · "In formazione" as a small check next to them. The aerodrome name shows only as a tooltip / small text under the code, not in the field. Same layout on narrow panels (fields shrink, no third row). Goes together with the free aerodrome / aircraft fields above.
 
-- [ ] **Missione semplice, step 3 "Dove" – several areas for BOAT** (staff 22 Nov): for "Navigazione BOAT" (low-level navigation) the areas are check boxes, not radio buttons: any number of AT / low-level areas can be chosen (default: the nearest suitable one, as today). The low-level route crosses the chosen areas in a sensible order (nearest-neighbour from the departure base, editable order), every area is reserved, listed in the booking e-mail with its time window, in the FPL (area ids in field 15 / OPAREA in field 18 with the times of each) and in the kneeboard / map. Other missions keep one area (radio), unless the staff asks otherwise.
+- [ ] **Missione semplice, step 3 "Dove" – several areas for BOAT** (staff 22 Nov): for the BOAT legs of a "Navigazione" the areas are check boxes, not radio buttons: any number of AT / low-level areas can be chosen (default: the nearest suitable one, as today). The low-level route crosses the chosen areas in a sensible order (nearest-neighbour from the departure base, editable order), every area is reserved, listed in the booking e-mail with its time window, in the FPL (area ids in field 15 / OPAREA in field 18 with the times of each) and in the kneeboard / map. Other missions keep one area (radio), unless the staff asks otherwise.
 
 - [ ] **Missione semplice – no theatre rectangle on the map** (staff 22 Nov, screenshot): the dashed rectangle is the "theatre" the engine builds around bases and area (free mission = custom theatre, bbox + margin); it means nothing to the user → do not draw the theatre boundary in the simple mission (map and mission map PNG); keep it for events.
 
-- [ ] **Missione semplice – mixed navigation profile** (staff 22 Nov question; proposal, waiting for the staff's choice): today "Navigazione" = route at one level (IFR), "Navigazione BOAT" = low-level route in AT areas; no mix. Proposal: the "Navigazione" card gets a profile choice – "In quota", "BOAT", "Misto" (transit at altitude to the entry point, low-level leg through the chosen AT areas, climb and transit back; legs and levels editable). FPL: flight rules change by leg (Y / Z with IFR / VFR at the change points, level changes in field 15), low-level legs only inside the AT / low-level areas, areas reserved with their time windows. Option: merge the two cards into one "Navigazione" (profile In quota / BOAT / Misto) or keep the BOAT card and add "Misto" as a third card.
+- [ ] **Missione semplice – one "Navigazione" card with a profile** (staff 22 Nov, replaces the separate "Navigazione" / "Navigazione BOAT" cards and the "Navigazione BOAT" rename): inside the card the profile is built leg by leg:
+  - leg types: **BOAT** (low-level, VFR only – never IFR), **VOAT** (VFR OAT at altitude), **IOAT** (IFR OAT); a profile is all one type or **MISTO** (several legs of different types, e.g. IOAT transit → BOAT in the AT areas → IOAT back);
+  - flight rules follow from the legs: all IFR = **IFR**, all VFR = **VFR**, both = **MISTO** (FPL field 8 Y or Z, with the IFR / VFR change points in field 15);
+  - BOAT legs only inside AT / low-level areas (several areas, check boxes), reserved with their time windows; level / altitude of each leg editable;
+  - FPL, nav log, kneeboard, map and booking e-mail per leg.
+  - To confirm with the staff: GAT legs (IFR on airways) also allowed, or OAT only.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
