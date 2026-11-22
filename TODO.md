@@ -25,6 +25,13 @@
   - FPL, nav log, kneeboard, map and booking e-mail per leg.
   - **GAT** legs too (staff 22 Nov): IFR GAT on airways at FL195 and below, FRA points above, as the current FPL rules. A plan with a GAT IFR part must be **validated with the EUROCONTROL tool** (IFPS validation, e.g. IFPUV) before filing: the tool cannot validate it – the FPL card, the kneeboard and the package show a clear note "GAT part: validate the route with the EUROCONTROL tool before filing" and the user can paste back the corrected route (manual edits kept, as today).
 
+- [ ] **Missione semplice, step 3 "Dove" – route builder** (staff 22 Nov, screenshot: "arrivo qui e non vedo nulla che mi aiuti a fare la rotta"): today step 3 shows only the area list and a text line; the route is not drawn on the map and can be edited only in the "Piani di volo" tab (link in step 4). Step 3 must show and edit the route itself:
+  - the generated route drawn on the map, coloured by leg type (BOAT / VOAT / IOAT / GAT), points numbered, legs labelled with level;
+  - the table of legs (from / to / type / level) with add / remove / reorder; click on the map to insert a point (known navigation point or free coordinates), drag of points if feasible;
+  - navigation points on the map only around the route and only the useful kinds (fixes, VRP, military points, AT areas) – today the full layer is too crowded;
+  - checks inline (BOAT < 2000 ft AGL and inside AT areas, GAT → EUROCONTROL note), "Rigenera" keeps the user's edits unless asked;
+  - mockup to show the staff before building.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
