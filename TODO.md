@@ -2,21 +2,7 @@
 
 ## Next build
 
-- [ ] **Header button "Reset" → "Nuova missione"** (staff 22 Nov): same place, label "+ Nuova missione"; it opens the first screen ("Cosa vuoi preparare?") with an empty mission. If the open mission has unsaved changes, a confirm in the page (not a browser dialog): "Salva e crea nuova" / "Crea senza salvare" / "Annulla". Same behaviour as "+ Nuova missione" in the saved-missions window (one function). The two-click reset of the old button goes.
-
-- [ ] **English names for mission / event categories and roles** (staff 22 Nov: "adotta i nomi in inglese, porta tutto in inglese"): event types (event wizard), simple-mission cards and their options, roles / tasks and the "Cosa serve" list use the English military names (e.g. "Air Mobility" instead of "Mobilità aerea", "Close Air Support", "Air-to-Air Refuelling"); only the names (staff 22 Nov: "solo i nomi in inglese per ora"), the rest of the staff UI stays Italian. Names:
-  - Events: Composite Air Operation, Close Air Support (CAS), SEAD / Strike, Identification / Interception, Air Defence & AEW, Combat Search and Rescue (CSAR), Air Mobility, Maritime Operations, Air-to-Air Refuelling (AAR), Helicopter Air-to-Air Refuelling (HAAR), Instrument Navigation (IFR), Low-Level Navigation, Search and Rescue (SAR), HEMS, MEDEVAC, Inter-Hospital Transfer, Humanitarian Aid, Aerial Firefighting.
-  - Simple mission groups: **Combat** (Close Air Support, Strike / SEAD, Interception, Maritime Patrol with Anti-Surface Warfare option, AEW / Air Defence); **Air Mobility & Rescue** (Air Mobility: Airlift / Cargo, Airdrop, Helicopter Insertion, Humanitarian Aid, Air-to-Air Refuelling – AAR / HAAR by aircraft, staff 22 Nov: AAR belongs to air mobility; Combat Search and Rescue; Search and Rescue; Medical: MEDEVAC / HEMS / Inter-Hospital Transfer; Aerial Firefighting); **Navigation & Training** (Navigation with BOAT / VOAT / IOAT / GAT / Mixed profile).
-
-- [ ] **Missione semplice – every mission type of the generator** (staff 22 Nov: maritime patrol, cargo, airdrop… today only in complex missions). Step 1 cards for all the event types, with the role choice inside the card when it has more than one (as the Navigazione profile):
-  - **Pattugliamento marittimo** (MAR: MPA; option anti-nave / ANTISHIP with simulated surface targets);
-  - **Trasporto / cargo** (AIRMOB: AIRLIFT, also humanitarian HUMAN as an option "aiuti umanitari");
-  - **Aviolancio** (AIRMOB: AIRDROP – drop zone in a PARA area, run-in, drop time);
-  - **Inserzione con elicotteri** (AIRMOB: INSERT – LZ);
-  - **CSAR** (CSAR + RESCORT, survivor / LZ as in the generator);
-  - **Sanitario** (MEDEVAC, HEMS, trasporto interospedaliero – choice inside the card);
-  - existing: CAS, Navigazione, Rifornimento in volo (AAR / HAAR by aircraft), AEW, Intercettazione, Strike, SAR, Antincendio.
-  Each new type: suitable aircraft in the list (free type still allowed), areas proposed for it (PARA areas for airdrop / insertion, sea areas / corridors for maritime patrol, firing areas for anti-ship), step 3 summary, serials, kneeboard section, FPL (STS/ where it applies: SAR, MEDEVAC, HOSP, HUM, FFR), booking e-mail; simulated threats only when ticked. Cards grouped so the grid stays readable (e.g. "Combattimento", "Trasporto e soccorso", "Navigazione e addestramento"). Test per new type (build + FPL + kneeboard).
+(empty)
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
@@ -50,6 +36,26 @@
   - Route editor in the flight plan card: a list of the route points (symbol, name, type, coordinates, airway to the next point) with ▲ ▼ ✕ per row and a search box "Aggiungi punto" (type RIS… -> RISOM, VRP code / name, coordinates 4530N01230E); map and list stay in sync. On the map: click a navigation point -> popup "Aggiungi alla rotta" / "Sostituisci il punto n"; drag and insert on a leg stay; the route text (field 15) rebuilt from the list.
   - Symbols: ICAO Annex 4 standard (staff 21 Nov: no AIP GEN 2.3 legend needed).
   - Done as: map button "🧭 Navigazione ▾" opens the panel (master switch, 12 switches with their symbol: VOR / VOR-DME, VORTAC, TACAN / DME, NDB, en-route fixes, terminal fixes (off by default), FRA points, VRP, military points, military gates, lower airways, point names), counter of visible points / points appearing on zoom; choice saved in S.navL. ICAO Annex 4 SVG symbols (L.divIcon), names as labels from zoom 8 (navaids) / 9; tooltip with type, frequency, coordinates. With a flight plan open, click on a point -> popup "Aggiungi alla rotta di <cs>" (before the arrival point) or "Sostituisci il punto n". Route editor in the card: table of the points (symbol, name, type, coordinates, via) with ▲ ▼ ✕, search box "Aggiungi punto" (ident prefix, VRP / gate name, coordinates 4530N01230E / 453012N0123045E / 45.5 12.3; Enter adds the first result) and "Posizione". PDF / slide maps do not draw navigation points, so nothing to change there.
+
+## v1.30 build (22 Nov 2026) – done
+
+- [x] **Header button "Reset" → "Nuova missione"** (staff 22 Nov): same place, label "+ Nuova missione"; it opens the first screen ("Cosa vuoi preparare?") with an empty mission. If the open mission has unsaved changes, a confirm in the page (not a browser dialog): "Salva e crea nuova" / "Crea senza salvare" / "Annulla". Same behaviour as "+ Nuova missione" in the saved-missions window (one function). The two-click reset of the old button goes.
+
+- [x] **English names for mission / event categories and roles** (staff 22 Nov: "adotta i nomi in inglese, porta tutto in inglese"): event types (event wizard), simple-mission cards and their options, roles / tasks and the "Cosa serve" list use the English military names (e.g. "Air Mobility" instead of "Mobilità aerea", "Close Air Support", "Air-to-Air Refuelling"); only the names (staff 22 Nov: "solo i nomi in inglese per ora"), the rest of the staff UI stays Italian. Names:
+  - Events: Composite Air Operation, Close Air Support (CAS), SEAD / Strike, Identification / Interception, Air Defence & AEW, Combat Search and Rescue (CSAR), Air Mobility, Maritime Operations, Air-to-Air Refuelling (AAR), Helicopter Air-to-Air Refuelling (HAAR), Instrument Navigation (IFR), Low-Level Navigation, Search and Rescue (SAR), HEMS, MEDEVAC, Inter-Hospital Transfer, Humanitarian Aid, Aerial Firefighting.
+  - Simple mission groups: **Combat** (Close Air Support, Strike / SEAD, Interception, Maritime Patrol with Anti-Surface Warfare option, AEW / Air Defence); **Air Mobility & Rescue** (Air Mobility: Airlift / Cargo, Airdrop, Helicopter Insertion, Humanitarian Aid, Air-to-Air Refuelling – AAR / HAAR by aircraft, staff 22 Nov: AAR belongs to air mobility; Combat Search and Rescue; Search and Rescue; Medical: MEDEVAC / HEMS / Inter-Hospital Transfer; Aerial Firefighting); **Navigation & Training** (Navigation with BOAT / VOAT / IOAT / GAT / Mixed profile).
+
+- [x] **Missione semplice – every mission type of the generator** (staff 22 Nov: maritime patrol, cargo, airdrop… today only in complex missions). Step 1 cards for all the event types, with the role choice inside the card when it has more than one (as the Navigazione profile):
+  - **Pattugliamento marittimo** (MAR: MPA; option anti-nave / ANTISHIP with simulated surface targets);
+  - **Trasporto / cargo** (AIRMOB: AIRLIFT, also humanitarian HUMAN as an option "aiuti umanitari");
+  - **Aviolancio** (AIRMOB: AIRDROP – drop zone in a PARA area, run-in, drop time);
+  - **Inserzione con elicotteri** (AIRMOB: INSERT – LZ);
+  - **CSAR** (CSAR + RESCORT, survivor / LZ as in the generator);
+  - **Sanitario** (MEDEVAC, HEMS, trasporto interospedaliero – choice inside the card);
+  - existing: CAS, Navigazione, Rifornimento in volo (AAR / HAAR by aircraft), AEW, Intercettazione, Strike, SAR, Antincendio.
+  Each new type: suitable aircraft in the list (free type still allowed), areas proposed for it (PARA areas for airdrop / insertion, sea areas / corridors for maritime patrol, firing areas for anti-ship), step 3 summary, serials, kneeboard section, FPL (STS/ where it applies: SAR, MEDEVAC, HOSP, HUM, FFR), booking e-mail; simulated threats only when ticked. Cards grouped so the grid stays readable (e.g. "Combattimento", "Trasporto e soccorso", "Navigazione e addestramento"). Test per new type (build + FPL + kneeboard).
+
+  - Done as: FREE_MIS with groups Combat / Air Mobility & Rescue / Navigation & Training and options (Air Mobility: Airlift / Cargo, Airdrop, Helicopter Insertion, Humanitarian Aid, Air-to-Air Refuelling – HAAR event when the receiver is a helicopter; Medical: MEDEVAC, HEMS, Inter-Hospital Transfer; Maritime Patrol: MPA or Anti-Surface Warfare); areas proposed: PARA / HELO for airdrop and insertion, sea areas (centroid not on land) for maritime patrol, firing areas at sea for anti-surface; FPL STS/ from the existing FPL_STS table; kneeboard titled with the option name. English names: EVT it, CATS it (= label), ROLE_GROUPS it, simple-mission cards / options / groups (rest of the UI Italian). Header "+ Nuova missione" (in-page confirm "Salva e crea nuova" / "Crea senza salvare" / "Annulla" when there are unsaved changes; same function from the saved-missions window); "Carica esempio" moved to the saved-missions window. Test free3.js; theatre.js / free2.js updated.
 
 ## v1.29 build (22 Nov 2026) – done
 

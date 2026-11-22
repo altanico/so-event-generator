@@ -25,8 +25,10 @@ r=await page.evaluate(([pipS])=>{ const pip=eval(pipS), poly=APP.theatre().poly;
 if(r.length) fail.push('proposed areas outside the theatre: '+r);
 // complete reset: everything back to an empty event
 await page.evaluate(()=>{ APP.ZF.q='R49'; APP.S.border=[[43,12],[43.5,13]]; APP.POINTS().items.push(['AAA','FIX',43,12,'']); });
-await page.click('#fullreset'); await page.waitForTimeout(80); if(!(await page.evaluate(()=>APP.S.meta.events.length))) fail.push('reset without confirmation');
-await page.click('#fullreset'); await page.waitForTimeout(150);
+await page.evaluate(()=>{ APP.S.savedAt=0; APP.S.updated=Date.now(); });
+await page.click('#newmis'); await page.waitForTimeout(80); if(!(await page.evaluate(()=>APP.S.meta.events.length))||!(await page.$('#nmconf'))) fail.push('new mission without confirmation');
+await page.click('#nmgo'); await page.waitForTimeout(150); if(await page.$('#nmconf')) fail.push('confirm still open');
+if(!/Cosa vuoi preparare/.test(await page.textContent('#panel'))) fail.push('new mission: no first screen');
 r=await page.evaluate(()=>({ev:APP.S.meta.events.length, gen:!!APP.S.gen, border:APP.S.border||null, th:APP.S.thCustom||null, q:APP.ZF.q, pts:APP.POINTS().items.length, open:APP.wOpen(), asp:APP.S.asp&&APP.S.asp.source, thr:APP.S.meta.theatre, bases:APP.S.blueBases.length, res:APP.RES().length, cur:localStorage.getItem('ivao-so-current')?JSON.parse(localStorage.getItem('ivao-so-current')).meta.events.length:-1}));
 if(r.ev||r.gen||r.border||r.th||r.q||r.pts||r.open!=='ev'||r.cur||r.thr||r.bases||r.res) fail.push('reset left '+JSON.stringify(r)); if(r.asp!=='aip') fail.push('reset: AIP zones not loaded ('+r.asp+')');
 

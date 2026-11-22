@@ -9,7 +9,7 @@ await page.waitForFunction(()=>!!APP.NAV,{timeout:15000}).catch(()=>fail.push('n
 await page.evaluate(()=>{ APP.S=APP.newScenario(); APP.renderAll(); }); await page.click('[data-kind="free"]');
 // one Navigazione card, profiles
 const cards=await page.evaluate(()=>[...document.querySelectorAll('[data-fmis]')].map(b=>b.textContent.trim()));
-if(cards.filter(c=>/Navigazione/.test(c)).length!==1||cards.some(c=>/bassa quota/.test(c))) fail.push('navigation cards '+cards);
+if(cards.filter(c=>/^Navigation/.test(c)).length!==1||cards.some(c=>/Low-Level|bassa quota/.test(c))) fail.push('navigation cards '+cards);
 await page.click('[data-fmis="NAV"]'); const pr=await page.evaluate(()=>[...document.querySelectorAll('[data-fprof]')].map(x=>x.dataset.fprof).join(','));
 if(pr!=='IOAT,VOAT,GAT,BOAT,MIX') fail.push('profiles '+pr);
 if(!(await page.evaluate(()=>[...document.querySelectorAll('[data-fmis]')].every(b=>getComputedStyle(b).whiteSpace!=='nowrap')))) fail.push('mission cards do not wrap');
