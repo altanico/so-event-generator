@@ -1,6 +1,8 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Missione semplice, step 1 – mission card label does not fit** (staff 22 Nov, screenshot): "Navigazione a bassa quota" is cut in its button → rename the card "Navigazione BOAT" (staff's suggestion) and let every mission card wrap its text on two lines (no clipping) on narrow panels.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
