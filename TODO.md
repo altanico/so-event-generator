@@ -2,6 +2,7 @@
 
 ## Next build
 
+- [ ] **Reserved areas – order of the "Tipo" filter** (staff 22 Nov): D, R, TSA, TRA, INDIA (type IND shown as "INDIA"), then the other types present (e.g. AAR) and "Custom"; "Tutti" stays first. Today the list is alphabetical (`types … .sort()` in the areas card). Test.
 - [ ] **"Quote della missione" card more compact** (staff 22 Nov, screenshot): the note "nasconde le aree che non hanno quote in comune (quelle che le toccano solo al bordo comprese)" takes a narrow column and becomes 6 lines tall. New layout: first row title + levels (SFC – FL275) + "Tutte le quote" button on the right, all on one line (`white-space:nowrap` for title and levels); the note moves under the sliders as one short muted line, together with the existing hint ("Imposta prima le quote…"), e.g. "Le aree senza quote in comune (anche solo al bordo) sono nascoste. Imposta prima le quote: "Proponile tu" sceglie solo tra le aree che le contengono." Test: the card height ≤ ~150 px at the normal panel width.
 - [ ] **Events – aerodromes: two separate things, toggle buttons** (staff 22 Nov, screenshot of "Basi di partenza e arrivo"):
   - **Departure / arrival bases** = only where the assets (participants' flights, BLUE or RED players) are based; independent of the exercise story; **several allowed**, all equal (no single "main" base). Toggle button **[Base]** on each aerodrome row; roles per base stay in the folded line ("tutti i ruoli" or chosen groups).
