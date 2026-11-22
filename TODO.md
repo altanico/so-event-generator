@@ -8,6 +8,7 @@
   - privacy (staff 22 Nov): the file holds the mission only – no roster, no pilot / controller names, no VIDs; participants are added locally by each builder and stay in their browser; test that an exported file contains no name from the roster;
   - remove `window.claude` (db, user, artifact, downloads); "Pubblica" → download of the public page / JSON to commit;
   - GitHub Pages setup: repo public (staff 22 Nov), checked first for secrets / names / source files not to publish (list to the owner); normal link = level user; sog and staff = secret links (`#k=<key>`, only the SHA-256 in the code, key kept in localStorage; keys given to the staff in chat, never committed);
+  - data: only processed JSON in the public repo; remove `data/nav_src` and `data/aip_src/*.pdf` from the files and from the git history (rewrite + force push, after the owner's OK, with a backup of the sources given to the staff); `.gitignore` for the source folders; build tools keep working with sources passed by path; data loading kept swappable for the Aurora sector file on the IVAO site;
   - division logo from the staff.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
