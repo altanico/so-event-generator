@@ -2,6 +2,14 @@
 
 ## Next build
 
+- [ ] **Simple mission: the user builds the route – no automatic route** (staff 22 Nov, AEW test: the FPL route was absurd – it started at VOR08, the IAF of the VOR 08 procedure – and it was not drawn; it could be seen only via "Modifica i piani di volo", hard to notice). For every mission type of the simple mission:
+  - no route proposed: the route starts empty (departure → arrival only); step 3 shows the route builder (legs table, drag a leg, add points, type / level per leg) for every mission type, not only Navigation, with a clear call to action at the top ("Crea la tua rotta: trascina il tratto partenza → arrivo sulla mappa o aggiungi i punti") and the route drawn on the map from the start;
+  - the area work (orbit, holding, CAS block, track) stays in the area as generated; the route is only the way there and back;
+  - FPL / kneeboard / package: until the route has at least one point, the FPL shows "rotta da creare (passo Dove)" and step 4 warns before the downloads; no hidden "Modifica i piani di volo" link as the only way;
+  - procedure points (IAF / ARR / FAF of approach procedures, the "VORxx" points of MIL.fix and terminal fixes) are never proposed and are not used when snapping a dropped / clicked point; still selectable by clicking them explicitly;
+  - events (complex missions) keep the generated FPL route, but the same procedure-point exclusion applies to the generated routes.
+  Tests.
+
 - [ ] **Simple mission AEW: INDIA areas by default** (staff 22 Nov): for an AEW / Air Defence mission the proposed areas are the INDIA AEW orbit areas (type IND, the INDIA tracks of the generator) sorted by distance from the departure base: the nearest INDIA area is chosen by default (with its AEW track), the other INDIA areas listed first among the proposals and drawn on the map; generic A2A / AIR areas only after them. Events already add an INDIA area for AEW (autoReserve) – unchanged. Test.
 
 - [ ] **Airways off by default** (staff 22 Nov, repeated): the airway layer must be off by default everywhere (events, "Piani di volo" tab, simple mission) and switched on automatically only when the navigation has an IGAT leg (IGAT profile or a mixed route with IGAT legs), off again when no IGAT leg is left (unless the user switched it on by hand). Check why it shows on today: the v1.28 automatic layer setting (step 3) and missions saved with the old layer settings – reset `awy` to off on load when it was not chosen by the user. Test.
