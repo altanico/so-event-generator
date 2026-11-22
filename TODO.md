@@ -32,6 +32,8 @@
   - checks inline (BOAT < 2000 ft AGL and inside AT areas, GAT → EUROCONTROL note), "Rigenera" keeps the user's edits unless asked;
   - mockup to show the staff before building.
 
+- [ ] **Bug – missione semplice AAR proposes a HAAR area to jets** (staff 22 Nov: AAR from LIPS with F-35 → "D266 HAAR", helicopters only): the candidate filter takes every area with use AAR. Fix: HAAR areas (name / activity "HAAR", e.g. D266A/B/C Mar Adriatico, 1000–4000 ft) only for helicopter receivers / HAAR tankers; fixed-wing AAR only in the AAR areas and corridors whose levels fit (receiver band FL150–280), never in HAAR ones; same rule in the event generator if it can pick a HAAR area for fixed-wing AAR (check); test.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
