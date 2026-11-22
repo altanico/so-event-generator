@@ -4,6 +4,7 @@
 
 - [ ] **Simple mission Maritime Patrol: P-72A at LICZ by default** (staff 22 Nov, like AIB / AAR / AEW): Maritime Patrol with the option Maritime Patrol (MPA) → the first flight is `P-72A` (role MPA) at **LICZ** Sigonella, departure and arrival LICZ; sea areas sorted from LICZ. The Anti-Surface Warfare option keeps today's default (fighters). Add it to `FREE_FIRST` (keyed by the option); the user can change type and bases. Test in free5.js.
 - [ ] **Simple mission Strike / SEAD: F-35A at LIPL by default** (staff 22 Nov): first flight `F-35A` (role STRIKE, 2-ship as today for fighters) at **LIPL** Ghedi, departure and arrival LIPL; firing / A2G areas sorted from LIPL. Add to `FREE_FIRST`; the user can change type, role (SEAD) and bases. Test in free5.js.
+- [ ] **Simple mission Interception: EF-2000 at LIRS by default** (staff 22 Nov): first flight `EF-2000 Typhoon` (role QRA) at **LIRS** Grosseto, departure and arrival LIRS; A2A / AIR areas sorted from LIRS. A target flight added with "+ Aggiungi un flight" keeps today's defaults. Add to `FREE_FIRST`. Test in free5.js.
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
