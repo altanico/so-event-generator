@@ -28,7 +28,7 @@
 - [ ] **Missione semplice, step 3 "Dove" – route builder** (staff 22 Nov, screenshot: "arrivo qui e non vedo nulla che mi aiuti a fare la rotta"): today step 3 shows only the area list and a text line; the route is not drawn on the map and can be edited only in the "Piani di volo" tab (link in step 4). Step 3 must show and edit the route itself:
   - the generated route drawn on the map, coloured by leg type (BOAT / VOAT / IOAT / GAT), points numbered, legs labelled with level;
   - the table of legs (from / to / type / level) with add / remove / reorder; click on the map to insert a point (known navigation point or free coordinates), drag of points if feasible;
-  - navigation points on the map only around the route and only the useful kinds (fixes, VRP, military points, AT areas) – today the full layer is too crowded;
+  - navigation points switched on automatically when step 3 opens (today they are off and the user must turn them on from the map tools), only around the route and only the useful kinds for the profile (fixes / FRA for IOAT / GAT, VRP / military points / gates for VOAT / BOAT, AT areas) – the full layer is too crowded; the user can still change them from the "Navigazione" map window;
   - checks inline (BOAT < 2000 ft AGL and inside AT areas, GAT → EUROCONTROL note), "Rigenera" keeps the user's edits unless asked;
   - mockup to show the staff before building.
 
