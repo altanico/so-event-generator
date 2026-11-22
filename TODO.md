@@ -3,6 +3,13 @@
 ## Next build (start only when the staff says "fai la build")
 - [ ] **Missione semplice, step 1 – mission card label does not fit** (staff 22 Nov, screenshot): "Navigazione a bassa quota" is cut in its button → rename the card "Navigazione BOAT" (staff's suggestion) and let every mission card wrap its text on two lines (no clipping) on narrow panels.
 
+- [ ] **Missione semplice / user missions – free departure and arrival** (staff 22 Nov): no forced menu. Departure and arrival are free fields with suggestions (ICAO code or name of the Italian aerodromes, as today), plus:
+  - any other ICAO code (e.g. a base abroad): accepted; if the tool does not know it, it asks for its position (coordinates or a click on the map) and optionally a name;
+  - "ZZZZ" (ship, field, aerodrome without ICAO code): name (e.g. ship name) + position (coordinates or click on the map; a ship may be at sea);
+  - flight plan: field 13 / 16 with the code or ZZZZ, field 18 DEP/ and DEST/ with the name and the position (ddmmNdddmmE) when ZZZZ; the route starts / ends at that position; no aerodrome procedures (gates, VRP) for unknown places;
+  - warnings of the known bases (excluded, schools) unchanged; no C2 / APP / TWR proposed for unknown places (TBC);
+  - same fields for the flights of complex missions where the base is chosen per flight.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
