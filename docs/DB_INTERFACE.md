@@ -265,3 +265,8 @@ Activation hours are not used (staff decision: the areas can always be used). Ex
 * No database in the page any more: saved missions are in localStorage (`ivao-so-saved`, current one `ivao-so-current`), shared as files `{ "format": "ivao-so-event", "version": 1, "exportedAt", "event": S }` without participants. A future backend (IVAO site) stores the same `event` object, never the roster.
 * `S.level` – `hq` / `division` for official events (`kind: 'official'`). The viewer level (user / sog / staff) comes from the auth adapter (`levelInit()`), not from the event.
 * Public page data: `published/event.json` = the payload of `buildPayload()` (`{ v, publishedAt, scenario }`), never with participant names.
+
+## v1.28 additions
+
+* `S.free.areas` – ids of the chosen areas (first = main work area; replaces `S.free.area`). `S.free.prof` – navigation profile IOAT / VOAT / GAT / BOAT / MIX. `S.free.route` – `{ pts: [{ id, name, pos, k }], legs: [{ type: BOAT | VOAT | IOAT | GAT, lvl, agl }], man, key }`, legs = pts + 1 (last leg to the arrival). `S.free.aq` – area search text.
+* Flights of `S.free.flights` may carry `depP` / `arrP` (`{ name, pos }` for aerodromes not in the list or ZZZZ; such places are added to AIRPORTS with kind `EXT`) and `acx` (`{ desig, cat, wake, tas }` for an aircraft type not in the list). Generated flights carry `acx` too.

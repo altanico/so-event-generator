@@ -20,9 +20,9 @@ if(!(await page.$('#frr'))||!/S\.3\.9/.test(await page.textContent('#panel'))) f
 if(!(await page.$eval('[data-fstep="2"].primary',e=>e.disabled))) fail.push('interception without the R&R tick');
 await page.click('[data-fmis="CAS"]'); await page.click('.b.primary[data-fstep="2"]'); await page.waitForTimeout(200);
 const s2=await page.textContent('#panel'); if(!/Con cosa e da dove/.test(s2)||!/Carico/.test(s2)||!/Aggiungi un flight/.test(s2)||!/Chaff \/ flare/.test(s2)) fail.push('step 2 '+s2.slice(0,200));
-await page.selectOption('[data-k="dep"]','LIPS'); await page.waitForTimeout(100);
+await page.fill('[data-k="dep"]','LIPS'); await page.dispatchEvent('[data-k="dep"]','change'); await page.waitForTimeout(100);
 await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(800);
-const s3=await page.evaluate(()=>({ area:APP.FREE().area, t:!!APP.S.t, res:APP.RES().map(z=>z.id), fl:APP.S.t&&APP.S.t.flights.map(f=>[f.cs,f.task,f.base,APP.loTxt(f.lo)]), cas:!!(APP.S.cas&&APP.S.cas.jtacs.length), thr:APP.S.t?APP.S.t.threats.length:-1, txt:document.getElementById('panel').textContent }));
+const s3=await page.evaluate(()=>({ area:(APP.FREE().areas||[])[0], t:!!APP.S.t, res:APP.RES().map(z=>z.id), fl:APP.S.t&&APP.S.t.flights.map(f=>[f.cs,f.task,f.base,APP.loTxt(f.lo)]), cas:!!(APP.S.cas&&APP.S.cas.jtacs.length), thr:APP.S.t?APP.S.t.threats.length:-1, txt:document.getElementById('panel').textContent }));
 if(!s3.t||!s3.area||!s3.res.length||!s3.cas) fail.push('step 3 '+JSON.stringify({...s3,txt:s3.txt.slice(0,300)}));
 if(!/Holding/.test(s3.txt)||!/Bersaglio/.test(s3.txt)) fail.push('step 3 summary');
 await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300);
@@ -34,14 +34,14 @@ if(/\b(della|missione|carico|partenza|Nessun)\b/.test(kt.replace(/R\d+ [^\n(]*/g
 const lo=await page.evaluate(()=>{ const f=APP.S.t.flights[0]; const lo=JSON.parse(JSON.stringify(f.lo)); lo.items=lo.items.filter(x=>!/GBU|Paveway/.test(x[1])); lo.items.unshift([2,'Mk-82']); APP.loSet(f,lo); return { w:APP.wpnOf(f), txt:APP.loTxt(f.lo) }; });
 if(lo.w[0]!=='Mk-82') fail.push('CAS weapons from the loadout '+JSON.stringify(lo));
 // interception, with others: target flight
-await page.evaluate(()=>{ const F=APP.FREE(); F.mis='ID'; F.rr=true; F.solo=false; F.flights=[]; F.area=null; F.built=0; F.step=2; APP.renderAll(); });
+await page.evaluate(()=>{ const F=APP.FREE(); F.mis='ID'; F.rr=true; F.solo=false; F.flights=[]; F.areas=null; F.built=0; F.step=2; APP.renderAll(); });
 await page.click('#fadd'); await page.waitForTimeout(100);
 await page.evaluate(()=>{ const F=APP.FREE(); F.flights[1].task='TARGET'; F.flights[1].type='PC-12 / King Air (light utility)'; });
 await page.evaluate(()=>{ const F=APP.FREE(); F.step=3; APP.renderAll(); }); await page.click('.b.primary[data-fstep="3"]').catch(()=>{}); await page.waitForTimeout(800);
 const idr=await page.evaluate(()=>({ t:!!APP.S.t, tasks:APP.S.t?APP.S.t.flights.map(f=>f.task):[] }));
 if(!idr.t||!idr.tasks.includes('QRA')) fail.push('interception mission '+JSON.stringify(idr));
 // navigation without area: no booking needed
-await page.evaluate(()=>{ const F=APP.FREE(); F.mis='NAV'; F.flights=[]; F.area=null; F.built=0; F.step=2; APP.renderAll(); });
+await page.evaluate(()=>{ const F=APP.FREE(); F.mis='NAV'; F.prof='IOAT'; F.flights=[]; F.areas=null; F.route=null; F.built=0; F.step=2; APP.renderAll(); });
 await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(800); await page.click('.b.primary[data-fstep="4"]'); await page.waitForTimeout(300);
 if(!/non serve prenotare/.test(await page.textContent('#panel'))) fail.push('nav without areas');
 // internal event: plain mission pack, no publish
