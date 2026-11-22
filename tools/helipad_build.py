@@ -8,22 +8,32 @@ Data © OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copy
 """
 import json, math, sys, time, urllib.parse, urllib.request
 
-OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
-Q = '''[out:json][timeout:300];
-area["ISO3166-1"="IT"][admin_level=2]->.it;
-(nwr["aeroway"="helipad"](area.it);)->.h; .h out center tags;
-(nwr["amenity"="hospital"](area.it);)->.o; .o out center tags;'''
+OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
+# Italy in 2-degree tiles (the whole country in one query is refused by the public servers)
+TILES = [(la, lo, la + 2, lo + 2) for la in range(36, 48, 2) for lo in range(6, 20, 2)]
+Q = '[out:json][timeout:120];area["ISO3166-1"="IT"][admin_level=2]->.it;(nwr["aeroway"="helipad"](area.it)({s},{w},{n},{e});nwr["amenity"="hospital"](area.it)({s},{w},{n},{e}););out center tags;'
+
+def fetch_one(q):
+    last = None
+    for _ in range(3):
+        for url in OVERPASS:
+            try:
+                req = urllib.request.Request(url, data=urllib.parse.urlencode({'data': q}).encode(), headers={'User-Agent': 'ivao-so-event-generator (github.com/altanico/so-event-generator)'})
+                return json.load(urllib.request.urlopen(req, timeout=180))['elements']
+            except Exception as e:
+                last = e; time.sleep(5)
+        time.sleep(30)
+    raise SystemExit(f'Overpass not reachable: {last}')
 
 def fetch():
-    last = None
-    for url in OVERPASS:
-        for _ in range(3):
-            try:
-                req = urllib.request.Request(url, data=urllib.parse.urlencode({'data': Q}).encode(), headers={'User-Agent': 'ivao-so-event-generator (github.com/altanico/so-event-generator)'})
-                return json.load(urllib.request.urlopen(req, timeout=400))
-            except Exception as e:
-                last = e; time.sleep(20)
-    raise SystemExit(f'Overpass not reachable: {last}')
+    seen, out = set(), []
+    for (s_, w, n, e) in TILES:
+        els = fetch_one(Q.format(s=s_, w=w, n=n, e=e)); time.sleep(2)
+        for el in els:
+            k = (el['type'], el['id'])
+            if k not in seen: seen.add(k); out.append(el)
+        print(f'tile {s_},{w}: {len(els)} elements', flush=True)
+    return {'elements': out}
 
 def pos(e):
     if 'lat' in e: return e['lat'], e['lon']
