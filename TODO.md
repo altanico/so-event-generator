@@ -2,6 +2,7 @@
 
 ## Next build
 
+- [ ] **"Quote della missione" card more compact** (staff 22 Nov, screenshot): the note "nasconde le aree che non hanno quote in comune (quelle che le toccano solo al bordo comprese)" takes a narrow column and becomes 6 lines tall. New layout: first row title + levels (SFC – FL275) + "Tutte le quote" button on the right, all on one line (`white-space:nowrap` for title and levels); the note moves under the sliders as one short muted line, together with the existing hint ("Imposta prima le quote…"), e.g. "Le aree senza quote in comune (anche solo al bordo) sono nascoste. Imposta prima le quote: "Proponile tu" sceglie solo tra le aree che le contengono." Test: the card height ≤ ~150 px at the normal panel width.
 - [ ] **Events – aerodromes: two separate things, toggle buttons** (staff 22 Nov, screenshot of "Basi di partenza e arrivo"):
   - **Departure / arrival bases** = only where the assets (participants' flights, BLUE or RED players) are based; independent of the exercise story; **several allowed**, all equal (no single "main" base). Toggle button **[Base]** on each aerodrome row; roles per base stay in the folded line ("tutti i ruoli" or chosen groups).
   - **BLUE / RED** = attribute of the aerodrome in the **scenario story** (who holds it in the exercise: BLUE airfield, RED-held airfield); toggle buttons **[BLUE] [RED]**, independent of [Base]. Merges today's "Aeroporti occupati da RED (scenario)" into the same list.
