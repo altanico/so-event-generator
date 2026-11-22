@@ -1,6 +1,13 @@
 # TODO
 
 ## Next build (start only when the staff says "fai la build")
+- [ ] **Leave the Claude artifact – GitHub Pages, access levels, event file** (staff 22 Nov, see CLAUDE.md "Target"; waiting for "fai la build"):
+  - auth adapter (level user / sog / staff; GitHub Pages = user, no login), first screen by level: user → "Missione semplice" / "Missione con più partecipanti"; sog → + "Evento SO HQ"; staff → + "Evento divisionale";
+  - outputs by level: user = generic briefings (mission pack, kneeboard, FPL, map, sheets, booking e-mail), no masterplan; sog = + HQ masterplan; staff = + divisional branding (Italian division logo), public page, NOTAM;
+  - event file `.soevent.json` (versioned) import / export for everybody, localStorage autosave, old events still open;
+  - remove `window.claude` (db, user, artifact, downloads); "Pubblica" → download of the public page / JSON to commit;
+  - GitHub Pages setup (repo is private: owner decides – paid plan, public repo or a public site repo); division logo from the staff.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
