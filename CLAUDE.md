@@ -27,13 +27,14 @@ The tool must work **without a Claude account and without the Claude artifact ru
 
 - Events are saved as a **file** anyone can open in the tool: JSON, versioned schema (`{ "format": "ivao-so-event", "version": N, "event": S }`), extension `.soevent.json`. Import / export from the "Eventi salvati" window; also autosave in localStorage.
 - The file contains the scenario, not the outputs (outputs are generated when opened, at the viewer level).
-- Participant names may be in the file (roster): they never go into public outputs (public page, NOTAM, public briefings) – rule unchanged.
+- **Privacy (staff 22 Nov): the file never contains participants.** It holds only the mission itself: theatre, events, areas, bases, flights by callsign / type / task / loadout, scenario, timings, C2 positions and frequencies. Stripped on export: `S.roster` (pilots and controllers), the pilots of each flight (`f.pilots`), the controllers assigned to C2 rows, JTACs, GCI and any other person name or IVAO VID, the author ids of the saved-events list. Participants are added **locally** by each person who builds the mission (roster import / typing in "Partecipanti"), kept only in that browser (localStorage), never uploaded or shared. Opening a file = mission without participants; the generator keeps working (flights without names, "— not staffed —" controllers).
+- Participant names never go into public outputs either (public page, NOTAM, public briefings) – rule unchanged.
 - Old events (saved before the move, without `format`) must still open.
 
 ### What has to go (Claude artifact runtime)
 
 Every use of `window.claude` must be replaced (grep `window.claude`):
-- `claude.use('db')` – "Eventi salvati" in the artifact database → localStorage + file import / export (later the IVAO site backend, behind a storage adapter).
+- `claude.use('db')` – "Eventi salvati" in the artifact database → localStorage + file import / export (later the IVAO site backend, behind a storage adapter; a backend stores the mission only, never the participants).
 - `claude.use('user')` – `officialInit()`, `evWho()`, names of the authors → auth adapter.
 - `claude.use('artifact')` – "Pubblica" (re-saves index.html with `<script id="published-data">`) → on GitHub: download the public page / the published JSON and commit it to the repo (or a `published/` folder); on the IVAO site: backend publish.
 - `claude.use('downloads')` – downloads → plain browser download (already the fallback).

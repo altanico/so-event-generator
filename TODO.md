@@ -5,6 +5,7 @@
   - auth adapter (level user / sog / staff; GitHub Pages = user, no login), first screen by level: user → "Missione semplice" / "Missione con più partecipanti"; sog → + "Evento SO HQ"; staff → + "Evento divisionale";
   - outputs by level: user = generic briefings (mission pack, kneeboard, FPL, map, sheets, booking e-mail), no masterplan; sog = + HQ masterplan; staff = + divisional branding (Italian division logo), public page, NOTAM;
   - event file `.soevent.json` (versioned) import / export for everybody, localStorage autosave, old events still open;
+  - privacy (staff 22 Nov): the file holds the mission only – no roster, no pilot / controller names, no VIDs; participants are added locally by each builder and stay in their browser; test that an exported file contains no name from the roster;
   - remove `window.claude` (db, user, artifact, downloads); "Pubblica" → download of the public page / JSON to commit;
   - GitHub Pages setup (repo is private: owner decides – paid plan, public repo or a public site repo); division logo from the staff.
 
