@@ -23,7 +23,7 @@
   - flight rules follow from the legs: all IFR = **IFR**, all VFR = **VFR**, both = **MISTO** (FPL field 8 Y or Z, with the IFR / VFR change points in field 15);
   - BOAT legs only inside AT / low-level areas (several areas, check boxes), reserved with their time windows; level / altitude of each leg editable;
   - FPL, nav log, kneeboard, map and booking e-mail per leg.
-  - To confirm with the staff: GAT legs (IFR on airways) also allowed, or OAT only.
+  - **GAT** legs too (staff 22 Nov): IFR GAT on airways at FL195 and below, FRA points above, as the current FPL rules. A plan with a GAT IFR part must be **validated with the EUROCONTROL tool** (IFPS validation, e.g. IFPUV) before filing: the tool cannot validate it – the FPL card, the kneeboard and the package show a clear note "GAT part: validate the route with the EUROCONTROL tool before filing" and the user can paste back the corrected route (manual edits kept, as today).
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
