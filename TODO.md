@@ -10,6 +10,8 @@
   - warnings of the known bases (excluded, schools) unchanged; no C2 / APP / TWR proposed for unknown places (TBC);
   - same fields for the flights of complex missions where the base is chosen per flight.
 
+- [ ] **User missions – free aircraft field** (staff 22 Nov): the "Aereo" field is free text with suggestions from the aircraft list (names and aliases, as the roster parser already does). A type not in the list is accepted: the tool asks its ICAO designator (or ZZZZ with the name, FPL field 18 TYP/), the category (fighter / attack / helicopter / transport / tanker / light / other – drives speeds, levels, callsign pool and tasks), wake turbulence category and cruise speed (defaults by category). No loadout catalogue for unknown types (free loadout lines only, chaff / flare and ECM selectable); no check that the type suits the mission, only a note.
+
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
 - Proposed groups: Control of the air (DCA / CAP, OCA sweep & escort, SEAD, AEW & C2, air policing: QRA T-scramble, SMI) · Attack (strike / strategic attack, CAS, air interdiction, maritime strike) · Air mobility (airlift / airdrop / insertion, AAR, HAAR, military aeromedical evacuation, personnel recovery / CSAR) · ISR (recce, maritime patrol) · Basic training (IFR navigation, low-level navigation) · Civil (SAR, HEMS, MEDEVAC, hospital transfer, humanitarian, AIB) · Misto (complex scenario across roles).
