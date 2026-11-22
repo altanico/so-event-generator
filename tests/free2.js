@@ -30,6 +30,15 @@ if(!/non è BOAT/.test(w.warn)||!/EUROCONTROL/.test(w.warn)) fail.push('route ch
 // insert a point by clicking the map (add mode)
 const ins=await page.evaluate(()=>{ const R=APP.FREE().route, n=R.pts.length, a=R.pts[0].pos, b2=R.pts[1].pos; document.getElementById('faddpt').click(); APP.freeMapClick([(a[0]+b2[0])/2+0.01,(a[1]+b2[1])/2]); return { before:n, after:APP.FREE().route.pts.length, man:APP.FREE().route.man }; });
 if(ins.after!==ins.before+1||!ins.man) fail.push('add point '+JSON.stringify(ins));
+// one route only: the engine route of the flight follows the step-3 route; drag a leg = new waypoint
+const one=await page.evaluate(()=>{ const F=APP.FREE(), R=F.route, n=R.pts.length; APP.routeDrop(1,[(R.pts[0].pos[0]+R.pts[1].pos[0])/2-0.05,(R.pts[0].pos[1]+R.pts[1].pos[1])/2]);
+  const eng=APP.S.t.airspace.filter(a=>a.type==='ROUTE'&&APP.S.t.flights.some(f=>f.id===a.flight)); return { n, after:R.pts.length, legs:R.legs.length, same:eng.every(a=>JSON.stringify(a.pts)===JSON.stringify(R.pts.map(p=>p.pos))), eng:eng.length }; });
+if(one.after!==one.n+1||one.legs!==one.after+1) fail.push('leg drag insert '+JSON.stringify(one));
+if(!one.same) fail.push('engine route differs from the step-3 route');
+ins.after=one.after;
+// navigation points: no distance filter, radio aids and fixes shown
+const nc=await page.evaluate(()=>{ const b=document.querySelector('[data-mapwin="nav"]'); if(b&&!document.getElementById('navcount')) b.click(); APP.drawNav(); return (document.getElementById('navcount')||{}).textContent||''; });
+if(!(+((nc.match(/(\d+) punti visibili/)||[])[1]||0) > 500)) fail.push('navigation points '+nc);
 // several areas, search any area, free choice with warnings
 const ar=await page.evaluate(()=>{ const s=APP.freeSearch('R313'); const z=s[0]; APP.freeAreaToggle(z.id); APP.freeBuild(); return { found:s.length, ids:APP.FREE().areas, res:APP.RES().map(x=>x.id), warn:APP.freeAreaWarn(z).join(';'), route:APP.FREE().route.pts.length }; });
 if(!ar.found||ar.ids.length<2||!ar.res.includes('LI-R313')||!/AT/.test(ar.warn)) fail.push('several / searched areas '+JSON.stringify(ar));
