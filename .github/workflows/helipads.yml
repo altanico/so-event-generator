@@ -1,0 +1,26 @@
+name: Hospital helipads (OpenStreetMap)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 1 * *'   # monthly
+  push:
+    branches: [main]
+    paths: ['tools/helipad_build.py', '.github/workflows/helipads.yml']
+permissions:
+  contents: write
+jobs:
+  helipads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: python tools/helipad_build.py data/helipads.json
+      - name: Commit the helipads
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/helipads.json
+          git diff --cached --quiet || git commit -m "Hospital helipads (OpenStreetMap, ODbL) [skip ci]"
+          git pull --rebase && git push

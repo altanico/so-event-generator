@@ -4,6 +4,7 @@
 - The app is one file, `index.html`. Make targeted edits; keep vanilla JS, no build step, no new CDN dependency without asking.
 - Staff UI text is Italian; every generated text (masterplan, decks, public page, serials, glossary, kneeboard) is English.
 - After changes: `npm run serve` then `npm test`; all tests must PASS. Add a test when adding an event type or an output section.
+- Map colours (staff 22 Nov): red is used ONLY for enemy (RED-held) bases among the aerodrome symbols; civil aerodromes teal, military anthracite.
 - Keep TODO.md up to date; the user decides when on-hold items start.
 - Do not start implementing, building or publishing on your own: when the staff asks for a change, write it in TODO.md ("Next build") and wait until they say "fai la build". Then implement everything listed, test, build the preview and publish.
 

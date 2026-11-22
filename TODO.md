@@ -2,29 +2,7 @@
 
 ## Next build
 
-- [ ] **Simple mission AAR (tanker) and AEW: default aircraft and base** (staff 22 Nov, like AIB): AAR mission (Air Mobility → Air-to-Air Refuelling) → the first flight is the tanker `KC-767` (role AAR, callsign from the tanker pool) at **LIRE** Pratica di Mare; AEW / Air Defence mission → the first flight is `G550 CAEW` (role AEW) at **LIRE**. Departure and arrival LIRE by default; receivers / fighters added with "+ Aggiungi un flight" keep the usual defaults; the user can change type, role and bases (helicopter HAAR, other bases…); the area proposals (AAR tracks, INDIA areas) are then sorted from LIRE.
-  - **INDIA areas only for the G550 CAEW** (staff 22 Nov): the INDIA AEW orbit areas are proposed / chosen by default only when the flight is an AEW aircraft (category AEW, e.g. G550 CAEW); an AEW / Air Defence mission flown with a fighter (DCA) gets the A2A / AIR areas, no INDIA (fix `freeAreaOk` / `freeCands`, v1.31 gave INDIA to every aircraft of the AEW mission).
-  - **HAAR** (helicopter air-to-air refuelling, AAR mission with a helicopter): default helicopter `HH-101` (role HAARRCV) at **LIPC** Cervia, departure and arrival LIPC, HAAR areas sorted from Cervia; applied when the AAR mission is switched to a helicopter (type changed to a helicopter or HAAR role chosen), only while the user has not typed the base by hand.
-  Test.
-- [ ] **Simple mission AIB (Aerial Firefighting): CL-415 from a civil airport by default** (staff 22 Nov): the first flight of an AIB mission is `CL-415 Canadair` (callsign CAN + number, as the real Canadair: e.g. CAN 25) instead of the first type of the list; its departure / arrival default is the civil airport (`AIRPORTS[k][3] === 'CIV'`, not EXT) nearest to the chosen fire area: step 2 starts with the civil airport nearest to the previous base / the centre of Italy, and when the area is chosen in step 3 the departure and arrival move to the civil airport nearest to it – only while the user has not typed a departure / arrival by hand (flag on the flight). The user can always change type and aerodromes (helicopters, AT-802, a military base…). Test.
-- [ ] **RAD check of IGAT departures and arrivals** (staff 22 Nov, source EUROCONTROL RAD AIRAC 2612 v1.14, file `RAD_2612_v1_13.xlsx` given by the staff – kept outside git like the other sources): warn when the first / last point of an IGAT route is not a point foreseen by the RAD for that aerodrome.
-  - `tools/rad_build.py <RAD.xlsx>` → `data/rad.json`: only the Italian part (rows with ID `LI…`): sheet "Annex 3A DEP" (DEP AD, last point of SID / SID id, DCT DEP points, FPL option = condition, e.g. "ONLY AVBL FOR TFC ARR LIPX"), sheet "Annex 3A ARR" (ARR AD, first point of STAR / STAR id, DCT ARR points, condition), "Annex 3A Conditions" `LI_LIM_AD` (ARR / DEP DCT = 0 NM) and `LI_TP` (SID / STAR mandatory where published); AIRAC cycle and version in the file. Rebuild at every AIRAC.
-  - Check in the flight plan (only when the leg from / to the aerodrome is IGAT, i.e. GAT IFR): departure → the first route point must be one of the DEP points of the aerodrome; arrival → the last route point must be one of the ARR points; a point with a condition (e.g. only for DEP LIMZ / ARR LIPX) is accepted only when the condition is met, otherwise the warning quotes it. Aerodrome not in the RAD lists (e.g. civil airports with SID / STAR): warning "SID / STAR obbligatorie dove pubblicate (RAD LI_TP): il primo / ultimo punto deve essere quello della SID / STAR". OAT and VFR legs: no RAD check.
-  - Help, no automatic route: in the flight plan step / tab, with an IGAT first or last leg, show the RAD points of the aerodrome ("Punti RAD di partenza LIPS: BOA, NAXAV, CHI, LUMAV, LOMED, TIBRO, VIC") as buttons to add them, and highlight them on the map.
-  - Warnings in Italian in the staff UI; the documents (kneeboard, masterplan) say nothing about the RAD.
-  - Republishing the extract in the public repository: OK (staff 22 Nov: the RAD is public).
-  Test.
-- [ ] **Aerodrome symbols: civil / military / joint / enemy** (staff 22 Nov, mockup "Mockup – simboli aeroporti" https://claude.ai/artifact/7enY7QWajDiD23dykiWYsb): today every base is a small blue square, easy to confuse with the blue areas and radio aids. New symbols (map of the generator and the exported maps / briefing images), by `AIRPORTS[k][3]`:
-  - CIV: open circle, dark teal `#0f766e`, dot in the centre;
-  - MIL: filled circle, anthracite `#1e293b`, white dot in the centre;
-  - JOINT: the civil symbol inside an anthracite square;
-  - enemy (RED-held) base: its type's symbol in red `#dc2626` with a dashed red ring, label "<ICAO> · RED";
-  - EXT (ship / ZZZZ / not in the list): the anchor of today;
-  - no line through the circle (it looks like a "no entry" sign);
-  - label: ICAO code in bold with the short name below, drawn above the navigation points;
-  - departure / arrival of the mission: bigger symbol on a white disc with a thin anthracite border.
-  - **Colour rule (staff 22 Nov): red is used ONLY for enemy bases** – nowhere else on the map or in the UI symbols.
-  Test.
+(empty – write the next requests here)
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
@@ -58,6 +36,35 @@
   - Route editor in the flight plan card: a list of the route points (symbol, name, type, coordinates, airway to the next point) with ▲ ▼ ✕ per row and a search box "Aggiungi punto" (type RIS… -> RISOM, VRP code / name, coordinates 4530N01230E); map and list stay in sync. On the map: click a navigation point -> popup "Aggiungi alla rotta" / "Sostituisci il punto n"; drag and insert on a leg stay; the route text (field 15) rebuilt from the list.
   - Symbols: ICAO Annex 4 standard (staff 21 Nov: no AIP GEN 2.3 legend needed).
   - Done as: map button "🧭 Navigazione ▾" opens the panel (master switch, 12 switches with their symbol: VOR / VOR-DME, VORTAC, TACAN / DME, NDB, en-route fixes, terminal fixes (off by default), FRA points, VRP, military points, military gates, lower airways, point names), counter of visible points / points appearing on zoom; choice saved in S.navL. ICAO Annex 4 SVG symbols (L.divIcon), names as labels from zoom 8 (navaids) / 9; tooltip with type, frequency, coordinates. With a flight plan open, click on a point -> popup "Aggiungi alla rotta di <cs>" (before the arrival point) or "Sostituisci il punto n". Route editor in the card: table of the points (symbol, name, type, coordinates, via) with ▲ ▼ ✕, search box "Aggiungi punto" (ident prefix, VRP / gate name, coordinates 4530N01230E / 453012N0123045E / 45.5 12.3; Enter adds the first result) and "Posizione". PDF / slide maps do not draw navigation points, so nothing to change there.
+
+## v1.32 build (22 Nov 2026) – done
+
+- [x] **Simple mission AAR (tanker) and AEW: default aircraft and base** (staff 22 Nov, like AIB): AAR mission (Air Mobility → Air-to-Air Refuelling) → the first flight is the tanker `KC-767` (role AAR, callsign from the tanker pool) at **LIRE** Pratica di Mare; AEW / Air Defence mission → the first flight is `G550 CAEW` (role AEW) at **LIRE**. Departure and arrival LIRE by default; receivers / fighters added with "+ Aggiungi un flight" keep the usual defaults; the user can change type, role and bases (helicopter HAAR, other bases…); the area proposals (AAR tracks, INDIA areas) are then sorted from LIRE.
+  - **INDIA areas only for the G550 CAEW** (staff 22 Nov): the INDIA AEW orbit areas are proposed / chosen by default only when the flight is an AEW aircraft (category AEW, e.g. G550 CAEW); an AEW / Air Defence mission flown with a fighter (DCA) gets the A2A / AIR areas, no INDIA (fix `freeAreaOk` / `freeCands`, v1.31 gave INDIA to every aircraft of the AEW mission).
+  - **HAAR** (helicopter air-to-air refuelling, AAR mission with a helicopter): default helicopter `HH-101` (role HAARRCV) at **LIPC** Cervia, departure and arrival LIPC, HAAR areas sorted from Cervia; applied when the AAR mission is switched to a helicopter (type changed to a helicopter or HAAR role chosen), only while the user has not typed the base by hand.
+  Test.
+- [x] **Simple mission AIB (Aerial Firefighting): CL-415 from a civil airport by default** (staff 22 Nov): the first flight of an AIB mission is `CL-415 Canadair` (callsign CAN + number, as the real Canadair: e.g. CAN 25) instead of the first type of the list; its departure / arrival default is the civil airport (`AIRPORTS[k][3] === 'CIV'`, not EXT) nearest to the chosen fire area: step 2 starts with the civil airport nearest to the previous base / the centre of Italy, and when the area is chosen in step 3 the departure and arrival move to the civil airport nearest to it – only while the user has not typed a departure / arrival by hand (flag on the flight). The user can always change type and aerodromes (helicopters, AT-802, a military base…). Test.
+- [x] **RAD check of IGAT departures and arrivals** (staff 22 Nov, source EUROCONTROL RAD AIRAC 2612 v1.14, file `RAD_2612_v1_13.xlsx` given by the staff – kept outside git like the other sources): warn when the first / last point of an IGAT route is not a point foreseen by the RAD for that aerodrome.
+  - `tools/rad_build.py <RAD.xlsx>` → `data/rad.json`: only the Italian part (rows with ID `LI…`): sheet "Annex 3A DEP" (DEP AD, last point of SID / SID id, DCT DEP points, FPL option = condition, e.g. "ONLY AVBL FOR TFC ARR LIPX"), sheet "Annex 3A ARR" (ARR AD, first point of STAR / STAR id, DCT ARR points, condition), "Annex 3A Conditions" `LI_LIM_AD` (ARR / DEP DCT = 0 NM) and `LI_TP` (SID / STAR mandatory where published); AIRAC cycle and version in the file. Rebuild at every AIRAC.
+  - Check in the flight plan (only when the leg from / to the aerodrome is IGAT, i.e. GAT IFR): departure → the first route point must be one of the DEP points of the aerodrome; arrival → the last route point must be one of the ARR points; a point with a condition (e.g. only for DEP LIMZ / ARR LIPX) is accepted only when the condition is met, otherwise the warning quotes it. Aerodrome not in the RAD lists (e.g. civil airports with SID / STAR): warning "SID / STAR obbligatorie dove pubblicate (RAD LI_TP): il primo / ultimo punto deve essere quello della SID / STAR". OAT and VFR legs: no RAD check.
+  - Help, no automatic route: in the flight plan step / tab, with an IGAT first or last leg, show the RAD points of the aerodrome ("Punti RAD di partenza LIPS: BOA, NAXAV, CHI, LUMAV, LOMED, TIBRO, VIC") as buttons to add them, and highlight them on the map.
+  - Warnings in Italian in the staff UI; the documents (kneeboard, masterplan) say nothing about the RAD.
+  - Republishing the extract in the public repository: OK (staff 22 Nov: the RAD is public).
+  Test.
+- [x] **Aerodrome symbols: civil / military / joint / enemy** (staff 22 Nov, mockup "Mockup – simboli aeroporti" https://claude.ai/artifact/7enY7QWajDiD23dykiWYsb): today every base is a small blue square, easy to confuse with the blue areas and radio aids. New symbols (map of the generator and the exported maps / briefing images), by `AIRPORTS[k][3]`:
+  - CIV: open circle, dark teal `#0f766e`, dot in the centre;
+  - MIL: filled circle, anthracite `#1e293b`, white dot in the centre;
+  - JOINT: the civil symbol inside an anthracite square;
+  - enemy (RED-held) base: its type's symbol in red `#dc2626` with a dashed red ring, label "<ICAO> · RED";
+  - EXT (ship / ZZZZ / not in the list): the anchor of today;
+  - no line through the circle (it looks like a "no entry" sign);
+  - label: ICAO code in bold with the short name below, drawn above the navigation points;
+  - departure / arrival of the mission: bigger symbol on a white disc with a thin anthracite border.
+  - **Colour rule (staff 22 Nov): red is used ONLY for enemy bases** – nowhere else on the map or in the UI symbols.
+  Test.
+- [x] **Real hospital helipads** (staff 22 Nov: "gli helipad sono di fantasia?"): hospital transfer, HEMS and MEDEVAC destinations use real hospital helipads from OpenStreetMap (`tools/helipad_build.py` → `data/helipads.json`, built by the GitHub Actions workflow `helipads.yml` on push and monthly; helipad within 600 m of an `amenity=hospital`, or a hospital tagged `helipad=yes`). Hospital transfer: sending hospital near the zone, receiving hospital 35–95 km away preferring the large ones (azienda ospedaliera, policlinico, university…). Placeholder points only when the file is missing or no helipad is near. Attribution "© OpenStreetMap contributors" (ODbL) on the map, in the serials that use them, in README.
+  - Done as (v1.32): `apSvg` / `apIcon` / `apMarker` / `apCanvas` (aerodrome symbols, map and exported maps); `tools/rad_build.py` → `data/rad.json` (RAD 2612 v1.14: 28 DEP / 26 ARR aerodromes), `radPts` / `radWarn` / `radHelpHtml` (warnings and "Punti RAD" buttons, points ringed on the map); `FREE_FIRST`, `civNear`, `freeAibBase`, `freeHaar`, `freeAewAc`; `heliList` / `hpPick` in the generator; test `free5.js`.
+
 
 ## v1.31 build (22 Nov 2026) – done
 

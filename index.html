@@ -1308,7 +1308,11 @@ function genEventElements(c) {
       'Route flown inside the area; height respected; TOT met within ±1 minute.'); });
   if (synAll) warnings.push(`Rotte di navigazione: ${synAll} punti sono sintetici (nessun punto del sectorfile dentro le zone riservate). Importa il sectorfile per usare i punti reali.`);
   // --- civil: SAR ---
-  const hosp = (near, r1 = 8, r2 = 25) => O('HOSP', snapRes(dest(near, Math.random() * 360, r1 + Math.random() * (r2 - r1))), { name: `Hospital "${word()}" helipad` });
+  // real hospital helipads (OpenStreetMap, data/helipads.json) when loaded, otherwise a placeholder point (staff 22 Nov)
+  const hpPick = (near, r1, r2, big) => { const L0 = heliList(); if (!L0.length) return null; const c = L0.map(h => ({ h, d: dist(near, h.pos) })).filter(x => x.d >= r1 && x.d <= r2);
+    const pool = (big ? c.filter(x => HELI_BIG.test(x.h.name)) : []).concat(c).slice(0, 40); if (pool.length) return pick(pool.slice(0, 8)).h; const n = L0.slice().sort((a, b) => dist(near, a.pos) - dist(near, b.pos))[0]; return n && dist(near, n.pos) < 90 ? n : null; };
+  const hpObj = (h, extra) => O('HOSP', h.pos.slice(), { name: `${h.name}${h.city && !h.name.toUpperCase().includes(h.city.toUpperCase()) ? ' (' + h.city + ')' : ''} helipad`, real: true, ...extra });
+  const hosp = (near, r1 = 8, r2 = 25) => { const h = hpPick(near, r1, r2 * 1.6, true); return h ? hpObj(h) : O('HOSP', snapRes(dest(near, Math.random() * 360, r1 + Math.random() * (r2 - r1))), { name: `Hospital "${word()}" helipad` }); };
   by('SAR').forEach((fl, i) => { const tgt = pick(['2 hikers missing on a mountain', 'a small boat with 3 persons', 'a crashed light aircraft (ELT 406 MHz)', 'a missing paraglider', 'a person overboard']);
     const o = O('SEARCH', zc('SAR', 0.7), { flight: fl.id, r: [6, 9, 12][lvl], name: `Search area "${word()}"`, note: `Target: ${tgt}. Pattern: ${pick(['expanding square', 'sector search', 'creeping line'])}.` });
     const h = hosp(o.pos, 10, 25);
@@ -1317,18 +1321,19 @@ function genEventElements(c) {
   // --- HEMS ---
   by('HEMS').forEach(fl => { const sc = pick(['road accident with 1 injured', 'mountain accident (hoist needed)', 'cardiac emergency at a rural address', 'work accident at a quarry']);
     const o = O('SCENE', zc('HEMS', 0.8), { flight: fl.id, name: `Scene "${word()}"`, note: `Patient: ${sc}.` }), h = hosp(o.pos, 10, 35);
-    SR('HEMS', `${fl.cs} – HEMS mission`, [fl], `Dispatch calls ${fl.cs}: ${o.note} Fly to ${o.name} (${o.id}), land or hoist, load the patient, deliver to ${h.name} (${h.id}). ${['Clear landing site.', 'Confined landing site: recce first.', 'Night/limited visibility and a second patient.'][lvl]}`,
+    SR('HEMS', `${fl.cs} – HEMS mission`, [fl], `Dispatch calls ${fl.cs}: ${o.note} Fly to ${o.name} (${o.id}), land or hoist, load the patient, deliver to ${h.name} (${h.id}). ${['Clear landing site.', 'Confined landing site: recce first.', 'Night/limited visibility and a second patient.'][lvl]}${h.real ? ' Helipad position © OpenStreetMap contributors.' : ''}`,
       'Phases reported to dispatch (airborne, on scene, patient on board, at hospital); safe landing; time to hospital respected.'); });
   // --- MEDEVAC ---
   by('MEDEVAC').forEach(fl => { const nC = [1, 2, 3][lvl] + 1;
     const o = O('SCENE', zc('MEDEVAC', 0.8), { flight: fl.id, name: `Remote site "${word()}"`, note: `${nC} casualties, ${pick(['mountain refuge', 'island clinic', 'flooded village', 'road blocked by a landslide'])}.` }), h = hosp(o.pos, 15, 40);
-    SR('MEDEVAC', `${fl.cs} – medevac`, [fl], `Evacuate ${nC} casualties from ${o.name} (${o.id}) to ${h.name} (${h.id}). Priority is assigned by dispatch; aircraft using the site follow the sequence given by the coordinator.`,
+    SR('MEDEVAC', `${fl.cs} – medevac`, [fl], `Evacuate ${nC} casualties from ${o.name} (${o.id}) to ${h.name} (${h.id}). Priority is assigned by dispatch; aircraft using the site follow the sequence given by the coordinator.${h.real ? ' Helipad position © OpenStreetMap contributors.' : ''}`,
       'Landing area assessed; casualties loaded by priority; hospital notified; sequence respected.'); });
   // --- hospital transfer ---
-  by('HOSPITAL').forEach(fl => { const a = O('HOSP', zc('HOSPITAL', 0.7), { flight: fl.id, name: `Sending hospital "${word()}" helipad` });
-    const b = O('HOSP', snapRes(dest(a.pos, Math.random() * 360, 20 + Math.random() * 30)), { flight: fl.id, name: `Receiving hospital "${word()}" helipad` });
+  by('HOSPITAL').forEach(fl => { const z0 = zc('HOSPITAL', 0.7), ha = hpPick(z0, 0, 60, false), hb = ha && hpPick(ha.pos, 35, 95, true);
+    const a = ha && hb ? hpObj(ha, { flight: fl.id }) : O('HOSP', z0, { flight: fl.id, name: `Sending hospital "${word()}" helipad` });
+    const b = ha && hb ? hpObj(hb, { flight: fl.id }) : O('HOSP', snapRes(dest(a.pos, Math.random() * 360, 20 + Math.random() * 30)), { flight: fl.id, name: `Receiving hospital "${word()}" helipad` });
     const what = pick(['critical patient (intensive care)', 'organs for transplant (time-critical)', 'blood and plasma supplies', 'neonatal transfer']);
-    SR('HOSP', `${fl.cs} – hospital transfer`, [fl], `Transfer: ${what}. Collect at ${a.name} (${a.id}) and deliver to ${b.name} (${b.id}). ${['Normal priority.', 'Deadline: arrival within 30 minutes.', 'Deadline 25 minutes and an en-route diversion.'][lvl]}`,
+    SR('HOSP', `${fl.cs} – hospital transfer`, [fl], `Transfer: ${what}. Collect at ${a.name} (${a.id}) and deliver to ${b.name} (${b.id}). ${['Normal priority.', 'Deadline: arrival within 30 minutes.', 'Deadline 25 minutes and an en-route diversion.'][lvl]}${a.real ? ' Helipad positions © OpenStreetMap contributors.' : ''}`,
       'Timing respected; helipad procedures followed; hand-over reported to dispatch.'); });
   // --- humanitarian ---
   by('HUMAN').forEach(fl => { const heli = fl.cat === 'HELO', what = pick(['food and water', 'medical supplies', 'shelter kits', 'generators and fuel']);
@@ -3196,7 +3201,7 @@ function initMap() {
   MAP = L.map('map', { zoomControl: true }).setView([v[0], v[1]], v[2]);
   MAP.createPane('land'); MAP.getPane('land').style.zIndex = 350;
   MAP.createPane('bulls'); MAP.getPane('bulls').style.zIndex = 450; // bullseyes above the areas (overlay pane 400) so they can be clicked
-  MAP.attributionControl.addAttribution('Map data: amCharts geodata / Natural Earth · relief: Copernicus DEM GLO-90');
+  MAP.attributionControl.addAttribution('Map data: amCharts geodata / Natural Earth · relief: Copernicus DEM GLO-90 · hospital helipads © OpenStreetMap contributors (ODbL)');
   MAP.on('moveend', () => { drawRelief(MAP); if (S && S.navOn) drawNav(); });
   if (LAND) drawLandLayer();
   LAYERS = L.layerGroup().addTo(MAP);
@@ -3290,8 +3295,8 @@ function drawMap(fit) {
     add(L.marker(bd.redLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#b91c1c;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">RED · ${esc(S.factions.red)}</div>` }) })); } }
   drawRoutes(add); drawNav();
   // bases
-  S.blueBases.forEach(i => { const p = ap(i); if (p) add(L.marker(p, { icon: icon('#2563eb', '', i, 'square', 12) })).bindTooltip(AIRPORTS[i][0]); });
-  RB().forEach(i => { const p = ap(i); if (p) add(L.marker(p, { icon: icon('#dc2626', '', i, 'square', 12) })).bindTooltip(AIRPORTS[i][0] + ' (RED-held)'); });
+  S.blueBases.forEach(i => { if (AIRPORTS[i] && AIRPORTS[i][3] !== 'EXT') apMarker(add, i, { big: isFree() }); });
+  RB().forEach(i => apMarker(add, i, { red: true }));
   CORS().filter(z => dist(z.axis[0], geom().front) < 400).forEach(z => { const on = (S.cor || []).includes(z.id);
     add(L.polygon(z.poly, { color: '#9333EA', weight: on ? 2 : 1, dashArray: '6 4', fillOpacity: on ? .08 : .01, opacity: on ? .9 : .45 })).bindTooltip(`${z.name} · ${corLevels(z)}${on ? ' · IN USO' : ''}`, { sticky: true }).on('click', () => { if (TAB !== 'scenario' || ADDMODE) return; const st = new Set(S.cor || []); st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); });
     if (on) add(L.polyline(z.axis, { color: '#7e22ce', weight: 1.5 })); });
@@ -4099,7 +4104,7 @@ function fplPanelHtml() { const all = fplAll(), f = fplSelF(); if (!f) return ''
     ${table}
     <div class="row" style="align-items:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap"><div style="flex:1 1 200px"><input data-fplq="${f.id}" placeholder="Cerca un punto: nome, codice o coordinate (4530N01230E)" autocomplete="off"></div>
       <button class="b sm shrink ${FADD ? 'primary' : ''}" id="faddpt" title="Ogni clic sulla mappa aggiunge un punto dove allunga meno la rotta">${FADD ? 'Clic sulla mappa… (fine)' : '+ Punti dalla mappa'}</button>${R.pts.length ? `<button class="b sm shrink" data-fplclear="${f.id}" title="Togli tutti i punti">Svuota</button>` : ''}</div>
-    <div id="fplres-${f.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+    <div id="fplres-${f.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>${radHelpHtml(f)}
     <p class="muted" style="font-size:11px;margin:4px 0 0">Mappa: trascina un tratto per aggiungere un punto, trascina un punto per spostarlo, doppio clic per toglierlo. Tipi: ${Object.entries(LEGT).map(([k, v]) => `<span title="${esc(v.d)}" style="white-space:nowrap"><span style="display:inline-block;width:12px;height:3px;background:${v.col};vertical-align:middle;margin-right:3px"></span>${k}</span>`).join(' ')}</p></div>
   <div class="card" style="margin-top:6px"><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 8px">${FPLSHOW.map(([k, l]) => `<div><label style="white-space:nowrap">${l}</label><input data-fpl="${f.id}:${k}" value="${esc(p.out[k])}" style="font-family:monospace"></div>`).join('')}</div>
     <details data-fplmore style="margin-top:6px" ${FPLMORE_OPEN ? 'open' : ''}><summary style="cursor:pointer;font-size:12.5px">Altri campi (8, 9, 10, 15, 18)</summary>
@@ -4202,6 +4207,7 @@ function drawRoutes(add) { if (!S.t || MODE !== 'staff') return; const edit = ro
   legs.forEach((lg, i) => { const pl = add(L.polyline([lg.a, lg.b], { color: LEGT[lg.type].col, weight: R.pts.length ? 4 : 5, opacity: .9, dashArray: R.pts.length ? (lg.oat ? null : '8 5') : '10 7' }));
     pl.bindTooltip(R.pts.length ? `${esc(f.cs)} · tratto ${i + 1} · ${lg.type} · ${legLvlTxt(lg)} · ${lg.nm} NM · trascinalo per aggiungere un punto` : `${esc(f.cs)} · trascina questa linea per creare la rotta`, { sticky: true });
     legDrag(pl, [lg.a, lg.b], (bi, pos) => routeDrop(f, i, pos)); });
+  if (RAD) [['dep', legs[0], 0], ['arr', legs[legs.length - 1], 1]].forEach(([k, Lg, e]) => { if (!Lg.ifr || Lg.oat) return; const r = radPts(f, k); if (!r) return; r.ok.forEach(id => { const q = navRes(id, routeEnds(f)[e]); if (q) add(L.circleMarker(q.pos, { radius: 11, color: '#ea580c', weight: 2, fill: false, dashArray: '3 3', interactive: false })); }); });
   R.pts.forEach((p, i) => { const m = add(L.marker(p.pos, { draggable: true, icon: L.divIcon({ className: '', html: `<div style="background:#0f172a;color:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;font:700 11px sans-serif;border:2px solid #fff;box-shadow:0 1px 3px #0006">${i + 1}</div>`, iconSize: [20, 20], iconAnchor: [10, 10] }), zIndexOffset: 800 }));
     m.bindTooltip(`${i + 1} · ${esc(p.name)} · trascina per spostarlo, doppio clic per toglierlo`);
     m.on('dragend', e => { const ll = e.target.getLatLng(); routeSet(f, RR => { RR.pts[i] = snapPt([+ll.lat.toFixed(5), +ll.lng.toFixed(5)], snapR()); }); });
@@ -4279,12 +4285,24 @@ const freeCode = k => String(k || '').replace(/#\d+$/, '');
 function freePlaces() { const F = S.free; if (!F) return; (F.flights || []).forEach(x => ['dep', 'arr'].forEach(k => { const c = x[k], pl = x[k + 'P'];
   if (!c || (AIRPORTS[c] && AIRPORTS[c][3] !== 'EXT') || (k === 'arr' && x.arr === x.dep)) return; if (pl && pl.pos) AIRPORTS[c] = [pl.name || freeCode(c), pl.pos[0], pl.pos[1], 'EXT']; })); }
 const freeApOk = (x, k) => { if (k === 'arr' && x.arr === x.dep) k = 'dep'; const c = x[k]; return !!c && ((AIRPORTS[c] && AIRPORTS[c][3] !== 'EXT') || !!(x[k + 'P'] && x[k + 'P'].pos)); };
-function freeNewFlight() { const F = FREE(), types = freeTypes(freeKey()), n = F.flights.length, type = types[0] || 'EF-2000 Typhoon', a = AC.find(x => x.type === type) || { cat: 'FIGHTER' };
-  const pool = CS_POOL[a.cat] || CS_POOL.OTHER || ['TRAINER'], used = new Set(F.flights.map(f => f.cs)); let cs = ''; for (let i = 0; !cs || used.has(cs); i++) cs = `${pool[(n + i) % pool.length]} ${1 + Math.floor((n + i) / pool.length)}`;
-  const f0 = F.flights[0], dep = (f0 && f0.dep) || 'LIPS';
-  return { id: uid(), cs, type, size: ['FIGHTER', 'ATTACK'].includes(a.cat) && F.mis !== 'NAV' ? 2 : 1, dep, arr: (f0 && f0.arr) || dep, depP: f0 && f0.depP, arrP: f0 && f0.arrP, form: true, task: freeTaskFor(freeKey(), type) }; }
+// first flight by mission (staff 22 Nov): AIB = CL-415 "CAN" from a civil airport, AAR = KC-767 tanker at LIRE, AEW = G550 CAEW at LIRE
+const FREE_FIRST = { AIB: { type: 'CL-415 Canadair', cs: 'CAN 25', civ: true }, AAR: { type: 'KC-767', base: 'LIRE' }, AEW: { type: 'G550 CAEW', base: 'LIRE' } };
+const civNear = p => Object.keys(AIRPORTS).filter(k => AIRPORTS[k][3] === 'CIV').sort((a, b) => dist(ap(a), p) - dist(ap(b), p))[0];
+function freeNewFlight() { const F = FREE(), key = freeKey(), first = !F.flights.length && FREE_FIRST[key] && AC.find(x => x.type === FREE_FIRST[key].type) ? FREE_FIRST[key] : null;
+  const types = freeTypes(key), n = F.flights.length, type = first ? first.type : types[0] || 'EF-2000 Typhoon', a = AC.find(x => x.type === type) || { cat: 'FIGHTER' };
+  const pool = CS_POOL[a.cat] || CS_POOL.OTHER || ['TRAINER'], used = new Set(F.flights.map(f => f.cs)); let cs = first && first.cs || ''; for (let i = 0; !cs || used.has(cs); i++) cs = `${pool[(n + i) % pool.length]} ${1 + Math.floor((n + i) / pool.length)}`;
+  const f0 = F.flights[0]; let dep = (f0 && f0.dep) || 'LIPS'; if (first && first.base) dep = first.base; else if (first && first.civ) dep = civNear(ap(dep) || [42.5, 12.5]);
+  return { id: uid(), cs, type, size: ['FIGHTER', 'ATTACK'].includes(a.cat) && F.mis !== 'NAV' ? 2 : 1, dep, arr: (f0 && !first && f0.arr) || dep, depP: f0 && !first && f0.depP, arrP: f0 && !first && f0.arrP, form: true, task: freeTaskFor(key, type) }; }
+// HAAR (AAR mission with a helicopter): HH-101 at LIPC Cervia (staff 22 Nov) – only while the user has not typed the bases
+function freeHaar(x, role) { if (freeKey() !== 'AAR') return; const a = freeAc(x), helo = a && a.cat === 'HELO';
+  if (role && x.task === 'HAARRCV' && !helo && AC.find(q => q.type === 'HH-101')) x.type = 'HH-101';
+  if ((x.task === 'HAARRCV' || (freeAc(x) || {}).cat === 'HELO') && !x.apMan) { const same = !x.arr || x.arr === x.dep; x.dep = 'LIPC'; if (same) x.arr = 'LIPC'; } }
+// AIB: once the fire area is chosen, departure / arrival move to the civil airport nearest to it (only while the user has not typed them)
+function freeAibBase() { const F = FREE(); if (freeKey() !== 'AIB') return; const z = freeZones()[0]; if (!z) return; const c = civNear(centroid(z.poly));
+  F.flights.forEach(x => { if (x.apMan || !c) return; const same = !x.arr || x.arr === x.dep; x.dep = c; if (same) x.arr = c; }); }
 // ---- areas: suggestions for the mission, free choice of any area, several areas (staff 22 Nov) ----
 const isLowArea = z => /^AT\s/i.test(z.name || '') || /^LI-AT/.test(z.id || '') || (z.use || []).includes('LOWLEVEL');
+const freeAewAc = () => FREE().flights.some(x => { const a = freeAc(x); return a && a.cat === 'AEW'; });
 const freeHelo = () => FREE().flights.some(x => { const a = freeAc(x); return a && a.cat === 'HELO'; });
 function freeAreaOk(z) { const F = FREE(), m = freeKey(), u = z.use || [], helo = freeHelo(), sea = () => !onLand(centroid(z.poly));
   if (m === 'AIRDROP' || m === 'INSERT') return u.includes('PARA') || u.includes('HELO');
@@ -4292,7 +4310,7 @@ function freeAreaOk(z) { const F = FREE(), m = freeKey(), u = z.use || [], helo 
   if (m === 'CAS' || m === 'STRIKE') return u.includes('FIRING') || u.includes('A2G');
   if (m === 'NAV') return F.prof === 'BOAT' || F.prof === 'MIX' ? isLowArea(z) : false;
   if (m === 'AAR') return helo ? haarArea(z) : (z.type === 'AAR' || u.includes('AAR')) && !haarArea(z); // HAAR areas: helicopters only (staff 22 Nov)
-  if (m === 'AEW' && z.type === 'IND') return true; // INDIA AEW orbit areas first (staff 22 Nov)
+  if (z.type === 'IND') return m === 'AEW' && freeAewAc(); // INDIA AEW orbit areas: only for an AEW aircraft (G550 CAEW…), staff 22 Nov
   if (m === 'AEW' || m === 'ID') return (u.includes('A2A') || u.includes('AIR') || u.includes('SUPERSONIC')) && zArea(z.poly) > 300;
   return false; }
 function freeAreaWarn(z) { const F = FREE(), m = freeKey(), x0 = F.flights[0], w = [];
@@ -4304,20 +4322,20 @@ function freeAreaWarn(z) { const F = FREE(), m = freeKey(), x0 = F.flights[0], w
   return w; }
 function freeCands() { const F = FREE(), f0 = F.flights[0], base = f0 && ap(f0.dep); if (!base) return []; if ((!S.asp || !(S.asp.zones || []).length) && AIPDATA) defaultAirspace();
   const band = TASK_FL[freeTaskFor(freeKey(), f0.type, f0)] || (F.mis === 'CAS' ? [100, 200] : null), fit = z => !band || haarArea(z) || zBandOk(z, band); // areas whose levels fit the mission first
-  const ind = z => freeKey() === 'AEW' && z.type === 'IND' ? 1 : 0;
+  const ind = z => freeKey() === 'AEW' && z.type === 'IND' && freeAewAc() ? 1 : 0;
   return LIBF().filter(z => z.type !== 'COR' && z.poly && freeAreaOk(z)).map(z => ({ z, d: dist(base, centroid(z.poly)) / NMK, fit: fit(z), ind: ind(z) })).filter(x => x.d < (x.ind ? 250 : 170)).sort((a, b) => (b.ind - a.ind) || (b.fit - a.fit) || a.d - b.d).slice(0, 8); }
 const freeNeedsArea = () => { const F = FREE(); return ['CAS', 'STRIKE', 'AAR', 'AEW', 'ID', 'AIRDROP', 'INSERT', 'MAR'].includes(freeKey()) || (F.mis === 'NAV' && (F.prof === 'BOAT' || F.prof === 'MIX')); };
 const freeZones = () => (FREE().areas || []).map(id => LIBF().find(z => z.id === id)).filter(Boolean);
 function freeSearch(q) { q = String(q || '').trim().toUpperCase(); if (q.length < 2) return []; const f0 = FREE().flights[0], base = f0 && ap(f0.dep);
   return LIBF().filter(z => z.poly && (String(z.name || '').toUpperCase().includes(q) || String(z.id || '').toUpperCase().replace(/^LI-/, '').includes(q.replace(/^LI-?/, '')))).sort((a, b) => base ? dist(base, centroid(a.poly)) - dist(base, centroid(b.poly)) : 0).slice(0, 12); }
-function freeAreaToggle(id) { const F = FREE(), l = F.areas || []; F.areas = l.includes(id) ? l.filter(x => x !== id) : l.concat([id]); F.built = 0; }
+function freeAreaToggle(id) { const F = FREE(), l = F.areas || []; F.areas = l.includes(id) ? l.filter(x => x !== id) : l.concat([id]); F.built = 0; freeAibBase(); }
 // flights of the mission as generator flights (a flight not in formation = one plan per aircraft)
 function freeFlights() { const out = [], F = FREE(), boat = F.mis === 'NAV' && (F.prof === 'BOAT' || F.prof === 'MIX');
   F.flights.forEach(x => { const a = freeAc(x) || { cat: 'FIGHTER', roles: [] }, task = F.mis === 'NAV' ? (boat ? 'LOWNAV' : 'IFRNAV') : (x.task && (FREE_ROLES[freeKey()] || []).includes(x.task) && F.mis !== 'MAR' ? x.task : freeTaskFor(freeKey(), x.type, x));
     const one = (cs, size) => out.push({ id: uid(), cs, type: x.type, cat: a.cat, roles: a.roles || [], pilots: [], size, task, base: x.dep, arr: x.arr && x.arr !== x.dep ? x.arr : undefined, acx: x.acx || undefined });
     if (x.form || x.size < 2) one(x.cs, x.size); else { const m = x.cs.match(/^(.*?)(\d+)$/); for (let i = 0; i < x.size; i++) one(m ? `${m[1]}${+m[2] + i}` : `${x.cs} ${i + 1}`, 1); } });
   return out; }
-function freePrep() { const F = FREE(); if (F.areas == null) { const c = freeCands(); F.areas = freeNeedsArea() && c.length ? [c[0].z.id] : []; F.built = 0; } if (!F.built) freeBuild(); }
+function freePrep() { const F = FREE(); if (F.areas == null) { const c = freeCands(); F.areas = freeNeedsArea() && c.length ? [c[0].z.id] : []; F.built = 0; freeAibBase(); } if (!F.built) freeBuild(); }
 let FREEB = false;
 function freeBuild() { if (FREEB) return false; FREEB = true; try { return freeBuild0(); } finally { FREEB = false; } }
 function freeBuild0() { const F = FREE(), mis = freeMis(F.mis); if (!mis || !F.flights.length) return false; freePlaces();
@@ -4340,6 +4358,57 @@ function freeBuild0() { const F = FREE(), mis = freeMis(F.mis); if (!mis || !F.f
   assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   if (F.routeOld && flights[0]) { const R0 = routeOf(flights[0]); R0.pts = F.routeOld.pts || []; R0.legs = F.routeOld.legs || []; delete F.routeOld; routeOf(flights[0]); } // v1.30 navigation route → flight plan of the first flight
   routeSync(); F.built = Date.now(); save(); demSoon(); return true; }
+// ---- aerodrome symbols (staff 22 Nov, mockup "Mockup – simboli aeroporti"): civil = teal open circle with a dot, military = anthracite filled circle with a white dot,
+// joint = the civil symbol in an anthracite square, enemy (RED-held) = its type in red with a dashed ring (red ONLY for enemy bases), departure / arrival = bigger on a white disc ----
+const AP_CIV = '#0f766e', AP_MIL = '#1e293b', AP_RED = '#dc2626';
+const apKind = k => { const t = AIRPORTS[k] && AIRPORTS[k][3]; return t === 'MIL' ? 'MIL' : t === 'JOINT' ? 'JOINT' : t === 'EXT' ? 'EXT' : 'CIV'; };
+const apShort = k => String((AIRPORTS[k] || [k])[0]).replace(/\s+(AB|Airport|Aeroporto)$/i, '').slice(0, 18);
+function apSvg(k, o = {}) { const kind = apKind(k), sz = o.big ? 30 : 22, red = !!o.red, C = red ? AP_RED : AP_CIV, M = red ? AP_RED : AP_MIL;
+  const halo = o.big ? `<circle cx="12" cy="12" r="11.4" fill="#fff" fill-opacity=".9" stroke="${AP_MIL}" stroke-width="1"/>` : '', ring = red ? `<circle cx="12" cy="12" r="11" fill="none" stroke="${AP_RED}" stroke-width="1.4" stroke-dasharray="2.5 2"/>` : '';
+  let g = kind === 'MIL' ? `<circle cx="12" cy="12" r="${red ? 7.5 : 8.5}" fill="${M}"/><circle cx="12" cy="12" r="2.5" fill="#fff"/>`
+    : kind === 'JOINT' ? `<rect x="${red ? 3.5 : 1.8}" y="${red ? 3.5 : 1.8}" width="${red ? 17 : 20.4}" height="${red ? 17 : 20.4}" rx="2" fill="#fff" stroke="${M}" stroke-width="2.4"/><circle cx="12" cy="12" r="5.4" fill="#fff" stroke="${C}" stroke-width="2.4"/><circle cx="12" cy="12" r="1.8" fill="${C}"/>`
+    : `<circle cx="12" cy="12" r="${red ? 6.8 : 7.5}" fill="#fff" stroke="${C}" stroke-width="2.6"/><circle cx="12" cy="12" r="2.4" fill="${C}"/>`;
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" style="overflow:visible;flex:0 0 auto">${halo}${ring}${g}</svg>`; }
+function apIcon(k, o = {}) { const sz = o.big ? 30 : 22, lbl = `<span style="display:flex;flex-direction:column;line-height:1.05;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff"><b style="font:700 ${o.big ? 13 : 12}px Poppins,sans-serif;color:${o.red ? AP_RED : '#0f172a'}">${esc(k)}${o.red ? ' · RED' : ''}</b><span style="font:500 10.5px Poppins,sans-serif;color:#334155">${esc(apShort(k))}</span></span>`;
+  return L.divIcon({ className: 'apsym', html: `<div style="display:flex;align-items:center;gap:3px">${apSvg(k, o)}${lbl}</div>`, iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] }); }
+function apMarker(add, k, o = {}) { const p = ap(k); if (!p) return null; const m = add(L.marker(p, { icon: apIcon(k, o), zIndexOffset: 600 })); m.bindTooltip(`${AIRPORTS[k][0]} – ${{ CIV: 'aeroporto civile', MIL: 'aeroporto militare', JOINT: 'aeroporto civile e militare', EXT: 'posto fuori elenco' }[apKind(k)]}${o.red ? ' (RED-held)' : ''}`); return m; }
+// same symbols on the exported maps (canvas)
+function apCanvas(c, x, y, k, o = {}) { const kind = apKind(k), s = (o.big ? 30 : 22) / 24, C = o.red ? AP_RED : AP_CIV, M = o.red ? AP_RED : AP_MIL, circ = (r, fill, stroke, lw, dash) => { c.beginPath(); c.arc(x, y, r * s, 0, 7); c.setLineDash(dash || []); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw * s; c.stroke(); } c.setLineDash([]); };
+  if (o.big) circ(11.4, 'rgba(255,255,255,.9)', AP_MIL, 1); if (o.red) circ(11, null, AP_RED, 1.4, [2.5 * s, 2 * s]);
+  if (kind === 'MIL') { circ(o.red ? 7.5 : 8.5, M); circ(2.5, '#fff'); }
+  else if (kind === 'JOINT') { const h = (o.red ? 8.5 : 10.2) * s; c.fillStyle = '#fff'; c.fillRect(x - h, y - h, 2 * h, 2 * h); c.strokeStyle = M; c.lineWidth = 2.4 * s; c.strokeRect(x - h, y - h, 2 * h, 2 * h); circ(5.4, '#fff', C, 2.4); circ(1.8, C); }
+  else { circ(o.red ? 6.8 : 7.5, '#fff', C, 2.6); circ(2.4, C); } }
+// ---- RAD (EUROCONTROL Route Availability Document, Italian part, data/rad.json – tools/rad_build.py): connection points of IGAT departures / arrivals (staff 22 Nov) ----
+let RAD = null, HELI = null;
+// hospital helipads (OpenStreetMap, tools/helipad_build.py via GitHub Actions): [name, city, lat, lon, emergency]
+const HELI_BIG = /azienda ospedaliera|policlinico|universit|niguarda|careggi|gemelli|cardarelli|civico|maggiore|san camillo|umberto i|molinette|borgo trento|ospedale di cisanello|trauma/i;
+const heliList = () => (HELI && HELI.list || []).map(r => ({ name: r[0], city: r[1], pos: [r[2], r[3]], em: r[4] }));
+async function heliInit() { try { const r = await fetch('data/helipads.json', { cache: 'no-cache' }); if (r.ok) HELI = await r.json(); } catch (e) { } }
+async function radInit() { try { const r = await fetch('data/rad.json', { cache: 'no-cache' }); if (r.ok) RAD = await r.json(); } catch (e) { } }
+const radPt = x => /^[A-Z]{3,5}\d[A-Z]$/.test(x) ? x.replace(/\d[A-Z]$/, '') : x; // SID / STAR id → its first / last point (GISPA1A → GISPA)
+const radAdMatch = (ad, list) => (list || []).some(x => x === ad || (x.endsWith('*') && ad.startsWith(x.slice(0, -1))));
+// points of the RAD for an aerodrome: ok = usable by this flight, cond = points with a condition this flight does not meet
+function radPts(f, kind) { const ad = freeCode(kind === 'dep' ? f.base : (f.arr || f.base)), other = freeCode(kind === 'dep' ? (f.arr || f.base) : f.base), rows = RAD && RAD[kind] && RAD[kind][ad];
+  if (!rows) return null; const cat = (fplAc(f).a || {}).cat, mil = !FPL_CIV.has((fplAc(f).a || {}).type), ok = new Set(), cond = {};
+  rows.forEach(r => { const pts = [...r.pts, ...r.proc.map(radPt)]; let met = !r.not;
+    if (r.onlyarr && kind === 'dep') met = met && radAdMatch(other, r.onlyarr); if (r.onlydep && kind === 'arr') met = met && radAdMatch(other, r.onlydep);
+    if (r.helo) met = met && cat === 'HELO'; if (r.mil) met = met && mil;
+    pts.forEach(p => { if (met) ok.add(p); else if (!r.not) cond[p] = r.txt; }); });
+  return { ad, ok: [...ok], cond }; }
+// warnings for the IGAT first / last leg of a route
+function radWarn(f, legs, P) { const w = []; if (!RAD || !P.length) return w;
+  [['dep', legs[0], P[0], 'Partenza', 'primo', 'SID'], ['arr', legs[legs.length - 1], P[P.length - 1], 'Arrivo', 'ultimo', 'STAR']].forEach(([k, L, p, lab, which, proc]) => {
+    if (!L || !L.ifr || L.oat) return; const ad = freeCode(k === 'dep' ? f.base : (f.arr || f.base)); if (!AIRPORTS[ad] || AIRPORTS[ad][3] === 'EXT') return;
+    const r = radPts(f, k), id = String(p.id || '').toUpperCase(), wh = which === 'primo' ? 'il primo' : "l'ultimo";
+    if (r && r.ok.includes(id)) return;
+    if (!r || !r.ok.length) { w.push(`${lab} IGAT ${ad}: ${proc} obbligatoria dove pubblicata (RAD LI_TP), ${wh} punto deve essere quello della ${proc}; DCT dall'aeroporto non ammesso (RAD LI_LIM_AD)${r && r.cond[id] ? ` – ${p.name} è previsto solo con la condizione "${r.cond[id]}"` : ''}`); return; }
+    if (r.cond[id]) { w.push(`${lab} IGAT ${ad}: ${p.name} è un punto RAD solo con la condizione "${r.cond[id]}"`); return; }
+    w.push(`${lab} IGAT ${ad}: ${p.name} non è un punto RAD di ${k === 'dep' ? 'partenza' : 'arrivo'} (previsti: ${r.ok.join(', ') || Object.keys(r.cond).join(', ')})`); });
+  return w; }
+function radHelpHtml(f) { if (!RAD) return ''; const legs = routeLegs(f), out = [];
+  [['dep', legs[0], 'partenza', 0], ['arr', legs[legs.length - 1], 'arrivo', 1]].forEach(([k, L, lab, end]) => { if (!L || !L.ifr || L.oat) return; const r = radPts(f, k); if (!r || !r.ok.length) return;
+    out.push(`<div style="font-size:11.5px;margin-top:4px">Punti RAD di ${lab} ${esc(r.ad)}: ${r.ok.map(p => `<button class="b sm" data-radadd="${f.id}|${k}|${esc(p)}" style="padding:1px 6px;margin:1px">${esc(p)}</button>`).join('')}</div>`); });
+  return out.length ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:4px 8px;margin-top:6px"><span class="muted" style="font-size:11px">Tratti IGAT: punti di collegamento previsti dal RAD EUROCONTROL (${esc((RAD.src || '').replace(/^EUROCONTROL /, ''))}).</span>${out.join('')}</div>` : ''; }
 // ---- route of each flight plan, built by the user (v1.31, staff 22 Nov: no automatic route anywhere) ----
 const fdep = () => { const x = FREE().flights[0]; return x && ap(x.dep); }, farr = () => { const x = FREE().flights[0]; return x && ap(x.arr || x.dep); };
 const legLvlDef = (type, cat) => type === 'BOAT' ? (cat === 'HELO' ? 500 : 1000) : type === 'VOAT' || type === 'VGAT' ? (cat === 'HELO' || cat === 'LIGHT' ? -45 : 95) : (cat === 'HELO' ? -60 : cat === 'LIGHT' ? 85 : 150);
@@ -4431,7 +4500,7 @@ function fplFromRoute(f, s, M, icao) { const R = routeOf(f, s), legs = routeLegs
     f13: `${s.dep}${fplClock(0)}`, f15, f16: `${s.dest}${hhmm(eet)}${s.altn ? ' ' + s.altn : ''}`, f18: r18.join(' ') || '0' };
   const out = {}; Object.keys(sug).forEach(k => { out[k] = M[k] != null && M[k] !== '' ? M[k] : sug[k]; });
   if (!P.length) warn.unshift(`Rotta da creare: ${freeCode(f.base) === freeCode(f.arr || f.base) ? 'clicca sulla mappa o su un punto di navigazione' : 'trascina la linea partenza → arrivo sulla mappa, clicca un punto'} oppure cerca un punto`);
-  legs.forEach(L => warn.push(...L.warn)); if (noAw.length) warn.push(`Tratt${noAw.length > 1 ? 'i' : 'o'} ${noAw.join(', ')} IGAT sotto FL195 in DCT: sotto FL195 la parte GAT IFR va su aerovia (aggiungi i punti dell'aerovia)`);
+  legs.forEach(L => warn.push(...L.warn)); warn.push(...radWarn(f, legs, P)); if (noAw.length) warn.push(`Tratt${noAw.length > 1 ? 'i' : 'o'} ${noAw.join(', ')} IGAT sotto FL195 in DCT: sotto FL195 la parte GAT IFR va su aerovia (aggiungi i punti dell'aerovia)`);
   if (igat) warn.push('Parte IGAT: valida la rotta con il tool EUROCONTROL (IFPS) prima di inviare il piano');
   if (out.f7.length > 7) warn.push(`Nominativo "${out.f7}" oltre 7 caratteri (campo 7)`);
   if (fplH() == null) warn.push('H-hour non impostata: EOBT provvisorio 0000');
@@ -4525,7 +4594,7 @@ function freeStep3() { const F = FREE(), c = freeCands(), sel = freeZones(), q =
 function drawFreeMap(add) { const F = FREE(); if (!F || Math.min(F.step, freeReach()) < 3 || !S.t) return;
   F.flights.forEach(x => ['dep', 'arr'].forEach(k => { const c = x[k]; if (c && AIRPORTS[c] && AIRPORTS[c][3] === 'EXT') add(L.marker([AIRPORTS[c][1], AIRPORTS[c][2]], { icon: icon('#0f172a', '⚓', freeCode(c), 'circle', 16) })).bindTooltip(`${esc(freeCode(c))} – ${esc(AIRPORTS[c][0])}`); })); }
 function freeMapZones() { const F = FREE(), ids = new Set(F.areas || []); freeCands().forEach(x => ids.add(x.z.id)); freeSearch(F.aq).forEach(z => ids.add(z.id)); if (F.mis === 'NAV' && (F.prof === 'BOAT' || F.prof === 'MIX')) LIBF().filter(z => z.poly && isLowArea(z)).forEach(z => ids.add(z.id));
-  if (freeKey() === 'AEW') LIBF().filter(z => z.poly && z.type === 'IND').forEach(z => ids.add(z.id));
+  if (freeKey() === 'AEW' && freeAewAc()) LIBF().filter(z => z.poly && z.type === 'IND').forEach(z => ids.add(z.id));
   return LIBF().filter(z => ids.has(z.id) && z.poly); }
 // map layers by navigation type (staff 22 Nov): set once when the flight plan step first opens for a profile, then left as the user sets them
 const NAVL_BY = { VGAT: { vrp: 1 }, VOAT: { vrp: 1, mil: 1, gate: 1 }, BOAT: { vrp: 1, mil: 1, gate: 1 }, IOAT: { fe: 1, fra: 1, mil: 1 }, IGAT: { fe: 1, fra: 1 }, MIX: { fe: 1, vrp: 1, mil: 1, gate: 1 } };
@@ -4640,13 +4709,13 @@ document.addEventListener('change', e => { const t = e.target, d = t.dataset || 
   if (t.id === 'fthr') { F.thr = t.checked; F.built = 0; save(); return; }
   if (d.farea != null) { freeAreaToggle(d.farea); freeBuild(); renderAll(true); drawNav(); return; }
   if (t.id === 'faq') { F.aq = t.value; save(); renderPanel(); drawMap(); return; }
-  if (d.fa) { const x = F.flights.find(q => q.id === d.fa); if (!x) return; x.acx = Object.assign({ cat: 'OTHER', wake: 'M', tas: 300 }, x.acx, { [d.k]: d.k === 'tas' ? +t.value : d.k === 'desig' ? t.value.toUpperCase().trim() : t.value }); if (d.k === 'cat') { x.acx.tas = CAT_TAS[t.value] || x.acx.tas; x.task = freeTaskFor(F.mis, x.type, x); } F.built = 0; save(); renderPanel(); return; }
+  if (d.fa) { const x = F.flights.find(q => q.id === d.fa); if (!x) return; x.acx = Object.assign({ cat: 'OTHER', wake: 'M', tas: 300 }, x.acx, { [d.k]: d.k === 'tas' ? +t.value : d.k === 'desig' ? t.value.toUpperCase().trim() : t.value }); if (d.k === 'cat') { x.acx.tas = CAT_TAS[t.value] || x.acx.tas; x.task = freeTaskFor(freeKey(), x.type, x); freeHaar(x); } F.built = 0; save(); renderPanel(); return; }
   if (d.fp) { const x = F.flights.find(q => q.id === d.fp); if (!x) return; const P = x[d.k + 'P'] = Object.assign({}, x[d.k + 'P']); if (d.pk === 'pos') { const p = parsePos(t.value); if (p) P.pos = p; else if (t.value.trim()) toast('Posizione non valida: lat lon in gradi, es. 43.10 9.85'); } else P.name = t.value.trim().toUpperCase(); F.built = 0; freePlaces(); save(); renderPanel(); return; }
   if (d.ff) { const x = F.flights.find(q => q.id === d.ff); if (!x) return; const k = d.k;
     if (k === 'size') x.size = +t.value; else if (k === 'form') x.form = t.checked;
-    else if (k === 'type') { const v = t.value.trim(), a = v ? resolveType(v) : null; if (a && a.type) { x.type = a.type; delete x.acx; } else if (v) { x.type = v; x.acx = x.acx || { desig: '', cat: 'OTHER', wake: 'M', tas: 300 }; } x.task = freeTaskFor(F.mis, x.type, x); }
-    else if (k === 'dep' || k === 'arr') { const v = t.value.toUpperCase().trim(); if (!v) return renderPanel(); x[k] = v; if (k === 'dep' && (!x.arr || x.arr === x._dep0)) x.arr = v; x._dep0 = x.dep; if (k === 'dep') F.areas = null; freePlaces(); }
-    else x[k] = k === 'cs' ? t.value.toUpperCase().trim() : t.value;
+    else if (k === 'type') { const v = t.value.trim(), a = v ? resolveType(v) : null; if (a && a.type) { x.type = a.type; delete x.acx; } else if (v) { x.type = v; x.acx = x.acx || { desig: '', cat: 'OTHER', wake: 'M', tas: 300 }; } x.task = freeTaskFor(freeKey(), x.type, x); freeHaar(x); }
+    else if (k === 'dep' || k === 'arr') { const v = t.value.toUpperCase().trim(); if (!v) return renderPanel(); x[k] = v; x.apMan = true; if (k === 'dep' && (!x.arr || x.arr === x._dep0)) x.arr = v; x._dep0 = x.dep; if (k === 'dep') F.areas = null; freePlaces(); }
+    else { x[k] = k === 'cs' ? t.value.toUpperCase().trim() : t.value; if (k === 'task') freeHaar(x, true); }
     F.built = 0; save(); renderPanel(); return; }
   if (t.id === 'fdate' || t.id === 'fhh' || t.id === 'fdur') { F[{ fdate: 'date', fhh: 'hh', fdur: 'dur' }[t.id]] = t.id === 'fdate' ? t.value.toUpperCase().trim() : t.value.trim(); F.built = 0; save(); return; } });
 
@@ -4670,13 +4739,15 @@ function facEdit(t, end) {
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 // flight plans tab (v1.22)
-document.addEventListener('click', e => { const t = e.target.closest('[data-navadd],[data-navrep],[data-rpup],[data-rpdel],[data-fpladd],[data-fplclear],#faddpt'); if (!t || !S || !S.t || MODE !== 'staff') return;
+document.addEventListener('click', e => { const t = e.target.closest('[data-navadd],[data-navrep],[data-rpup],[data-rpdel],[data-fpladd],[data-fplclear],[data-radadd],#faddpt'); if (!t || !S || !S.t || MODE !== 'staff') return;
   const fp = id => S.t.flights.find(x => x.id === id), sel = fplSelF(), d = t.dataset;
   if (t.id === 'faddpt') { FADD = !FADD; renderPanel(); if (FADD) toast('Clicca sulla mappa o su un punto di navigazione per aggiungerlo alla rotta'); return; }
   if (d.navadd) { if (!sel) return; MAP && MAP.closePopup && MAP.closePopup(); routeInsertBest(sel, rpPt(NAV.pts[+d.navadd])); toast('Punto aggiunto alla rotta'); return; }
   if (d.navrep) { if (!sel) return; const sl = t.parentElement.querySelector('[data-navrepsel]'), k = +(sl ? sl.value : 0); MAP && MAP.closePopup && MAP.closePopup(); routeSet(sel, R => { if (R.pts[k]) R.pts[k] = rpPt(NAV.pts[+d.navrep]); }); toast('Punto sostituito'); return; }
   if (d.rpup) { const [id, i] = d.rpup.split('|'); return routeMove(fp(id), +i, -1); }
   if (d.rpdel) { const [id, i] = d.rpdel.split('|'); return routeDel(fp(id), +i); }
+  if (d.radadd) { const [id, k, pid] = d.radadd.split('|'), f = fp(id); if (!f) return; const near = routeEnds(f)[k === 'dep' ? 0 : 1], q = navRes(pid, near); if (!q) return toast(`${pid} non trovato nei dati di navigazione`);
+    const R = routeOf(f); routeInsertAt(f, rpPt(q), k === 'dep' ? 0 : R.pts.length); toast(`${pid} aggiunto alla rotta`); return; }
   if (d.fplclear) { const f = fp(d.fplclear); return routeSet(f, R => { R.pts = []; R.legs = R.legs.slice(0, 1); }); }
   if (d.fpladd) { const [id, k, v] = d.fpladd.split('|'), f = fp(id); if (!f) return; const pt = k === 'c' ? rpCoord(v.split(',').map(Number)) : rpPt(NAV.pts[+v]); routeInsertBest(f, pt); toast(`${pt.name} aggiunto alla rotta`); } });
 // leg type / level of a route (data-rl="<flight id>|<leg>")
@@ -5057,8 +5128,8 @@ async function renderMap(mode, opt = {}) {
     if (!S.t) [...J.cps, ...J.ips].forEach(q => { dot(q.pos, '#0ea5e9', 6); const [a, b] = P(q.pos); label((J.cps.includes(q) ? 'CP ' : q.heli ? '' : 'IP ') + q.name, a + 9, b + 4, K2('#bae6fd'), 15); }); }
   else if (!S.t && S.cas && REL().cas && mode === 'generic') S.cas.jtacs.forEach(J => [...J.cps, ...J.ips].forEach(q => { dot(q.pos, '#0ea5e9', 6); const [a, b] = P(q.pos); label((J.cps.includes(q) ? 'CP ' : q.heli ? '' : 'IP ') + q.name, a + 9, b + 4, K2('#bae6fd'), 15); }));
   if (bullShown() && !opt.jtac && !opt.aib && !opt.sar && !opt.pr && !(S.t && mode !== 'generic' && S.t.airspace.some(a => a.type === 'BULLSEYE'))) { const bp = bullPos(); circle(bp, 18.52, K2('#fbbf24'), null); circle(bp, 37.04, K2('rgba(251,191,36,.5)'), null); const [x, y] = P(bp); label('◎ ' + S.meta.bullseye, x + 6, y + 16, K2('#fde68a'), 16); }
-  S.blueBases.forEach(i => { const p = ap(i); if (!p) return; sq(p, '#2563eb'); const [x, y] = P(p); label(i, x + 8, y - 6, K2('#bfdbfe'), 16); });
-  RB().forEach(i => { const p = ap(i); if (!p) return; sq(p, '#dc2626'); const [x, y] = P(p); label(i, x + 8, y - 6, K2('#fecaca'), 16); });
+  S.blueBases.forEach(i => { const p = ap(i); if (!p) return; if (AIRPORTS[i][3] === 'EXT') { dot(p, '#0f172a', 7); const [x0, y0] = P(p); label(freeCode(i) + ' ' + AIRPORTS[i][0], x0 + 12, y0 - 6, LT ? '#0f172a' : '#e2e8f0', 15); return; } const [x, y] = P(p); apCanvas(c, x, y, i, { big: isFree() }); label(i, x + 14, y - 6, LT ? '#0f172a' : '#e2e8f0', 16); });
+  RB().forEach(i => { const p = ap(i); if (!p) return; const [x, y] = P(p); apCanvas(c, x, y, i, { red: true }); label(i + ' · RED', x + 14, y - 6, LT ? '#b91c1c' : '#fecaca', 16); });
   c.font = '11px Arial'; c.fillStyle = K2('rgba(255,255,255,.6)');
   c.fillText(tiles ? 'Map data: amCharts geodata / Natural Earth' : 'Basemap unavailable – schematic grid', W - 270, H - 8);
   try { return cv.toDataURL('image/png'); } catch (err) { return opt.noTiles ? null : renderMap(mode, { ...opt, noTiles: true }); }
@@ -6128,8 +6199,8 @@ function initPublicMap() {
   { const bd = borderGeom(); if (bd) { add(L.polygon(bd.red, { stroke: false, fillColor: '#ef4444', fillOpacity: .07, interactive: false })); add(L.polygon(bd.blue, { stroke: false, fillColor: '#3b82f6', fillOpacity: .05, interactive: false }));
     add(L.polyline(bd.line, { color: '#7f1d1d', weight: 3, dashArray: '12 6' })).bindTooltip(`BLUE / RED boundary – ${S.factions.blue} | ${S.factions.red}`); } }
   if (bullShown() && !(S.t && S.t.airspace.some(a => a.type === 'BULLSEYE'))) { const bp = bullPos(); pts.push(bp); add(L.circle(bp, { radius: 18520, color: '#D97706', weight: 1, fill: false })); add(L.marker(bp, { icon: icon('#f59e0b', '◎', S.meta.bullseye, 'circle', 16) })).bindTooltip(`Bullseye ${S.meta.bullseye}`); }
-  S.blueBases.forEach(i => { const p = ap(i); if (p) { pts.push(p); add(L.marker(p, { icon: icon('#2563eb', '', i, 'square', 12) })).bindTooltip(AIRPORTS[i][0]); } });
-  RB().forEach(i => { const p = ap(i); if (p) { pts.push(p); add(L.marker(p, { icon: icon('#dc2626', '', i, 'square', 12) })).bindTooltip(AIRPORTS[i][0] + ' (RED-held)'); } });
+  S.blueBases.forEach(i => { const p = ap(i); if (p) { pts.push(p); apMarker(add, i); } });
+  RB().forEach(i => { const p = ap(i); if (p) { pts.push(p); apMarker(add, i, { red: true }); } });
   if (!S.t) S.zones.forEach(z => { const col = z.side === 'BLUE' ? '#3b82f6' : '#ef4444'; pts.push(dest(z.center, 0, z.r), dest(z.center, 180, z.r));
     add(L.circle(z.center, { radius: z.r * 1000, color: col, weight: 1.5, dashArray: '6 6', fillOpacity: .08 })).bindTooltip(CATS[z.cat].label); });
   else {
@@ -6255,10 +6326,12 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
+heliInit();
+radInit().then(() => { if (S && S.t && MODE === 'staff' && (TAB === 'fpl' || isFree())) renderPanel(); });
 navInit().then(() => { NAVG = null; AWYIDX = null; if (MAP && S && S.navOn) drawNav(); if ((TAB === 'fpl' || isFree()) && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 levelInit(); renderEvBadge();
-window.APP = { AC, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AC, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

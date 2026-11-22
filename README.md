@@ -82,6 +82,11 @@ A new event starts from the first screen: "Evento ufficiale della divisione" (di
 
 The generator never proposes a route: every flight plan starts as departure → arrival ("DCT") and the route is built by the user on the map (drag the line, click points, search a point), one flight at a time, in the "Piano di volo" step of the simple mission or the "Piani di volo" tab of events. Each leg has a type: BOAT (OAT VFR below 2000 ft AGL, AT areas only), VOAT (OAT VFR up to FL285), IOAT (OAT IFR), VGAT (GAT VFR up to FL195), IGAT (GAT IFR: airways up to FL195, FRA above, EUROCONTROL validation). Field 8 (I / V / Y / Z + M or G) and the IFR / VFR and OAT / GAT change points of field 15 follow the legs; the other fields are proposed and can be edited. Procedure points (approach IAF / FAF, terminal fixes) are never used to snap a point. A flight without a route shows "Route to be filed by the flight" in the documents.
 
+## RAD and hospital helipads (v1.32)
+
+- `data/rad.json` – Italian part of the EUROCONTROL Route Availability Document (aerodrome connectivity, Annex 3A DEP / ARR, and the Italian conditions LI_LIM_AD, LI_TP), built with `python3 tools/rad_build.py RAD_<airac>.xlsx` at every AIRAC (the xlsx stays outside git). Used to warn when the first / last point of an IGAT route is not a RAD point of the aerodrome.
+- `data/helipads.json` – hospital helipads of Italy from OpenStreetMap (data © OpenStreetMap contributors, ODbL 1.0), built by the workflow `helipads.yml` (`tools/helipad_build.py`, Overpass API) on push and monthly. Used for hospital transfer, HEMS and MEDEVAC destinations.
+
 ## Hosting and access (v1.27)
 
 - Static site (GitHub Pages of this repository): open `index.html`; no account, no server. The normal link opens the generator at the `user` level; the `sog` and `staff` levels open from private links (`#k=<key>`; only the SHA-256 of the keys is in the code). The public page of the published event is at `#evento` and reads `published/event.json`.
