@@ -2,7 +2,7 @@
 
 ## Next build
 
-(empty)
+- [ ] **Navigation legs: traffic type × flight rules** (staff 22 Nov): leg types BOAT (OAT VFR, < 2000 ft AGL, AT areas only), VOAT (OAT VFR, up to FL285), IOAT (OAT IFR), **VGAT** (GAT VFR, up to FL195 – new), **IGAT** (GAT IFR, airways up to FL195, FRA above, EUROCONTROL validation note – today's "GAT"). Profiles BOAT / VOAT / IOAT / VGAT / IGAT / MISTO (any combination in the mixed one). FPL: field 8 rules from the legs (I / V / Y / Z) + M when any leg is OAT, otherwise G; field 15 IFR / VFR and OAT / GAT change points (OAT / GAT markers with the ICAO format, RMK/OAT GAT with the Italian one). Checks: VGAT above FL195, VOAT above FL285. Old routes with "GAT" legs become IGAT. Colours on the map / table for the five types. Tests.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
 - Basis: NATO AJP-3.3 Edition C (Feb 2026), four operational roles of air power: control of the air, attack, air mobility, ISR (EW = enabler across all roles). Plus two non-doctrinal groups: basic flying training, civil / civil protection.
