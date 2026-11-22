@@ -2,6 +2,8 @@
 
 ## Next build
 
+- [ ] **Bug – going back from step 4 to step 3 switches the navigation data off** (staff 22 Nov): moving between the steps of the simple mission (and changing an area, which regenerates the mission) must keep the navigation layer and its settings as the user left them; the automatic setting by profile applies only the first time step 3 opens for that profile. Find what clears `S.navOn` / `S.navL` (regeneration, step change, map tools window) and fix; test: step 3 → 4 → 3 → change area → layer still on with the same kinds.
+
 - [ ] **The user builds the route – no automatic FPL route (simple missions, complex missions, events)** (staff 22 Nov, AEW test: the FPL route was absurd – it started at VOR08, the IAF of the VOR 08 procedure – and it was not drawn; it could be seen only via "Modifica i piani di volo", hard to notice). For every mission type of the simple mission:
   - no route proposed: the route starts empty (departure → arrival only); step 3 shows the route builder (legs table, drag a leg, add points, type / level per leg) for every mission type, not only Navigation, with a clear call to action at the top ("Crea la tua rotta: trascina il tratto partenza → arrivo sulla mappa o aggiungi i punti") and the route drawn on the map from the start;
   - the area work (orbit, holding, CAS block, track) stays in the area as generated; the route is only the way there and back;
