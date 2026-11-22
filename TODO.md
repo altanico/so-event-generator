@@ -2,6 +2,8 @@
 
 ## Next build
 
+- [ ] **Bug – missione semplice, step 3: navigation points missing** (staff 22 Nov, screenshot): two causes: (1) the v1.28 filter keeps only points within 30 NM of the route POINTS and areas, so along long legs (e.g. 13 → 14) radio aids and fixes disappear; (2) the zoom thresholds hide VOR / NDB / TACAN and labels at regional zoom. Fix: radio aids (VOR, VOR-DME, VORTAC, TACAN, NDB) always shown in the whole view at every zoom with their identifier; fixes / VRP / military points within 30 NM of the route LEGS (distance to the segment, not to the points) and of the chosen areas; labels for the points near the route from zoom 7; the counter says how many are hidden and why. Same rule in the "Piani di volo" tab.
+
 - [ ] **Bug – missione semplice, Navigazione: second dashed route on the map** (staff 22 Nov, screenshot): the dashed green line with hollow circles is the low-level route the event engine generates for the LOWNAV flight (airspace ROUTE); since v1.28 the mission elements are drawn in the simple mission, so it appears next to the real route (numbered points, used by FPL / nav log / kneeboard). Fix: in the simple Navigazione the route of step 3 replaces the engine route (the engine ROUTE airspace of the flight is set from S.free.route, so map, documents and serials show one route only); test that only one route is drawn / listed.
 
 ## Proposal under discussion – event categories by current doctrine (19 Nov)
