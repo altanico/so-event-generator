@@ -2,6 +2,13 @@
 
 ## Next build
 
+- [ ] **RAD check of IGAT departures and arrivals** (staff 22 Nov, source EUROCONTROL RAD AIRAC 2612 v1.14, file `RAD_2612_v1_13.xlsx` given by the staff – kept outside git like the other sources): warn when the first / last point of an IGAT route is not a point foreseen by the RAD for that aerodrome.
+  - `tools/rad_build.py <RAD.xlsx>` → `data/rad.json`: only the Italian part (rows with ID `LI…`): sheet "Annex 3A DEP" (DEP AD, last point of SID / SID id, DCT DEP points, FPL option = condition, e.g. "ONLY AVBL FOR TFC ARR LIPX"), sheet "Annex 3A ARR" (ARR AD, first point of STAR / STAR id, DCT ARR points, condition), "Annex 3A Conditions" `LI_LIM_AD` (ARR / DEP DCT = 0 NM) and `LI_TP` (SID / STAR mandatory where published); AIRAC cycle and version in the file. Rebuild at every AIRAC.
+  - Check in the flight plan (only when the leg from / to the aerodrome is IGAT, i.e. GAT IFR): departure → the first route point must be one of the DEP points of the aerodrome; arrival → the last route point must be one of the ARR points; a point with a condition (e.g. only for DEP LIMZ / ARR LIPX) is accepted only when the condition is met, otherwise the warning quotes it. Aerodrome not in the RAD lists (e.g. civil airports with SID / STAR): warning "SID / STAR obbligatorie dove pubblicate (RAD LI_TP): il primo / ultimo punto deve essere quello della SID / STAR". OAT and VFR legs: no RAD check.
+  - Help, no automatic route: in the flight plan step / tab, with an IGAT first or last leg, show the RAD points of the aerodrome ("Punti RAD di partenza LIPS: BOA, NAXAV, CHI, LUMAV, LOMED, TIBRO, VIC") as buttons to add them, and highlight them on the map.
+  - Warnings in Italian in the staff UI; the documents (kneeboard, masterplan) say nothing about the RAD.
+  - Before committing `data/rad.json` to the public repository: check that the EUROCONTROL terms allow republishing the extract (ask the owner, as for the other sources).
+  Test.
 - [ ] **Aerodrome symbols: civil / military / joint / enemy** (staff 22 Nov, mockup "Mockup – simboli aeroporti" https://claude.ai/artifact/7enY7QWajDiD23dykiWYsb): today every base is a small blue square, easy to confuse with the blue areas and radio aids. New symbols (map of the generator and the exported maps / briefing images), by `AIRPORTS[k][3]`:
   - CIV: open circle, dark teal `#0f766e`, dot in the centre;
   - MIL: filled circle, anthracite `#1e293b`, white dot in the centre;
