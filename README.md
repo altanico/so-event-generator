@@ -93,6 +93,11 @@ The generator never proposes a route: every flight plan starts as departure → 
 - Events: "Basi degli assetti" = only the departure / arrival bases of the participants (several, all equal, no meaning in the story); the base of each flight is automatic or chosen in the flights table. The RED airfields of the story are computed from the border.
 - Simple mission "Calibration" (Navigation & Training): FLIGHTCHECK P-180 from LIRE; one or more checks (VOR / TACAN / NDB, ILS, PAPI, PAR) at one of the 19 military aerodromes, filtered by what each aerodrome has.
 
+## Simple missions and calibration kneeboard (v1.35)
+
+- A simple mission has no exercise name: its outputs use callsign + mission + date (e.g. `FLIGHTCHECK66_Calibration_KNEEBOARD.pdf`). KNOCK IT OFF only for tactical training; other missions: MAYDAY / PAN PAN, 7700, follow ATC.
+- Calibration: the APP / TWR / GCA positions of the checked aerodrome go in the C2 list, serials and kneeboard (frequencies from the ATC data, TBC when missing). The kneeboard has one checklist page per check with the radio aid (TACAN channel and VHF, paired VHF computed from the channel), a drawing of the check and editable PASS / FAIL + remarks fields. FLIGHTCHECK flights use numbers 66–69.
+
 ## Hosting and access (v1.27)
 
 - Static site (GitHub Pages of this repository): open `index.html`; no account, no server. The normal link opens the generator at the `user` level; the `sog` and `staff` levels open from private links (`#k=<key>`; only the SHA-256 of the keys is in the code). The public page of the published event is at `#evento` and reads `published/event.json`.

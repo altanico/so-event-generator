@@ -16,6 +16,9 @@ TOK = {'EUFI': ['EF-2000 Typhoon'], 'F35': ['F-35A'], 'VF35': ['F-35B'], 'F35B':
        'H47': ['CH-47 Chinook'], 'A129': ['AH-129 Mangusta'], 'A109': ['AW109 / H145 / H135 (light twin helo)'], 'B06': ['AW109 / H145 / H135 (light twin helo)'], 'A169': ['AW169'],
        'CL2T': ['CL-415 Canadair'], 'CL415': ['CL-415 Canadair'], 'S64': ['S-64 Skycrane / heavy firefighting helo']}
 
+# fixed numbers by callsign (staff 23 Nov): the calibration flights are FLIGHTCHECK 66..69 (FLTCK66..69)
+NUMBERS = {'FLIGHTCHECK': [66, 67, 68, 69]}
+
 def cell(v): return re.sub(r'\s+', ' ', str(v or '')).strip()
 def icaos(t): return re.findall(r'\b(LI[A-Z]{2})\b', t)
 def toks(t): return [x for x in re.split(r'[\s|,()\-/]+', t.upper()) if x]
@@ -49,7 +52,7 @@ def main(src, dst='data/callsigns.json'):
             if not r[3] or not base: continue
             ac, calib = types(r[2]), 'RADIOMISURE' in r[2].upper()
             if not ac: continue
-            out['units'].append({'bases': base, 'unit': r[1], 'ac': ac, 'oat': r[3].upper(), 'fpl': re.sub(r'XX$', 'xx', r[4].upper()), 'gat': gatc, **({'calib': True} if calib else {})})
+            out['units'].append({'bases': base, 'unit': r[1], 'ac': ac, 'oat': r[3].upper(), 'fpl': re.sub(r'XX$', 'xx', r[4].upper()), 'gat': gatc, **({'calib': True} if calib else {}), **({'numbers': NUMBERS[r[3].upper()]} if r[3].upper() in NUMBERS else {})})
         elif sec == 'Esercito Italiano':
             if a: base = list(dict.fromkeys(icaos(a)))
             if r[6] and r[6] != '"': gatc = gat(r[6])

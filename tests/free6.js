@@ -10,7 +10,7 @@ await page.evaluate(()=>{ APP.S=APP.newScenario(); APP.renderAll(); }); await pa
 // defaults and callsigns
 const def=async(mis,sub)=>page.evaluate(([m,s])=>{ const F=APP.FREE(); F.mis=m; F.sub=s||''; if(m==='CALIB') F.calChk=[s]; F.rr=true; F.flights=[]; F.areas=null; F.built=0; APP.S.fpl=null; F.step=2; APP.renderAll(); const x=F.flights[0]; return [x.type,x.dep,x.cs,x.task].join('|'); },[mis,sub]);
 const want={ 'STRIKE':'F-35A|LIPL|LUCE 01|STRIKE', 'ID':'EF-2000 Typhoon|LIRS|GA01|QRA', 'MAR/MPA':'P-72A|LICZ|SPADA 01|MPA', 'AIRMOB/AIRLIFT':'C-130J|LIRP|LYRA 01|AIRLIFT', 'AIRMOB/AIRDROP':'C-130J|LIRP|LYRA 01|AIRDROP',
-  'AIRMOB/INSERT':'HH-101|LIRM|TIGER 01|INSERT', 'AIRMOB/HUMAN':'Falcon 900|LIRA|TANGO 01|HUMAN', 'CALIB/CPAPI':'P-180 Avanti|LIRE|FLIGHTCHECK 01|CALIB' };
+  'AIRMOB/INSERT':'HH-101|LIRM|TIGER 01|INSERT', 'AIRMOB/HUMAN':'Falcon 900|LIRA|TANGO 01|HUMAN', 'CALIB/CPAPI':'P-180 Avanti|LIRE|FLIGHTCHECK 66|CALIB' };
 for(const [k,v] of Object.entries(want)){ const [m,s]=k.split('/'); const got=await def(m,s); if(got!==v) fail.push(`default ${k}: ${got}`); }
 const anti=await def('MAR','ANTISHIP'); if(/P-72A/.test(anti)) fail.push('anti-surface got the MPA default '+anti);
 // FPL field 7: short form of the list, GAT callsign when all GAT

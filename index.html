@@ -1773,12 +1773,13 @@ function buildC2(flights, assigned) {
 function buildTextsSober(flights, assigned, el) {
   const P = PROF(), uniq = a => [...new Set(a)];
   const roe = uniq(P.list.flatMap(e => e.rules || []));
-  roe.push('No weapons are released in this exercise: all traffic is cooperative.', 'Any real emergency: call KNOCK IT OFF and follow ATC instructions.');
+  const kio = P.ids.some(k => ['ID', 'AEW', 'AAR', 'HAAR'].includes(k)); // KNOCK IT OFF only with tactical / air-to-air training (staff 23 Nov)
+  roe.push('No weapons are released in this exercise: all traffic is cooperative.', kio ? 'Any real emergency: call KNOCK IT OFF and follow ATC instructions.' : 'Any real emergency: MAYDAY / PAN PAN on the frequency in use, squawk 7700 and follow ATC instructions.');
   const spins = [...(REL().bull ? [`Bullseye: ${S.meta.bullseye} – ${fmtLL(bullPos())}.`] : []), 'Check-in with the controlling position: callsign, mission, position, altitude, fuel/playtime.', 'Squawk codes: assigned by ATC (TBD).', 'Lost comms: continue as briefed, squawk 7600, land at the nearest suitable airfield.', ...uniq(P.list.flatMap(e => e.spins || []))];
   const words = shuffle(WORDS);
   const codewords = [[words[0], 'Exercise start'], ...P.list.flatMap(e => (e.words || []).map(w => [w[0], w[0]])).slice(0, 0)];
   P.list.forEach((e, i) => (e.words || []).forEach(w => codewords.push([words[1 + i], w[0]])));
-  codewords.push([words[6], 'Exercise end – all players RTB'], ['KNOCK IT OFF', 'Exercise stop (real emergency)']);
+  codewords.push([words[6], 'Exercise end – all players RTB']); if (kio) codewords.push(['KNOCK IT OFF', 'Exercise stop (real emergency)']);
   const tl = [['H-60', 'Mass briefing'], ['H-30', 'Start-up / taxi']];
   const ev = uniq(P.list.flatMap(e => (e.tl || []).map(x => x.join('|')))).map(x => x.split('|')).sort((a, b) => timeKey(a[0]) - timeKey(b[0]));
   tl.push(...ev, ['H+90', 'End of exercise and debrief']);
@@ -3909,8 +3910,8 @@ function bookTime(off) { const d = evDate(), h = String(S.meta.hHour || '').matc
 function bookMail(o = {}) { const p2 = n => String(n).padStart(2, '0'), hm = t => t ? `${p2(t.getUTCHours())}${p2(t.getUTCMinutes())}` : 'TBD';
   const st = bookTime(o.start != null ? o.start : -15), en = bookTime(o.end != null ? o.end : 120), dl = bookTime((o.start != null ? o.start : -15) - 48 * 60);
   const areas = (o.areas || RES()).filter(z => z && z.poly), fl = (o.flights || (S.t ? S.t.flights : [])).map(f => `${f.cs} (${f.size} x ${f.type})`);
-  const day = S.meta.date || 'DATE TBD', subj = `Area activation request – ${S.meta.op} – ${day}`;
-  const body = [`Hello,`, ``, `we would like to request the activation of the following areas for a training mission.`, ``, `Mission: ${S.meta.op}`, `Date: ${day}`, `Time: ${hm(st)} – ${hm(en)} UTC`, ``,
+  const day = S.meta.date || 'DATE TBD', subj = `Area activation request – ${opTitle()} – ${day}`;
+  const body = [`Hello,`, ``, `we would like to request the activation of the following areas for a training mission.`, ``, `Mission: ${opTitle()}`, `Date: ${day}`, `Time: ${hm(st)} – ${hm(en)} UTC`, ``,
     `Areas:`, ...(areas.length ? areas.map(z => `- ${z.name}${z.id && /^LI-/.test(z.id) ? ` (${z.id.replace(/^LI-/, '')})` : ''}: ${z.lower} – ${z.upper}${o.levels && o.levels[z.id] ? `, used ${o.levels[z.id]}` : ''}${o.wins && o.wins[z.id] ? `, ${hm(bookTime(Math.floor(o.wins[z.id][0])))} – ${hm(bookTime(Math.ceil(o.wins[z.id][1])))} UTC` : ''}`) : ['- none (route only)']), ``,
     `Flights: ${fl.join(', ') || 'TBD'}`, ``, `Thank you.`].join('\n');
   return { to: BOOK_TO, subj, body, deadline: dl ? `${p2(dl.getUTCDate())} ${MON[dl.getUTCMonth()]} ${dl.getUTCFullYear()}, ${hm(dl)} UTC` : '', href: `mailto:${BOOK_TO}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}` }; }
@@ -4099,7 +4100,7 @@ const fplAll = () => S.t ? S.t.flights.map(f => ({ f, p: fplBuild(f) })) : [];
 // plans for the documents: computed in the staff app, taken from the published payload on the public page
 const fplDocs = () => MODE !== 'staff' ? (S.fplTxt || []).map(x => ({ cs: x.cs, size: x.size || '', type: x.type || '', txt: x.txt })) : fplAll().map(({ f, p }) => ({ cs: f.cs, size: f.size, type: f.type, txt: fplDocTxt(p) }));
 const fplIcao = () => MODE !== 'staff' && S.fplTxt ? S.fplFmt === 'ICAO' : !!fplStore().icao;
-function fplTextFile() { const L = [`${S.meta.op} – suggested flight plans`, `${S.meta.date || 'Date TBD'} · H-hour ${S.meta.hHour || 'TBD'} · ${fplStore().icao ? 'OAT in ICAO format (field 15)' : 'Italian OAT format (field 18 RMK/OAT)'}`, `Navigation data: ${NAV ? NAV.src : 'not loaded'}. Routes are built by each flight; the other fields are suggestions: check and adapt before filing.`, ''];
+function fplTextFile() { const L = [`${opTitle()} – flight plans`, `${S.meta.date || 'Date TBD'} · H-hour ${S.meta.hHour || 'TBD'} · ${fplStore().icao ? 'OAT in ICAO format (field 15)' : 'Italian OAT format (field 18 RMK/OAT)'}`, `Navigation data: ${NAV ? NAV.src : 'not loaded'}. Routes are built by each flight; the other fields are suggestions: check and adapt before filing.`, ''];
   fplAll().forEach(({ f, p }) => { L.push(`${f.cs} – ${f.size} × ${f.type} – ${ROLES[f.task] || f.task}`, p.icaoTxt, 'Route: ' + (p.noRoute ? 'to be filed by the flight' : [p.s.dep, ...p.pts.map(x => x.name + (x.k && !navPub(x) ? ' (unpublished)' : '')), p.s.dest].join(' – ')), ''); });
   return L.join('\n'); }
 // ---------- UI: flight plan of one flight at a time (tab "4 · Piani di volo" of events, step 4 of the simple mission) – v1.31 clean layout ----------
@@ -4214,10 +4215,11 @@ function navSearch(q, near) { q = String(q || '').trim().toUpperCase(); if (q.le
   if (NAV) { const hits = NAV.pts.filter(p => navCls(p) && (p.id.startsWith(q) || ((p.k === 'R' || p.k === 'G') && navName(p).toUpperCase().includes(q))));
     hits.sort((a, b) => (b.id === q) - (a.id === q) || (b.id.startsWith(q)) - (a.id.startsWith(q)) || (near ? dist(a.pos, near) - dist(b.pos, near) : 0)); out.push(...hits.slice(0, 8).map(p => ({ p }))); }
   return out.slice(0, 9); }
-function navPopup(p, f) { const pts = routeOf(f).pts;
-  return `<div style="font-size:12.5px;min-width:200px"><b>${esc(navName(p))}</b> <span class="muted">${navTypeTxt(p)}</span><br>
-    <button class="b sm" style="margin:6px 0 4px" data-navadd="${p.i}">Aggiungi come punto ${pts.length + 1} di ${esc(f.cs)}</button><br>
-    ${pts.length ? `<span>Sostituisci il punto </span><select data-navrepsel style="width:auto">${pts.map((x, i) => `<option value="${i}">${i + 1} · ${esc(x.name)}</option>`).join('')}</select> <button class="b sm" data-navrep="${p.i}">OK</button>` : ''}</div>`; }
+// popup of a navigation point while a flight plan is open: two buttons of the same size, the action written on each (staff 23 Nov – no separate "OK")
+function navPopup(p, f) { const pts = routeOf(f).pts, bs = 'display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:36px;margin:4px 0 0;font-size:13px';
+  return `<div style="font-size:12.5px;min-width:230px"><b>${esc(navName(p))}</b> <span class="muted">${navTypeTxt(p)}</span>
+    <button class="b" style="${bs}" data-navadd="${p.i}">Aggiungi come punto ${pts.length + 1}</button>
+    ${pts.length ? `<div class="b" style="${bs};padding:0 6px;cursor:default"><button class="b" data-navrep="${p.i}" style="border:0;background:none;padding:6px 2px;font-size:13px;flex:0 0 auto">Sostituisci il punto</button><select data-navrepsel style="width:auto;padding:2px 4px;font-size:12.5px">${pts.map((x, i) => `<option value="${i}" ${i === pts.length - 1 ? 'selected' : ''}>${i + 1} · ${esc(x.name)}</option>`).join('')}</select></div>` : ''}</div>`; }
 // routes on the map: the selected flight editable (legs coloured by type, numbered draggable points, drag a leg to add a point), the other routes thin
 function drawRoutes(add) { if (!S.t || MODE !== 'staff') return; const edit = routeEditOn(), sel = edit ? fplSelF() : null; if (!edit && !isFree()) return;
   S.t.flights.forEach(f => { if (f === sel) return; const R = routeOf(f); if (!R.pts.length) return; const [d, a] = routeEnds(f);
@@ -4385,8 +4387,8 @@ function freeBuild0() { const F = FREE(), mis = freeMis(F.mis); if (!mis || !F.f
   if (flights.some(f => f.task === 'QRA')) qraSetup(flights);
   const el = generateElements(flights); if (!F.thr) el.threats = el.threats.filter(x => x.status === 'TARGET' && x.flight && flights.some(f => f.id === x.flight)); // simulated threats off: only the targets of the flights
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
-  if (F.mis === 'CALIB') calApply(S.t);
   assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
+  if (F.mis === 'CALIB') calApply(S.t);
   if (F.routeOld && flights[0]) { const R0 = routeOf(flights[0]); R0.pts = F.routeOld.pts || []; R0.legs = F.routeOld.legs || []; delete F.routeOld; routeOf(flights[0]); } // v1.30 navigation route → flight plan of the first flight
   routeSync(); F.built = Date.now(); save(); demSoon(); return true; }
 // ---- aerodrome symbols (staff 22 Nov, mockup "Mockup – simboli aeroporti"): civil = teal open circle with a dot, military = anthracite filled circle with a white dot,
@@ -4414,12 +4416,12 @@ let CSN = null;
 async function csInit() { try { const r = await fetch('data/callsigns.json', { cache: 'no-cache' }); if (r.ok) CSN = await r.json(); } catch (e) { } }
 function csRow(base, type, calib) { if (!CSN || !base) return null; const rows = CSN.units.filter(u => u.bases.includes(base) && u.ac.includes(type));
   return (calib ? rows.find(u => u.calib) : null) || rows.find(u => !u.calib) || null; }
-const csNum = (word, used) => { for (let n = 1; n < 100; n++) { const c = `${word} ${String(n).padStart(2, '0')}`; if (!used.has(c)) return c; } return `${word} 99`; };
+const csNum = (word, used, nums) => { for (const n of nums || []) { const c = `${word} ${String(n).padStart(2, '0')}`; if (!used.has(c)) return c; } for (let n = 1; n < 100; n++) { const c = `${word} ${String(n).padStart(2, '0')}`; if (!used.has(c)) return c; } return `${word} 99`; };
 // callsign of a new flight: QRA callsign of the base for an interceptor, Canadair number of the base, unit callsign of base + aircraft; null = not in the list
 function csFromList(base, type, task, used, calib) { if (!CSN) return null; used = used || new Set();
   if (task === 'QRA' && CSN.qra[base]) return csNum(CSN.qra[base], used).replace(' ', '');
   if (type === 'CL-415 Canadair') { const c = CSN.can.filter(x => x.base === base).concat(CSN.can.filter(x => !x.base)).map(x => x.cs.replace('CAN', 'CAN ')).find(c => !used.has(c)); return c || null; }
-  const r = csRow(base, type, calib); return r ? csNum(r.oat, used) : null; }
+  const r = csRow(base, type, calib); return r ? csNum(r.oat, used, r.numbers) : null; }
 // field 7 from the radio callsign: short FPL form of the list (FRECCIA 01 → FRECC01) or the GAT callsign (IAM0401) when the plan is all GAT
 function csFpl(cs, gatOnly, base) { const m = /^([A-Z]+) ?(\d{2})$/.exec(String(cs || '').toUpperCase().trim()); if (!CSN || !m) return null; const [, w, nn] = m;
   if (Object.values(CSN.qra).includes(w) || w === 'CAN') return w + nn;
@@ -4453,21 +4455,80 @@ function calCardHtml() { const F = FREE(), c = CAL(), ks = calChk(), x = F.fligh
       ${rwyNeed ? `<div><label>Pista</label><input id="calrwy" value="${esc(c.rwy || '')}" placeholder="es. 13" maxlength="3" style="text-transform:uppercase"></div>` : ''}
       ${ks.includes('CNAV') ? `<div><label>Radioassistenza</label><div style="display:flex;flex-wrap:wrap;gap:4px">${aids.map(([id, kd]) => `<button class="b sm${c.aid === id + ':' + kd ? ' primary' : ''}" data-calaid="${id}:${kd}">${id} ${kd}</button>`).join('')}</div></div>` : `<div class="muted" style="font-size:11.5px">${[ks.includes('CPAPI') ? "L'angolo del PAPI lo conosce chi pianifica." : '', ks.includes('CPAR') ? 'Frequenza GCA / PAR dai dati ATC (TBC se manca).' : ''].filter(Boolean).join(' ')}</div>`}</div>
     <div style="margin-top:8px"><label>Dopo i controlli</label>${optGrid('calland', [['ad', `Atterra a ${c.ad}`, ''], ['base', `Rientra a ${base}`, '']], c.land)}</div>` : ''}</div>`; }
+// radio aid of a calibration check: frequency and TACAN channel (a channel without a VHF frequency gets the paired one: 17–59 → 108.00–112.20, 70–126 → 112.30–117.90, Y = +0.05)
+const tacVhf = ch => { const m = /^(\d+)([XY])$/.exec(ch || ''); if (!m) return ''; const n = +m[1]; let f = n >= 17 && n <= 59 ? 108 + (n - 17) * 0.1 : n >= 70 && n <= 126 ? 112.3 + (n - 70) * 0.1 : null; if (f == null) return ''; if (m[2] === 'Y') f += 0.05; return f.toFixed(2); };
+function aidInfo(q, kd) { const x = String((q && q.x) || ''), ch = (/(\d+[XY])\b/.exec(x) || [])[1] || '', fr = (/^([\d.]+)/.exec(x) || [])[1] || '';
+  if (q && q.k === 'N') return { txt: `${fr || 'TBC'} kHz`, fr, ch: '' };
+  const vhf = fr || tacVhf(ch); return { txt: [ch ? `CH ${ch}` : '', vhf ? `${vhf} MHz${fr ? '' : ' (paired)'}` : ''].filter(Boolean).join(' / ') || 'TBC', fr: vhf, ch }; }
+// kneeboard of a calibration mission: one checklist page per check, with a drawing and editable PASS / FAIL (staff 23 Nov)
+function calKneePages(ctx) { const { pdf, page, head, txt, table, room, rgb, R, B, M, PW, PH, ML, CW, BLUE, GREY, f } = ctx; const cal = S.t.cal; if (!cal || !cal.checks) return;
+  const form = pdf.getForm(), safe = s => String(s).replace(/[^A-Za-z0-9]/g, '');
+  cal.checks.forEach((c, n) => { page(`Check ${n + 1}/${cal.checks.length} - ${c.short}`);
+    head(c.title); table([{ h: 'Item', w: .34 }, { h: 'Value', w: .66 }], c.data, { s: 10 });
+    head('Checklist'); c.steps.forEach((st, i) => { room(18); const pg = ctx.pg(), y = ctx.y();
+      const cb = form.createCheckBox(`${safe(f.cs)}_${c.k}_step${i + 1}`); cb.addToPage(pg, { x: ML, y: PH - y - 12, width: 11, height: 11, borderWidth: 1, borderColor: GREY });
+      txt(`${i + 1}. ${st}`, { x: 18, s: 10, after: 2 }); });
+    // drawing
+    head('Drawing'); const H = 120; room(H + 6); const pg = ctx.pg(), by = PH - ctx.y() - H, bx = ML, k = 1;
+    pg.drawRectangle({ x: bx, y: by, width: CW, height: H, borderColor: rgb(.8, .83, .9), borderWidth: .6 });
+    const L = (x1, y1, x2, y2, o = {}) => pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: o.w || 1.2, color: o.c || BLUE, dashArray: o.d });
+    const T = (t, x, y, s = 9, fnt = R, c = rgb(0, 0, 0)) => pg.drawText(String(t), { x, y, size: Math.max(9, s), font: fnt, color: c });
+    if (c.k === 'CNAV') { const cx = bx + CW / 2, cy = by + H / 2, sc = (H / 2 - 6) / 13, P = (b, nm) => [cx + nm * sc * Math.sin(b * Math.PI / 180), cy + nm * sc * Math.cos(b * Math.PI / 180)], rr = b => 'R' + String(((b % 360) + 360) % 360).padStart(3, '0');
+      const r2 = c.r1 + 180, a1 = P(c.r1, 13), a2 = P(r2, 13); L(a1[0], a1[1], a2[0], a2[1], { w: 1.4, c: rgb(.49, .23, .93) });
+      let prev = null; for (let a = -60; a <= 60; a += 5) { const p = P(c.r1 + a, 10); if (prev) L(prev[0], prev[1], p[0], p[1], { w: 2.2 }); prev = p; }
+      for (let a = -60; a <= 60; a += 10) { const p1 = P(c.r1 + a, 9.4), p2 = P(c.r1 + a, 10.6), q = P(c.r1 + a, 12); L(p1[0], p1[1], p2[0], p2[1], { w: 1 }); if (a && a % 30 === 0) T(rr(c.r1 + a), q[0] - 11, q[1] - 4, 9, R, BLUE); }
+      pg.drawCircle({ x: cx, y: cy, size: 4, borderColor: BLUE, borderWidth: 1.4 }); const lb = P(c.r1 + 180 + 60, 3.5); T(`${c.aidId} ${c.aidKd}`, lb[0] - 20, lb[1] - 4, 9, B);
+      const ta = P(c.r1, 12.2), tb = P(r2, 12.2); T(`${rr(c.r1)} in / out to 25 NM`, Math.min(ta[0] + 4, bx + CW - 128), ta[1] + 4, 9, B, rgb(.49, .23, .93)); T(rr(r2), tb[0] + 4, tb[1] - 12, 9, R, rgb(.49, .23, .93));
+      T('arc: 10 DME', bx + 28, by + H - 24, 9, B, BLUE);
+      L(bx + 14, by + H - 30, bx + 14, by + H - 12, { c: rgb(0, 0, 0) }); T('N', bx + 10, by + H - 42, 9, B); T('not to scale', bx + CW - 62, by + 6, 9, R, GREY); }
+    else { // final: plan view on top, profile below (the angle is left blank: the planner fills it)
+      const xT = bx + CW - 30, xL = bx + 16, nm = (xT - xL) / (c.fin || 10), yP = by + H - 34, yG = by + 12, w = 10, hG = H * 0.33;
+      pg.drawRectangle({ x: xT, y: yP - 4, width: 22, height: 8, color: rgb(.2, .23, .3) }); T(`RWY ${c.rwy || '__'}`, xT - 8, yP + 8, 9, B); T('plan view', xL + 160, by + H - 12, 9, B, GREY);
+      L(xL, yP, xT, yP, { w: 1.6 }); [7, 10].filter(d => d <= (c.fin || 10)).forEach(d => { const x = xT - d * nm; L(x, yP - 4, x, yP + 4, { c: rgb(0, 0, 0) }); T(`${d} NM`, x - 10, yP - w - 11); L(x, yG - 3, x, yG + 3, { c: rgb(0, 0, 0) }); });
+      if (c.k === 'CILS' || c.k === 'CPAR') { L(xL, yP + w, xT, yP, { w: .8, d: [3, 3] }); L(xL, yP - w, xT, yP, { w: .8, d: [3, 3] }); T(c.k === 'CILS' ? 'LOC course width' : 'PAR azimuth tolerance', xL + 4, yP + w + 3, 9, R, BLUE); }
+      if (c.k === 'CPAPI') { for (let i = 0; i < 4; i++) pg.drawCircle({ x: xT + 4 + i * 5, y: yP - 12, size: 1.8, color: i < 2 ? rgb(1, 1, 1) : rgb(.86, .15, .15), borderColor: rgb(0, 0, 0), borderWidth: .4 }); T('PAPI', xT - 4, yP - 26); }
+      L(xL, yG, xT + 22, yG, { c: rgb(.3, .3, .3) }); L(xT, yG, xL, yG + hG, { w: 1.8 }); T('profile', xL, yG + 4, 9, B, GREY);
+      if (c.k === 'CPAR' || c.k === 'CILS') { L(xT, yG, xL, yG + hG * 1.3, { w: .8, d: [3, 3] }); L(xT, yG, xL, yG + hG * 0.7, { w: .8, d: [3, 3] }); T(c.k === 'CPAR' ? 'PAR elevation tolerance' : 'glide path width', xL + 4, yG + hG * 0.7 - 14, 9, R, BLUE); }
+      T(`${c.k === 'CPAPI' ? 'PAPI' : 'glide'} angle ____ deg`, xT - 150, yG + hG * 0.9, 9, B); }
+    ctx.addY(H + 8);
+    // result: editable PASS / FAIL + remarks
+    room(78); head('Result'); room(56); const pg2 = ctx.pg(), y0 = PH - ctx.y() - 14;
+    const pass = form.createCheckBox(`${safe(f.cs)}_${c.k}_PASS`), fail = form.createCheckBox(`${safe(f.cs)}_${c.k}_FAIL`);
+    pass.addToPage(pg2, { x: ML, y: y0, width: 13, height: 13, borderWidth: 1, borderColor: rgb(.08, .5, .25) }); pg2.drawText('PASS', { x: ML + 18, y: y0 + 2, size: 11, font: B, color: rgb(.08, .5, .25) });
+    fail.addToPage(pg2, { x: ML + 80, y: y0, width: 13, height: 13, borderWidth: 1, borderColor: rgb(.7, .1, .1) }); pg2.drawText('FAIL', { x: ML + 98, y: y0 + 2, size: 11, font: B, color: rgb(.7, .1, .1) });
+    pg2.drawText('Remarks', { x: ML + 150, y: y0 + 2, size: 9, font: R, color: GREY });
+    const rm = form.createTextField(`${safe(f.cs)}_${c.k}_remarks`); rm.enableMultiline(); rm.addToPage(pg2, { x: ML, y: y0 - 40, width: CW, height: 34, borderWidth: .8, borderColor: GREY }); rm.setFontSize(10);
+    ctx.addY(58); void k; void M; void PW; }); }
 // mission elements: the checks at the aerodrome (serials, final / arc / radials on the map)
 function calApply(t) { const F = FREE(), c = CAL(), ks = calChk(), f = t.flights[0]; if (!f || !c.ad || !ap(c.ad)) return; const A = ap(c.ad), N = (p, b, nm) => dest(p, b, nm * NMK);
   const rwy = parseInt(c.rwy, 10), crs = rwy >= 1 && rwy <= 36 ? rwy * 10 : null, mv = +casCfg().magvar || 0, inb = crs != null ? (crs + mv + 360) % 360 : null; // runway → true course of the final
-  t.serials = (t.serials || []).filter(r => r.kind !== 'NAVI'); t.airspace = t.airspace.filter(a => !(a.type === 'ROUTE' && a.flight === f.id)); t.objectives = t.objectives || [];
+  t.serials = (t.serials || []).filter(r => r.kind !== 'NAVI'); t.airspace = t.airspace.filter(a => !(a.type === 'ROUTE' && a.flight === f.id)); t.objectives = t.objectives || []; t.cal = { ad: c.ad, checks: [] };
   const SR = (title, text, success) => t.serials.push({ id: 'S' + (t.serials.length + 1), kind: 'CALIB', title, flights: [f.id], text, success });
   let finDone = false; const fin = nm => inb != null && !finDone && (finDone = true) ? t.airspace.push({ id: 'CAL-FIN', type: 'ROUTE', flight: f.id, name: `Final RWY ${c.rwy} (${nm} NM)`, pts: [N(A, (inb + 180) % 360, nm), A.slice()], names: [`${nm} NM final`, c.ad] }) : null;
-  const ad = `${c.ad} ${AIRPORTS[c.ad][0]}`, twr = baseTwr ? baseTwr(c.ad) : null, twrTxt = twr && twr.freq ? `${twr.cs} ${twr.freq}` : 'TWR (frequency TBC)';
+  const ad = `${c.ad} ${AIRPORTS[c.ad][0]}`, twr = baseTwr(c.ad), app = baseApp(c.ad), gca = baseGca(c.ad), pos = (o, d) => o && o.cs ? `${o.cs} ${o.freq || 'TBC'}` : d;
+  const twrTxt = pos(twr, `${c.ad} TWR (frequency TBC)`), appTxt = pos(app, `${c.ad} APP (frequency TBC)`), gcaTxt = gca.known ? `${gca.cs} ${gca.freq}` : `${c.ad} GCA / PAR (frequency TBC)`;
+  // ATC positions of the checked aerodrome in the frequency list (from the ATC data, TBC when missing – staff 23 Nov)
+  t.c2 = (t.c2 || []).filter(r => r.key !== 'CAL'); const have = new Set(t.c2.map(r => r.cs));
+  [[app, `APP ${c.ad} (flight check)`], [twr, `TWR ${c.ad} (flight check)`], ...(ks.includes('CPAR') ? [[gca.known ? gca : null, `GCA / PAR ${c.ad} (PAR check)`]] : [])].forEach(([o, role]) => { if (o && o.cs && !have.has(o.cs)) t.c2.push({ key: 'CAL', role, cs: o.cs, freq: o.freq || 'TBC', real: true, controller: '— not staffed —' }); });
   if (ks.includes('CNAV')) { const [id, kd] = (c.aid || ':').split(':'), q = navRes(id, A), P = q ? q.pos : A, fr = q && /^[\d.]+/.test(q.x) ? q.x.split(' ')[0] : '';
     const r1 = Math.round(bearing(P, dest(A, 0, 1)) / 10) * 10 || 360, arc = []; for (let a = -60; a <= 60; a += 10) arc.push(N(P, (r1 + a + 360) % 360, 10));
     t.airspace.push({ id: 'CAL-ARC', type: 'ROUTE', flight: f.id, name: `${id} ${kd} 10 DME arc`, pts: arc, names: arc.map(() => '') });
     t.airspace.push({ id: 'CAL-RAD', type: 'ROUTE', flight: f.id, name: `${id} ${kd} radial ${String(r1).padStart(3, '0')}`, pts: [N(P, r1, 25), P.slice(), N(P, (r1 + 180) % 360, 25)], names: ['25 NM', id, '25 NM'] });
-    SR(`Flight check – ${id} ${kd}`, `Flight check of the ${kd} ${id}${fr ? ' (' + fr + ')' : ''} at ${ad}: fly the 10 DME arc from radial ${String((r1 + 300) % 360).padStart(3, '0')} to radial ${String((r1 + 60) % 360).padStart(3, '0')} at the assigned level, then radial ${String(r1).padStart(3, '0')} inbound from 25 NM and outbound to 25 NM on the reciprocal. Record bearing / DME errors at each 10° step. Coordinate with ${twrTxt}.`, `Arc and radials flown within ±1 NM / ±2°, errors recorded, the aid declared within tolerance or not.`); }
+    const ai = aidInfo(q, kd), rr = x => String(x % 360).padStart(3, '0');
+    t.cal.checks.push({ k: 'CNAV', short: `${id} ${kd}`, title: `Flight check – ${id} ${kd}`, aidId: id, aidKd: kd, r1, fin: 25,
+      data: [['Aerodrome', ad], ['Radio aid', `${id} ${kd} – ${ai.txt}`], ['Arc', `10 DME, R${rr(r1 + 300)} → R${rr(r1 + 60)}`], ['Radial', `R${rr(r1)} in / out, 25 NM`], ['ATC', `${appTxt} · ${twrTxt}`]],
+      steps: [`Set ${id} ${kd} ${ai.txt}, identify the Morse code`, `Check-in with ${appTxt}: flight check, levels`, `Position at R${rr(r1 + 300)} 10 DME, level ______`, `Fly the 10 DME arc to R${rr(r1 + 60)}: record bearing / DME every 10°`, `Radial R${rr(r1)} inbound from 25 NM to the aid`, `Radial R${rr((r1 + 180) % 360)} outbound to 25 NM`, 'Report the result to ATC'] });
+    SR(`Flight check – ${id} ${kd}`, `Flight check of the ${kd} ${id} (${aidInfo(q, kd).txt}) at ${ad}: fly the 10 DME arc from radial ${String((r1 + 300) % 360).padStart(3, '0')} to radial ${String((r1 + 60) % 360).padStart(3, '0')} at the assigned level, then radial ${String(r1).padStart(3, '0')} inbound from 25 NM and outbound to 25 NM on the reciprocal. Record bearing / DME errors at each 10° step. Coordinate with ${twrTxt}.`, `Arc and radials flown within ±1 NM / ±2°, errors recorded, the aid declared within tolerance or not.`); }
+  const rw = c.rwy || 'TBC', base = (k, short, title, finNm, extra, steps) => t.cal.checks.push({ k, short, title, rwy: c.rwy, fin: finNm, data: [['Aerodrome', ad], ['Runway', rw], ...extra], steps });
+  if (ks.includes('CILS')) base('CILS', `ILS RWY ${rw}`, `ILS check – RWY ${rw}`, 10, [['ILS frequency', '______'], ['Final', '10 NM'], ['ATC', `${appTxt} · ${twrTxt}`]],
+    ['Set the ILS frequency ______, identify', `Check-in with ${appTxt}`, `Radar vectors to 10 NM final RWY ${rw}`, 'Run 1 – localizer: on course, then both edges of the course', 'Run 2 – glide path: angle and structure down to the threshold', 'Go-around, radar circuit back to 10 NM final', 'Report the result to ATC']);
+  if (ks.includes('CPAPI')) base('CPAPI', `PAPI RWY ${rw}`, `PAPI calibration – RWY ${rw}`, 7, [['PAPI angle', '______ (known by the planner)'], ['Start', '5–7 NM final'], ['ATC', twrTxt]],
+    [`Check-in with ${twrTxt}`, `Position at 7 NM final RWY ${rw}`, 'Run 1 – constant angle ____°: note the light transitions', 'Run 2 – constant angle: confirm the transitions', 'Run 3 – constant angle (if needed)', 'Go-around after each run, circuit back to 7 NM final', 'Report the result to ATC']);
+  if (ks.includes('CPAR')) base('CPAR', `PAR RWY ${rw}`, `PAR check – RWY ${rw}`, 10, [['GCA / PAR', gcaTxt], ['Radar pattern', appTxt], ['TWR', twrTxt]],
+    [`Check-in with ${appTxt}, then GCA ${gcaTxt}`, `Radar pattern to final RWY ${rw}`, 'Run 1 – PAR approach: compare azimuth / elevation with the aircraft position', 'Run 2 – PAR approach', 'Run 3 – PAR approach (if needed)', 'Go-around, radar circuit between the runs', 'Report the result to the GCA controller']);
   if (ks.includes('CILS')) { fin(10); SR(`Flight check – ILS RWY ${c.rwy || 'TBC'}`, `ILS check of runway ${c.rwy || 'TBC'} at ${ad}: approaches on the localizer from 10 NM (alignment and width: fly the course and both sides of it) and on the glide path (angle and structure down to the threshold), go-around and radar vectors back to 10 NM final between the runs. Coordinate with ${twrTxt}.`, `Localizer and glide path checked on every run, deviations recorded, the ILS declared within tolerance or not.`); }
   if (ks.includes('CPAPI')) { fin(ks.includes('CILS') || ks.includes('CPAR') ? 10 : 7); SR(`PAPI calibration – RWY ${c.rwy || 'TBC'}`, `PAPI calibration of runway ${c.rwy || 'TBC'} at ${ad}: straight-in approaches starting at 5–7 NM final, several runs at the constant PAPI angle (set by the planner), checking the transition of each light; go-around and circuit back to 7 NM final after each run. Coordinate with ${twrTxt}.`, `Every run flown at a constant angle, the light transitions recorded, the PAPI declared correctly set or not.`); }
-  if (ks.includes('CPAR')) { fin(10); const r = recChain(c.ad); SR(`PAR check – RWY ${c.rwy || 'TBC'}`, `PAR check of runway ${c.rwy || 'TBC'} at ${ad}: precision approaches flown with the GCA / PAR controller (${r && r.txt ? r.txt : 'frequency TBC'}), comparing the controller's azimuth / elevation information with the aircraft position on each run; go-around and radar circuit back between the runs.`, `Several PAR approaches flown, the radar declared within tolerance or not.`); }
+  if (ks.includes('CPAR')) { fin(10); SR(`PAR check – RWY ${c.rwy || 'TBC'}`, `PAR check of runway ${c.rwy || 'TBC'} at ${ad}: precision approaches flown with the GCA / PAR controller ${gcaTxt} (radar pattern with ${appTxt}, landing clearance ${twrTxt}), comparing the controller's azimuth / elevation information with the aircraft position on each run; go-around and radar circuit back between the runs.`, `Several PAR approaches flown, the radar declared within tolerance or not.`); }
   f.task = 'CALIB'; }
 // ---- RAD (EUROCONTROL Route Availability Document, Italian part, data/rad.json – tools/rad_build.py): connection points of IGAT departures / arrivals (staff 22 Nov) ----
 let RAD = null, HELI = null;
@@ -4723,8 +4784,11 @@ async function exportKneeboard(btn) {
   catch (e) { console.error(e); toast('Errore: ' + e.message); }
   if (btn) btn.disabled = false; }
 // kneeboard v1.31 (staff 22 Nov: readable on A5): body 11 pt, headings 11 pt bold, monospace 10 pt bold, nothing under 9 pt; real tables; one subject per page; callsign and page number on every page
+// tactical / air-combat training: the only simple missions where KNOCK IT OFF applies (staff 23 Nov)
+function freeTactical() { if (!isFree()) return true; const k = freeKey(), F = FREE(); if (['ID', 'CAS', 'STRIKE', 'SEAD', 'ANTISHIP', 'CSAR'].includes(k)) return true;
+  if (['AEW', 'AAR'].includes(k)) return F.flights.some(x => { const a = freeAc(x); return a && ['FIGHTER', 'ATTACK'].includes(a.cat); }); return false; }
 async function kneeboardPdf() { const { PDFDocument, rgb, StandardFonts } = PDFLib, pdf = await PDFDocument.create(), F = FREE(), misName = freeName();
-  pdf.setTitle(`${S.meta.op} – Kneeboard`);
+  pdf.setTitle(`${opTitle()} – Kneeboard`);
   const R = await pdf.embedFont(StandardFonts.Helvetica), B = await pdf.embedFont(StandardFonts.HelveticaBold), M = await pdf.embedFont(StandardFonts.CourierBold);
   const PW = 419.53, PH = 595.28, ML = 20, CW = PW - 2 * ML, TOP = 40, BOT = 30, BLUE = rgb(13 / 255, 44 / 255, 153 / 255), GREY = rgb(.33, .36, .42), SHADE = rgb(.93, .95, .98), LINE = rgb(.75, .79, .86);
   const clean = s => String(s ?? '').replace(/→/g, '->').replace(/[–—]/g, '-').replace(/·/g, '-').replace(/×/g, 'x').replace(/°/g, ' deg').replace(/[“”]/g, '"').replace(/’/g, "'").replace(/[^\x20-\x7E\xA0-\xFF\n]/g, '');
@@ -4747,7 +4811,7 @@ async function kneeboardPdf() { const { PDFDocument, rgb, StandardFonts } = PDFL
     // 1 · mission, area, loadout
     page(misName + (F.solo ? ' (solo)' : ''));
     table([{ h: 'Date', w: .3 }, { h: 'Take-off', w: .2 }, { h: 'Aircraft', w: .3 }, { h: 'From - to', w: .2 }], [[S.meta.date || '', `${fplClock(0)}Z`, `${f.size} x ${f.type}`, `${freeCode(f.base) || 'ZZZZ'} - ${freeCode(f.arr || f.base) || 'ZZZZ'}`]]);
-    if (f.lo) { head('Loadout'); txt(loTxt(f.lo)); }
+    if (f.lo && F.mis !== 'CALIB') { head('Loadout'); txt(loTxt(f.lo)); }
     const fr = RES(); if (fr.length) { head(fr.length > 1 ? 'Areas' : 'Area'); table([{ h: 'Area', w: .38 }, { h: 'Levels', w: .3 }, { h: 'ATS unit', w: .32 }], fr.map(z => [z.name, `${z.lower} - ${z.upper}`, zoneAtsTxt(z)])); }
     if (F.mis === 'ID') { head('IVAO Rules & Regulations'); txt(RR_EN, { s: 10 }); }
     if (f.rec) { head('Recovery'); txt(f.rec); }
@@ -4763,7 +4827,8 @@ async function kneeboardPdf() { const { PDFDocument, rgb, StandardFonts } = PDFL
       if (F.solo) txt('Solo: fly the holding, read the check-in, then fly the 9-line as briefed (simulated attack inside the final attack headings), egress and report BDA to yourself.', { s: 9.5, c: GREY }); }
     // 3 · other tasks
     const ser = (S.t.serials || []).filter(r => r.flights.includes(f.id) && r.kind !== 'CAS');
-    if (ser.length) { page('Tasks'); ser.forEach(r => { head(r.title); txt(r.text); if (r.success) txt('Success: ' + r.success, { s: 10, c: GREY }); }); }
+    if (F.mis === 'CALIB' && S.t.cal) calKneePages({ pdf, page, head, txt, table, room, rgb, R, B, M, PW, PH, ML, CW, BLUE, GREY, f, pg: () => pg, y: () => y, addY: d => { y += d; } });
+    else if (ser.length) { page('Tasks'); ser.forEach(r => { head(r.title); txt(r.text); if (r.success) txt('Success: ' + r.success, { s: 10, c: GREY }); }); }
     // 4 · flight plan and nav log
     page('Flight plan - nav log');
     head('Flight plan'); p.icaoTxt.split('\n').forEach(l => txt(l, { f: M, s: 10, after: 0 })); y += 4;
@@ -4775,8 +4840,8 @@ async function kneeboardPdf() { const { PDFDocument, rgb, StandardFonts } = PDFL
     // 5 · frequencies and emergencies
     page('Frequencies - emergencies');
     head('Frequencies'); table([{ h: 'Station', w: .38 }, { h: 'Frequency', w: .24, f: M }, { h: 'Role', w: .38 }], (S.t.c2 || []).filter(c => c.freq && c.freq !== 'TBD').map(c => [c.cs, c.freq, c.role]).concat([['GUARD', '121.500 / 243.000', 'emergency']]));
-    head('Emergencies'); txt('Real emergency: KNOCK IT OFF, squawk 7700, follow ATC.'); txt('Lost comms: squawk 7600, continue as filed and land at the planned aerodrome.'); txt('Weather below minima: return to base.'); }
-  pages.forEach((q, i) => { const t = `${i + 1} / ${pages.length}`; q.pg.drawText(t, { x: PW - ML - R.widthOfTextAtSize(t, 9), y: 12, size: 9, font: R, color: GREY }); q.pg.drawText(clean(`${S.meta.op} - training only`), { x: ML, y: 12, size: 9, font: R, color: GREY }); });
+    head('Emergencies'); txt(freeTactical() ? 'Real emergency: KNOCK IT OFF, squawk 7700, follow ATC.' : 'Real emergency: MAYDAY / PAN PAN on the frequency in use, squawk 7700, follow ATC.'); txt('Lost comms: squawk 7600, continue as filed and land at the planned aerodrome.'); txt('Weather below minima: return to base.'); }
+  pages.forEach((q, i) => { const t = `${i + 1} / ${pages.length}`; q.pg.drawText(t, { x: PW - ML - R.widthOfTextAtSize(t, 9), y: 12, size: 9, font: R, color: GREY }); q.pg.drawText(clean(`${opTitle()}${isFree() ? ' - ' + (S.meta.date || '') : ''} - training only`), { x: ML, y: 12, size: 9, font: R, color: GREY }); });
   return pdf; }
 async function exportFreeMap(btn) { if (btn) btn.disabled = true; try { const m = await renderMap('brief', { light: true, w: 1400, h: 900 }); if (m) await download(`${fileBase()}_MAP.png`, new Blob([dataUrlBytes(m)], { type: 'image/png' })); else toast('Mappa non disponibile'); } catch (e) { toast('Errore: ' + e.message); } if (btn) btn.disabled = false; }
 document.addEventListener('click', e => { const t = e.target.closest('[data-kind],[data-kindreset],[data-fmis],[data-fstep],[data-fdel],#fadd,#fregen,#fknee,#fmap,[data-copytxt],[data-fpick],[data-fmain]'); if (!t || MODE !== 'staff' || !S) return;
@@ -4857,7 +4922,7 @@ document.addEventListener('change', e => { const t = e.target; if (!S || !isFree
   if (t.id === 'calrwy') { c.rwy = t.value.toUpperCase().replace(/[^0-9LRC]/g, '').slice(0, 3); FREE().built = 0; save(); renderPanel(); }
   if (t.dataset && t.dataset.calland) { c.land = t.dataset.calland; calArr(); save(); renderPanel(); drawMap(); } });
 document.addEventListener('change', e => { const t = e.target; if (!S || !isFree() || !t.dataset || !t.dataset.calchk) return; const F = FREE(), k = t.dataset.calchk; let l = calChk();
-  l = t.checked ? [...new Set([...l, k])] : l.filter(x => x !== k); if (!l.length) { toast('Scegli almeno un controllo'); l = [k]; } F.calChk = l; const c = CAL(); if (c.ad && !calHas(c.ad)) c.ad = ''; F.built = 0; save(); renderPanel(); });
+  l = t.checked ? [...new Set([...l, k])] : l.filter(x => x !== k); if (!l.length) { toast('Scegli almeno un controllo'); l = [k]; } F.calChk = l; const c = CAL(); if (c.ad && !calHas(c.ad)) { c.ad = ''; c.aid = ''; } calArr(); save(); renderPanel(); drawMap(); });
 // bases of the assets: add / remove, search, base of a flight (v1.33)
 document.addEventListener('click', e => { const t = e.target.closest('[data-badd],[data-bdel],[data-fbase]'); if (!t || !S || MODE !== 'staff') return; const d = t.dataset;
   if (d.badd) { S.baseQ = ''; basesSet([...(S.blueBases || []), d.badd]); if (baseWarn(d.badd)) toast(d.badd + ': ' + baseWarn(d.badd)); return; }
@@ -4895,7 +4960,7 @@ document.addEventListener('click', e => { const t = e.target.closest('[data-fpls
     (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Piano di volo copiato'), () => toast('Copia non disponibile: seleziona il testo e copialo')); return; }
   if (t.dataset.fplreset) { const f = S.t.flights.find(x => x.id === t.dataset.fplreset), M = f && fplMan(f); if (M) FPLK.forEach(k => delete M[k]); save(); renderPanel(); drawMap(); toast('Campi proposti ripristinati (la rotta resta)'); return; }
   if (t.id === 'fplresetall') { Object.values(fplStore().man).forEach(M => FPLK.forEach(k => delete M[k])); save(); renderPanel(); drawMap(); toast('Campi proposti ripristinati'); return; }
-  if (t.id === 'fpldl') download(`${String(S.meta.op || 'event').replace(/[^A-Za-z0-9]+/g, '_')}_flight_plans.txt`, new Blob([fplTextFile()], { type: 'text/plain' })); });
+  if (t.id === 'fpldl') download(`${fileBase() || 'event'}_flight_plans.txt`, new Blob([fplTextFile()], { type: 'text/plain' })); });
 document.addEventListener('input', e => { const d = e.target.dataset && e.target.dataset.fpl; if (!d) return; const [id, k] = d.split(':'); fplSet(id, k, e.target.value); fplRefresh(id); });
 document.addEventListener('change', e => { if (e.target.id === 'fploat') { fplStore().icao = e.target.checked; save(); renderPanel(); return; } if (e.target.id === 'navon') { S.navOn = e.target.checked; save(); renderMapTools(); drawNav(); return; } if (e.target.dataset && e.target.dataset.navl) { navLay()[e.target.dataset.navl] = e.target.checked ? 1 : 0; if (e.target.dataset.navl === 'awy') S.navAwyMan = true; save(); drawNav(); return; }
   if (e.target.dataset && e.target.dataset.fpl) { renderPanel(); drawMap(); } });
@@ -5108,7 +5173,10 @@ document.addEventListener('click', e => {
   }
   save(); renderPanel();
 });
-const fileBase = () => S.meta.op.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+// simple mission: no exercise name – callsign + mission (staff 23 Nov)
+const freeCs1 = () => { const F = (S && S.free) || {}, x = (F.flights || [])[0], f = S.t && S.t.flights[0]; return String((f && f.cs) || (x && x.cs) || 'MISSION'); };
+const opTitle = () => isFree() ? `${freeCs1()} – ${freeName()}` : S.meta.op;
+const fileBase = () => (isFree() ? `${freeCs1().replace(/\s+/g, '')}_${String(freeName()).split(/\s*[–-]\s*/)[0]}` : S.meta.op).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 /* =====================================================================
    10. STATIC MAP RENDERER (canvas → PNG for slides)
@@ -5557,7 +5625,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   const { PDFDocument, rgb, StandardFonts, PDFName, PDFString } = PDFLib;
   const mp = mpGet(), t = S.t, th = theatre(), g = geom();
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`${S.meta.op} – ${jsel ? (jsel.kind === 'gci' ? 'GCI pack' : jsel.kind === 'aar' ? 'AAR pack' : jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : isInternal() ? 'Mission pack' : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
+  pdf.setTitle(`${opTitle()} – ${jsel ? (jsel.kind === 'gci' ? 'GCI pack' : jsel.kind === 'aar' ? 'AAR pack' : jsel.kind === 'aib' ? 'AIB pack' : jsel.kind === 'sar' ? 'SAR pack' : jsel.kind === 'pr' ? 'PR pack' : 'JTAC pack') : isInternal() ? 'Mission pack' : 'Masterplan'}`); pdf.setAuthor(`${mp.division} – Special Operations`); pdf.setCreator('IVAO SO Training Mission Generator');
   let F = {};
   if (assets.fonts && window.fontkit) { pdf.registerFontkit(window.fontkit); for (const k of Object.keys(assets.fonts)) F[k] = await pdf.embedFont(assets.fonts[k], { subset: false }); }
   else { F.reg = await pdf.embedFont(StandardFonts.Helvetica); F.bold = await pdf.embedFont(StandardFonts.HelveticaBold); F.ital = await pdf.embedFont(StandardFonts.HelveticaOblique); F.head = F.bold; F.xb = F.bold; }
@@ -5566,7 +5634,7 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
     .map(ch => set.has(ch.codePointAt(0)) ? ch : ({ '–': '-', '—': '-', '·': '-', '×': 'x', '°': ' deg', '“': '"', '”': '"', '’': "'", '•': '-' }[ch] ?? '')).join(''); };
   const BLUE = rgb(13 / 255, 44 / 255, 153 / 255), BLACK = rgb(0, 0, 0), WHITE = rgb(1, 1, 1), LINK = rgb(0, 0, 1), GREY = rgb(.35, .38, .45);
   const PW = 595.28, PH = 841.89, ML = 62, CW = PW - 2 * ML, TOP = 84, BOT = 66;
-  const event = S.meta.op, date = S.meta.date || 'Date TBD', plain = isInternal(), division = plain ? '' : isSog() ? orgName() : (mp.division || 'Division');
+  const event = opTitle(), date = S.meta.date || 'Date TBD', plain = isInternal(), division = plain ? '' : isSog() ? orgName() : (mp.division || 'Division');
   const W = (txt, f, s) => f.widthOfTextAtSize(clean(txt, f), s);
   const draw = (pg, txt, x, yTop, f, s, color = BLACK) => pg.drawText(clean(txt, f), { x, y: PH - yTop, size: s, font: f, color });
   const addLink = (pg, x, yTop, w, h, url) => {
@@ -6440,7 +6508,7 @@ radInit().then(() => { if (S && S.t && MODE === 'staff' && (TAB === 'fpl' || isF
 navInit().then(() => { NAVG = null; AWYIDX = null; if (MAP && S && S.navOn) drawNav(); if ((TAB === 'fpl' || isFree()) && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 levelInit(); renderEvBadge();
-window.APP = { AC, get NAVL() { return NAVL; }, newMissionNow, freeName, calChk, ap, basesSet, borderSide, get ZF() { return ZF; }, get BEDIT() { return BEDIT; }, RB, calApply, calOk, CAL_FAC, csFromList, csFpl, get CSN() { return CSN; }, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AC, navPopup, tacVhf, fileBase, opTitle, get NAVL() { return NAVL; }, newMissionNow, freeName, calChk, ap, basesSet, borderSide, get ZF() { return ZF; }, get BEDIT() { return BEDIT; }, RB, calApply, calOk, CAL_FAC, csFromList, csFpl, get CSN() { return CSN; }, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
