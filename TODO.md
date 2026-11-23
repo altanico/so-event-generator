@@ -3,6 +3,7 @@
 ## Next build
 
 - [ ] **Bug – navigation points of the previous mission stay on the map after "Nuova missione"** (staff 23 Nov, screenshot): `drawMap()` returns early when no theatre is chosen (new mission, chooser, simple mission before its theatre) before calling `drawNav()`, so the navigation layer (and the faint aerodromes / route layers drawn outside `LAYERS`) is never cleared until a reload. Fix: clear / redraw the navigation layer in that early return too (and on `newMissionNow()`), so a new mission starts with an empty map. Test: mission with points on → "Nuova missione" → no navigation markers.
+- [ ] **Calibration – several checks in one mission** (staff 23 Nov): today the step-1 options (VOR / TACAN / NDB, ILS, PAPI, PAR) are radio buttons, one check per mission. Make them **check boxes** (same symmetric grid, at least one): e.g. ILS + PAPI + PAR on the same flight. Step 2: the aerodrome list shows the aerodromes that have **all** the chosen checks (the ones without some of them listed below with what is missing); radio aid buttons only when VOR / TACAN / NDB is chosen; runway field shared by ILS / PAPI / PAR. Generation: one serial per check in the order VOR / TACAN / NDB → ILS → PAPI → PAR (one final drawn once), timeline in sequence; `F.sub` becomes a list (`F.calChk`); FREE_ROLES / name: "Calibration – ILS, PAPI, PAR". Test.
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
