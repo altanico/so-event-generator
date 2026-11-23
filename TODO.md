@@ -2,6 +2,7 @@
 
 ## Next build
 
+- [ ] **Bug – calibration: frequencies of the checked aerodrome missing** (staff 23 Nov: "manca la frequenza di LIPI_G_APP"): the C2 / frequency list of a simple mission is built around the departure base only (e.g. LIRE / Roma), so the positions of the checked aerodrome are not there and the PAR serial lists the chain by name only ("LIPA_APP → LIPI_G_APP final talk-down → LIPI_TWR"). Fix: for Calibration add the ATC positions of the checked aerodrome to the frequency list – APP, TWR and the **GCA / PAR position (LIPI_G_APP 127.525)** from the ATC data, never invented (TBC when missing) – and write **position + frequency** in the serials and in the kneeboard check sections (e.g. "GCA LIPI_G_APP 127.525"). Same for the arrival aerodrome when it differs from the departure. Test (LIPI PAR → 127.525 in the serial, in the C2 list and in the kneeboard).
 - [ ] **Calibration kneeboard: one checklist section per check** (staff 23 Nov):
   - **no loadout** on the calibration kneeboard;
   - radio aids with **frequency and TACAN channel** (e.g. GHE TACAN 46X / 110.90 MHz, TPR VORTAC 24X / 108.70; a TACAN without a VHF frequency in the data gets the paired VHF computed from the channel: 17X–59X → 108.00–112.20, 70X–126X → 112.30–117.90, Y = +0.05 MHz, e.g. GRO 35Y → 109.85); NDB with kHz;
