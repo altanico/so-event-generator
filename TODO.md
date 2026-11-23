@@ -2,7 +2,11 @@
 
 ## Next build
 
-(nothing yet)
+- [ ] **Calibration NDB: no radials, no DME** (staff 23 Nov, text of the RIV NDB check: "fly the 10 DME arc from radial 190…, radial 250 inbound…"): an NDB has no radials and (here) no DME. For an NDB check write it in NDB terms, in the serial, the kneeboard checklist and the drawing:
+  - **orbit at 10 NM from the beacon (GNSS distance)** instead of the 10 DME arc, recording the ADF bearing error every 10°;
+  - **inbound track QDM xxx from 25 NM to the beacon** (note the station passage) and **outbound QDR xxx to 25 NM**, instead of "radial … inbound / outbound";
+  - drawing: orbit labelled with the bearings (QDM / QDR), no "DME"; table "Orbit 10 NM (GNSS)" and "QDM / QDR"; VOR / TACAN keep radials and DME.
+- [ ] **Bug – calibration: NDB frequency taken from the TACAN with the same name** (same message: "NDB RIV (110.00)"): at LIPI the TACAN RIV (110.00, 37X) and the NDB RIV (371 kHz) share the ident and the aid is looked up by ident only. Look it up by ident **and** kind, so the NDB shows **371.0 kHz** (serial, kneeboard, checklist). Test (LIPI RIV NDB → 371 kHz, no "radial", no "DME"; RIV TACAN still CH 37X / 110.00).
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
