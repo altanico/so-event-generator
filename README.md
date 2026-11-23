@@ -87,6 +87,12 @@ The generator never proposes a route: every flight plan starts as departure → 
 - `data/rad.json` – Italian part of the EUROCONTROL Route Availability Document (aerodrome connectivity, Annex 3A DEP / ARR, and the Italian conditions LI_LIM_AD, LI_TP), built with `python3 tools/rad_build.py RAD_<airac>.xlsx` at every AIRAC (the xlsx stays outside git). Used to warn when the first / last point of an IGAT route is not a RAD point of the aerodrome.
 - `data/helipads.json` – hospital helipads of Italy from OpenStreetMap (data © OpenStreetMap contributors, ODbL 1.0), built by the workflow `helipads.yml` (`tools/helipad_build.py`, Overpass API) on push and monthly. Used for hospital transfer, HEMS and MEDEVAC destinations.
 
+## Callsigns, bases, calibration (v1.33)
+
+- `data/callsigns.json` – radio callsigns of the Italian units (staff list `RADIO_CALLSIGNS.xlsx`, public), built with `python3 tools/callsign_build.py RADIO_CALLSIGNS.xlsx`: the callsign of a flight comes from its base + aircraft (two digits, e.g. DARDO 01), field 7 uses the short FPL form (FRECC01) or the GAT callsign (IAM0401) when the plan is all GAT; QRA callsigns by base; Canadair numbers by base.
+- Events: "Basi degli assetti" = only the departure / arrival bases of the participants (several, all equal, no meaning in the story); the base of each flight is automatic or chosen in the flights table. The RED airfields of the story are computed from the border.
+- Simple mission "Calibration" (Navigation & Training): FLIGHTCHECK P-180 from LIRE; VOR / TACAN / NDB, ILS, PAPI or PAR check at one of the 19 military aerodromes, filtered by what each aerodrome has.
+
 ## Hosting and access (v1.27)
 
 - Static site (GitHub Pages of this repository): open `index.html`; no account, no server. The normal link opens the generator at the `user` level; the `sog` and `staff` levels open from private links (`#k=<key>`; only the SHA-256 of the keys is in the code). The public page of the published event is at `#evento` and reads `published/event.json`.

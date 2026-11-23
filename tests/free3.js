@@ -17,7 +17,7 @@ if(/Mobilità aerea|Navigazione a bassa quota|Operazioni marittime/.test(en)) fa
 await page.evaluate(()=>{ APP.S=APP.newScenario(); APP.renderAll(); }); await page.click('[data-kind="free"]');
 const st1=await page.textContent('#panel'); ['COMBAT','AIR MOBILITY & RESCUE','NAVIGATION & TRAINING'].forEach(g=>{ if(!st1.includes(g)) fail.push('group '+g); });
 const keys=await page.evaluate(()=>[...document.querySelectorAll('[data-fmis]')].map(x=>x.dataset.fmis).join(','));
-if(keys!=='CAS,STRIKE,ID,MAR,AEW,AIRMOB,CSAR,SAR,MED,AIB,NAV') fail.push('cards '+keys);
+if(keys!=='CAS,STRIKE,ID,MAR,AEW,AIRMOB,CSAR,SAR,MED,AIB,NAV,CALIB') fail.push('cards '+keys);
 await page.click('[data-fmis="AIRMOB"]'); const subs=await page.evaluate(()=>[...document.querySelectorAll('[data-fsub]')].map(x=>x.dataset.fsub).join(','));
 if(subs!=='AIRLIFT,AIRDROP,INSERT,HUMAN,AAR') fail.push('air mobility options '+subs);
 const run=async(mis,sub,type,dep)=>page.evaluate(([mis,sub,type,dep])=>{ const F=APP.FREE(); F.mis=mis; F.sub=sub||''; F.flights=[]; F.areas=null; F.route=null; F.built=0; F.step=2; APP.renderAll();

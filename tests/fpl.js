@@ -100,7 +100,7 @@ const pop=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id), 
 if(pop[1]!==pop[0]+1||!/ PES /.test(pop[2])) fail.push('insert from map '+JSON.stringify(pop));
 await page.screenshot({path:'fpl_editor.png'}); await page.fill('[data-fplq]','PE'); await page.waitForTimeout(150); await page.screenshot({path:'fpl_editor2.png',fullPage:true});
 // map tools: 3 icons, auto windows per tab, one window at a time, style radio, threats list
-const mt=await page.evaluate(async()=>{ const o={}; const btns=[...document.querySelectorAll('#maptools .mtbtn')].map(b=>b.dataset.mapwin).join(); o.btns=btns;
+const mt=await page.evaluate(async()=>{ const o={}; const btns=[...document.querySelectorAll('#maptools .mtbtn')].map(b=>b.dataset.mapwin).filter(Boolean).join(); o.btns=btns;
   document.querySelector('[data-tab="scenario"]').click(); await new Promise(r=>setTimeout(r,150)); o.scen=APP.MAPWIN; o.items=document.querySelectorAll('#maptools [data-addmode^="zone:"]').length;
   document.querySelector('#maptools [data-addmode^="zone:"]').click(); await new Promise(r=>setTimeout(r,50)); o.mode=APP.ADDMODE;
   document.querySelector('[data-mapwin="style"]').click(); await new Promise(r=>setTimeout(r,50)); o.style=APP.MAPWIN; o.nwin=document.querySelectorAll('#maptools .mtwin').length;

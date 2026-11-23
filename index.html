@@ -296,7 +296,7 @@ const THEATRES = [
    view:[40.75,17.3,8],red:{center:[40.3,18.05],r:45,bases:['LIBN','LIBR']},main:'LIBV',blue:['LIBV','LIBD','LIBA','LIBG'],sea:[40.55,18.85],outside:[40.3,19.6]},
 ];
 
-const ROLES = {SEAD:'SEAD/DEAD',STRIKE:'Strike / Interdiction',CAS:'Close Air Support',DCA:'Defensive Counter Air',
+const ROLES = {CALIB:'Flight check (calibration)',SEAD:'SEAD/DEAD',STRIKE:'Strike / Interdiction',CAS:'Close Air Support',DCA:'Defensive Counter Air',
   OCA:'Offensive Counter Air (Sweep)',ESCORT:'Escort',QRA:'QRA / Intercept',LOWSLOW:'Low & Slow intercept',
   ANTISHIP:'Anti-surface warfare',CSAR:'Combat SAR',RESCORT:'Rescue escort',INSERT:'Helo insertion',
   AIRLIFT:'Airlift',AIRDROP:'Airdrop',AAR:'Air-to-air refuelling',AEW:'AEW / airborne C2',MPA:'Maritime patrol',RECCE:'Recce / ISR',
@@ -353,6 +353,8 @@ const AC = [
   ['G550 CAEW','AEW',['AEW','RECCE'],['G550','CAEW','E550']],
   ['P-72A','MPA',['MPA','RECCE'],['P72','P72A','ATR72MP']],
   ['P-8 Poseidon','MPA',['MPA','ANTISHIP'],['P8','P8A','POSEIDON']],
+  ['P-180 Avanti','LIGHT',['CALIB','AIRLIFT','MEDEVAC','HUMAN'],['P180','AVANTI','P180AVANTI']],
+  ['Falcon 900','TRANSPORT',['HUMAN','AIRLIFT','MEDEVAC'],['F900','FA900','FALCON900','DA900']],
   ['MQ-9 Reaper','ISR',['RECCE','CAS'],['MQ9','REAPER','PREDATORB']],
   // civil / rescue types
   ['AW109 / H145 / H135 (light twin helo)','HELO',['SAR','HEMS','MEDEVAC','HOSPITAL'],['A109','AW109','H145','EC45','EC145','EC135','H135','BK117','B429','AW119','AW169C']],
@@ -1442,7 +1444,7 @@ const zoneAtsTxt = z => { const a = zoneAts(z); return a ? `${a.unit} – ${a.cs
 const gcaOn = () => !!(S && S.gca && S.gca.on);
 const GCA_MODE = { ANY: ['PAR / SRA a scelta del GCA', 'PAR or SRA at the GCA\'s choice'], PAR: ['PAR', 'PAR'], SRA: ['SRA', 'SRA'] };
 const gcaMode = f => ((S.gcaFl || {})[f.cs]) || 'ANY';
-const gcaBases = () => { const t = S.t, l = t && t.flights ? t.flights.filter(f => f.task !== 'STANDBY').map(f => f.base) : []; return [...new Set([S.blueBases[0], ...l].filter(b => b && AIRPORTS[b]))]; };
+const gcaBases = () => { const t = S.t, l = t && t.flights ? t.flights.filter(f => f.task !== 'STANDBY').map(f => f.base) : []; return [...new Set([...S.blueBases, ...l].filter(b => b && AIRPORTS[b]))]; };
 function recChain(icao) { const a = baseApp(icao), g = baseGca(icao), t = baseTwr(icao);
   return { app: a, gca: g, twr: t, txt: `${a.cs || icao + '_APP (TBC)'} → ${g.cs}${g.known ? '' : ' (TBC)'} final talk-down → ${t ? t.cs : 'no TWR – APP to landing'}` }; }
 const recTxt = f => { if (!gcaOn() || !f || !f.base || f.task === 'STANDBY') return ''; return `Recovery to ${f.base}: ${GCA_MODE[gcaMode(f)][1]} – ${recChain(f.base).txt}`; };
@@ -1488,7 +1490,7 @@ function proposeC2() {
 }
 const c2Sel = () => { if (!S.c2sel) S.c2sel = proposeC2(); return S.c2sel; };
 
-const RB = () => PROF().sober ? [] : S.redBases;
+const RB = () => PROF().sober ? [] : redHeld();
 const GEN = () => !!(S.gen || (S.zones && S.zones.length));
 
 /* =====================================================================
@@ -1627,7 +1629,7 @@ const ROLE_GROUPS = [
   { k: 'IFR', it: 'Instrument Navigation', en: 'instrument training', tasks: ['IFRNAV'], civ: true }];
 const grpOf = task => ROLE_GROUPS.find(g => g.tasks.includes(task));
 const isCivAp = icao => AIRPORTS[icao] && AIRPORTS[icao][3] === 'CIV';
-const baseInfo = icao => (S.bases && S.bases[icao]) || { side: (RB().includes(icao) ? 'HELD' : 'BLUE'), roles: ['ALL'], rroles: ['ALL'] };
+const baseInfo = icao => ({ side: 'BLUE', roles: ['ALL'] }); // v1.33: no roles / side per base (the base of each flight is chosen automatically or in the flights table)
 const baseGroups = icao => ROLE_GROUPS.filter(g => SCHOOL[icao] ? SCHOOL_GRP.includes(g.k) : (!isCivAp(icao) || g.civ)); // civil airfields: civil purposes only; schools: basic navigation only
 const schoolAcOk = (icao, f) => { const s = SCHOOL[icao]; if (!s || !f) return true; return s.types ? s.types.includes(f.type) : (s.cats || []).includes(f.cat); };
 function baseOk(icao, task, f) { if (task === 'STANDBY') return true; const g = grpOf(task); if (!g) return true; if (isCivAp(icao) && !g.civ) return false;
@@ -1641,6 +1643,7 @@ function assignBases(flights, g) {
   const near = arr => [...arr].sort((a, b) => dist(ap(a), g.front) - dist(ap(b), g.front)), allAll = bases.every(b => (baseInfo(b).roles || ['ALL']).includes('ALL'));
   let i = 0, j = 0;
   for (const f of flights) {
+    const man = (S.baseMan || {})[f.cs]; if (man && bases.includes(man)) { f.base = man; continue; } // chosen by the staff in the flights table
     const ok = bases.filter(b => baseOk(b, f.task, f));
     if (!ok.length) { const mil = bases.filter(b => !isCivAp(b)); f.base = near(mil.length ? mil : bases)[0]; warn.push(`${f.cs} (${ROLES[f.task] || f.task}): nessuna base con questo ruolo${grpOf(f.task) && !grpOf(f.task).civ && bases.every(isCivAp) ? ' (gli aeroporti civili sono solo per scopi civili)' : ''} – messo a ${f.base}.`); continue; }
     if (!allAll) { f.base = near(ok)[0]; continue; } // roles set by the staff: nearest base with the role
@@ -3094,7 +3097,7 @@ function applyAAR(t) {
 function tailor() {
   const { flights, unknown } = buildFlights();
   const assigned = assignTasks(flights);
-  const baseWarn = assignBases(flights, geom()); qraSetup(flights);
+  const baseWarn = assignBases(flights, geom()); csApplyList(flights); qraSetup(flights);
   flights.forEach(f => f.pkg = PKG_OF[f.task] || 'S');
   // escorts join the package they protect
   const has = p => flights.some(f => f.pkg === p && f.task !== 'ESCORT');
@@ -3289,7 +3292,7 @@ function drawMap(fit) {
       J.ips.filter(c => TAB !== 'cas' || usedIP.has(c.name)).forEach(c => drag(add(L.marker(c.pos, { draggable: true, icon: icon('#0284C7', 'I', c.name, 'circle', 14) })), p => casMovePt(c, p, c.heli ? c.name : 'IP ' + c.name)).bindTooltip(`${c.heli ? '' : 'IP '}${c.name} – trascina per spostarlo`)); }
   }
   { const bd = borderGeom(); if (bd) { add(L.polygon(bd.red, { stroke: false, fillColor: '#ef4444', fillOpacity: .07, interactive: false })); add(L.polygon(bd.blue, { stroke: false, fillColor: '#3b82f6', fillOpacity: .05, interactive: false }));
-    add(L.polyline(bd.line, { color: '#7f1d1d', weight: 3, dashArray: '12 6' })).bindTooltip(`BLUE / RED boundary – ${S.factions.blue} | ${S.factions.red}`);
+    { const bl = add(L.polyline(bd.line, { color: '#7f1d1d', weight: 3, dashArray: '12 6' })); bl.bindTooltip(BEDIT || MODE !== 'staff' ? `BLUE / RED boundary – ${S.factions.blue} | ${S.factions.red}` : 'Confine BLUE / RED – clic per modificarlo', { sticky: true }); if (MODE === 'staff' && !isFree()) bl.on('click', () => { if (!BEDIT) borderEditToggle(); }); }
     if (bd.own) add(L.polyline(bd.ext, { color: '#7f1d1d', weight: 1.5, dashArray: '4 8', opacity: .6, interactive: false })); drawBorderEdit(add);
     add(L.marker(bd.blueLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#1d4ed8;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">BLUE · ${esc(S.factions.blue)}</div>` }) }));
     add(L.marker(bd.redLbl, { interactive: false, icon: L.divIcon({ className: '', html: `<div style="color:#b91c1c;font:700 11px Poppins,sans-serif;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff">RED · ${esc(S.factions.red)}</div>` }) })); } }
@@ -3297,6 +3300,9 @@ function drawMap(fit) {
   // bases
   S.blueBases.forEach(i => { if (AIRPORTS[i] && AIRPORTS[i][3] !== 'EXT') apMarker(add, i, { big: isFree() }); });
   RB().forEach(i => apMarker(add, i, { red: true }));
+  if (MODE === 'staff' && !isFree() && TAB === 'scenario' && thChosen() && !ADDMODE && !BEDIT) { const on = new Set([...S.blueBases, ...RB()]); // other aerodromes: faint, click = add as a base of the assets
+    Object.keys(AIRPORTS).forEach(k => { if (on.has(k) || AIRPORTS[k][3] === 'EXT') return; const p = ap(k); const m = add(L.marker(p, { icon: L.divIcon({ className: 'apsym apfaint', html: `<div style="opacity:.45">${apSvg(k)}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }));
+      m.bindTooltip(`${k} ${AIRPORTS[k][0]} – clic per aggiungerla alle basi degli assetti`); m.on('click', () => basesSet([...(S.blueBases || []), k])); }); }
   CORS().filter(z => dist(z.axis[0], geom().front) < 400).forEach(z => { const on = (S.cor || []).includes(z.id);
     add(L.polygon(z.poly, { color: '#9333EA', weight: on ? 2 : 1, dashArray: '6 4', fillOpacity: on ? .08 : .01, opacity: on ? .9 : .45 })).bindTooltip(`${z.name} · ${corLevels(z)}${on ? ' · IN USO' : ''}`, { sticky: true }).on('click', () => { if (TAB !== 'scenario' || ADDMODE) return; const st = new Set(S.cor || []); st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); });
     if (on) add(L.polyline(z.axis, { color: '#7e22ce', weight: 1.5 })); });
@@ -3366,7 +3372,7 @@ function toSide(p, want) { const sd = borderSide(p); if (!want || !sd || sd === 
   return p; }
 function borderIssues() {
   if (!borderGeom()) return []; const out = [], chk = (p, want, what) => { const sd = borderSide(p); if (sd && sd !== want) out.push(`${what} sul lato ${sd}`); };
-  S.blueBases.filter(i => baseInfo(i).side !== 'BOTH').forEach(i => chk(ap(i), 'BLUE', `Base BLUE ${i}`)); // a base shared by BLUE and RED players is not checked RB().forEach(i => chk(ap(i), 'RED', `Base RED ${i}`));
+  // v1.33: the bases of the assets have no side in the story – not checked RB().forEach(i => chk(ap(i), 'RED', `Base RED ${i}`));
   (S.zones || []).forEach(z => SIDE_Z[z.cat] && chk(z.center, SIDE_Z[z.cat], `Zona ${z.name}`));
   if (S.t) S.t.threats.forEach(t => SIDE_T.has(t.type) && chk(t.pos, 'RED', `Minaccia ${t.id} (${TT[t.type].short})`));
   return out;
@@ -3374,11 +3380,14 @@ function borderIssues() {
 let BEDIT = false;
 function borderHtml() {
   const bd = borderGeom(); if (!bd) return ''; const iss = borderIssues();
-  return `<div class="row" style="flex-wrap:wrap;align-items:center;margin-top:6px"><span style="font-size:13px"><b>Confine BLUE / RED</b> <span class="muted">(${bd.own ? `modificato, ${bd.line.length} punti` : 'automatico'})</span></span>
-    <button class="b sm shrink ${BEDIT ? 'primary' : ''}" id="bedit">${BEDIT ? 'Fine modifica' : 'Modifica sulla mappa'}</button>${bd.own ? '<button class="b sm shrink" id="breset">Ripristina automatico</button>' : ''}</div>
-  ${BEDIT ? '<p class="muted" style="font-size:12px;margin:4px 0">Trascina i punti ■ per spostarli; trascina o clicca i ＋ a metà dei tratti per aggiungere un punto; doppio clic (o tasto destro) su un punto per toglierlo. Oltre gli estremi la linea prosegue dritta.</p>' : ''}
-  ${iss.length ? `<div class="warn" style="margin-top:4px">Dal lato sbagliato del confine: ${iss.map(esc).join(' · ')}. Spostali sulla mappa o correggi il confine.</div>` : ''}`;
+  return `<div id="bordercard" style="border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px;background:#fff"><div style="display:flex;height:5px"><div style="flex:1;background:#2563eb"></div><div style="flex:1;background:#dc2626"></div></div>
+  <div style="padding:8px 10px"><div class="row" style="align-items:baseline;flex-wrap:wrap"><b style="font-size:14px;flex:1">Confine BLUE / RED</b><span class="muted" style="font-size:11.5px">${bd.own ? `modificato · ${bd.line.length} punti` : 'automatico'}</span></div>
+    <p class="muted" style="font-size:12px;margin:2px 0 6px">La linea che divide il lato BLUE dal lato RED: le minacce e gli aeroporti nemici stanno sul lato RED, i punti amici su quello BLUE.</p>
+    <div class="row" style="flex-wrap:wrap;gap:6px"><button class="b ${BEDIT ? '' : 'primary'} shrink" id="bedit">${BEDIT ? 'Fine modifica' : 'Modifica il confine sulla mappa'}</button>${bd.own ? '<button class="b sm shrink" id="breset">Ripristina automatico</button>' : ''}</div>
+    ${BEDIT ? '<p style="font-size:12px;margin:6px 0 0;background:#eff6ff;border-radius:6px;padding:5px 8px">Trascina i punti ■ per spostarli; trascina o clicca i ＋ a metà dei tratti per aggiungere un punto; doppio clic (o tasto destro) su un punto per toglierlo. Oltre gli estremi la linea prosegue dritta.</p>' : ''}
+    ${iss.length ? `<div class="warn" style="margin-top:6px">Dal lato sbagliato del confine: ${iss.map(esc).join(' · ')}. Spostali sulla mappa o correggi il confine.</div>` : ''}</div></div>`;
 }
+function borderEditToggle() { BEDIT = !BEDIT; if (BEDIT && !((S.border || []).length >= 2)) { S.border = borderAuto(); save(); } renderPanel(); drawMap(); renderMapTools(); if (BEDIT) { toast('Modifica il confine sulla mappa'); const c = document.getElementById('bordercard'); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'nearest' }); } }
 function drawBorderEdit(add) {
   if (!BEDIT || !borderGeom()) return; if (!((S.border || []).length >= 2)) S.border = borderAuto();
   const B = S.border, done = () => { save(); renderPanel(); drawMap(); }, sq = (txt, col) => L.divIcon({ className: '', iconSize: [14, 14], iconAnchor: [7, 7], html: `<div style="width:12px;height:12px;background:${col};border:2px solid #fff;box-shadow:0 0 2px #000;font:700 11px/11px sans-serif;color:#fff;text-align:center">${txt}</div>` });
@@ -3409,7 +3418,8 @@ const MTICON = { style: '<svg width="22" height="22" viewBox="0 0 24 24" fill="n
   nav: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8 4.8-2.2Z"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2"/></svg>',
   thr: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v5M9.5 11.5h5"/></svg>',
   x: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>' };
-const MTNAME = { style: 'Stile', nav: 'Navigazione', thr: 'Minacce' };
+const MTNAME = { style: 'Stile', nav: 'Navigazione', thr: 'Minacce', bord: 'Confine' };
+MTICON.bord = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 18c4-1 5-7 9-7s5 5 9 3" stroke="#7f1d1d" stroke-dasharray="4 3"/><circle cx="6" cy="7" r="2.4" fill="#2563eb" stroke="none"/><circle cx="18" cy="20" r="2.4" fill="#dc2626" stroke="none"/></svg>';
 // what can be added with a click on the map in this phase (the old "Clic sulla mappa" select)
 function addModes() { const g = [];
   if (TAB === 'scenario') g.push(['Zone di minaccia (fase 1)', Object.entries(CATS).map(([k, v]) => [`zone:${k}`, v.it, v.side === 'BLUE' ? '#2563eb' : '#dc2626'])]);
@@ -3434,11 +3444,13 @@ function renderMapTools() {
   if (MAPWIN_TAB !== TAB) { MAPWIN_TAB = TAB; MAPWIN = TAB === 'fpl' ? 'nav' : TAB === 'scenario' && S && S.kind !== '' && !isFree() ? 'thr' : (MAPWIN === 'style' ? 'style' : null); }
   const btn = k => `<div class="mtcol"><button class="mtbtn${MAPWIN === k ? ' on' : ''}" data-mapwin="${k}" aria-label="${MTNAME[k]}" aria-pressed="${MAPWIN === k}" title="${MTNAME[k]}">${MTICON[k]}</button><span class="mtlab${MAPWIN === k ? ' on' : ''}">${MTNAME[k]}</span></div>`;
   const drawing = ADDMODE === 'th:draw' || ADDMODE === 'cus:draw' || (ADDMODE && MAPWIN !== 'thr');
-  el.innerHTML = `<div class="mtrail">${btn('style')}${btn('nav')}${btn('thr')}</div>${MAPWIN ? `<div class="mtwin" id="mapwin-${MAPWIN}">${mapWinHtml(MAPWIN)}</div>` : ''}${drawing && MAPWIN !== 'thr' ? `<div class="mtpill"${MAPWIN ? ' style="top:auto;bottom:auto;position:static;width:auto;margin:0"' : ''}>${ADDMODE === 'th:draw' ? '✏️ Disegno del teatro in corso' : ADDMODE === 'cus:draw' ? '✏️ Disegno area custom in corso' : `Clic sulla mappa: <b>${esc((addModes().flatMap(x => x[1]).find(x => x[0] === ADDMODE) || [0, ADDMODE])[1])}</b> · <a href="#" data-addmode="">Annulla</a>`}</div>` : ''}`;
+  const bbtn = S && !isFree() && MODE === 'staff' && borderGeom() ? `<div class="mtcol"><button class="mtbtn${BEDIT ? ' on' : ''}" data-bordtool="1" aria-label="Confine BLUE / RED" aria-pressed="${BEDIT}" title="Modifica il confine BLUE / RED">${MTICON.bord}</button><span class="mtlab${BEDIT ? ' on' : ''}">${MTNAME.bord}</span></div>` : '';
+  el.innerHTML = `<div class="mtrail">${btn('style')}${btn('nav')}${btn('thr')}${bbtn}</div>${MAPWIN ? `<div class="mtwin" id="mapwin-${MAPWIN}">${mapWinHtml(MAPWIN)}</div>` : ''}${drawing && MAPWIN !== 'thr' ? `<div class="mtpill"${MAPWIN ? ' style="top:auto;bottom:auto;position:static;width:auto;margin:0"' : ''}>${ADDMODE === 'th:draw' ? '✏️ Disegno del teatro in corso' : ADDMODE === 'cus:draw' ? '✏️ Disegno area custom in corso' : `Clic sulla mappa: <b>${esc((addModes().flatMap(x => x[1]).find(x => x[0] === ADDMODE) || [0, ADDMODE])[1])}</b> · <a href="#" data-addmode="">Annulla</a>`}</div>` : ''}`;
   const pill = el.querySelector('.mtpill'), body = el.querySelector('.mtwbody'); if (pill && body) body.prepend(pill);
   if (MAPWIN === 'nav') drawNav();
 }
-document.addEventListener('click', e => { const t = e.target.closest('[data-mapwin],[data-addmode]'); if (!t || !document.getElementById('maptools').contains(t)) return; e.preventDefault();
+document.addEventListener('click', e => { const t = e.target.closest('[data-mapwin],[data-addmode],[data-bordtool]'); if (!t || !document.getElementById('maptools').contains(t)) return; e.preventDefault();
+  if (t.dataset.bordtool) { if (TAB !== 'scenario') { TAB = 'scenario'; renderAll(); } borderEditToggle(); return; }
   if (t.dataset.mapwin) { MAPWIN = MAPWIN === t.dataset.mapwin ? null : t.dataset.mapwin; renderMapTools(); return; }
   if (t.dataset.addmode != null) { ADDMODE = ADDMODE === t.dataset.addmode ? '' : t.dataset.addmode; renderMapTools(); } });
 document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.mstyle) { S.mapStyle = e.target.dataset.mstyle; save(); applyMapStyle(); renderMapTools(); } });
@@ -3447,7 +3459,7 @@ document.addEventListener('change', e => { if (e.target.dataset && e.target.data
 function newMissionNow() {
   try { localStorage.removeItem('ivao-so-current'); localStorage.removeItem('ivao-so-points'); } catch (e) { }
   S = newScenario(); POINTS = { source: '', items: [] }; if (AIPDATA) defaultAirspace();
-  Object.assign(ZF, { q: '', type: '', sel: '', all: false, sort: 'dist' }); WOPEN = 'ev'; WREACH = 0; BEDIT = false; ADDMODE = ''; TAB = 'scenario'; SUBTAB = 'manual'; CSV_PENDING = null; FAC_ED = null; EVCONF = ''; EVOPEN = false; FADD = false; FPICK = '';
+  Object.assign(ZF, { q: '', type: '', sel: '', all: true, sort: 'dist' }); WOPEN = 'ev'; WREACH = 0; BEDIT = false; ADDMODE = ''; TAB = 'scenario'; SUBTAB = 'manual'; CSV_PENDING = null; FAC_ED = null; EVCONF = ''; EVOPEN = false; FADD = false; FPICK = '';
   const c = document.getElementById('nmconf'); if (c) c.remove();
   if (MAP) MAP.closePopup(); try { renderEvPanel(); } catch (e) { } save(); renderAll(true);
 }
@@ -3505,7 +3517,8 @@ function zonePickHtml0(zs) { const res = new Set(S.reserved || []);
   return `<div style="min-width:220px"><b style="font-size:12px">${zs.length > 1 ? zs.length + ' aree sovrapposte qui' : 'Area qui'}</b><div class="muted" style="font-size:11px;margin-bottom:4px">Spunta quelle da riservare (dalla più piccola):</div>${zs.map(z => `<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0;cursor:pointer"><input type="checkbox" data-res="${esc(z.id)}" ${res.has(z.id) ? 'checked' : ''} style="width:auto"><span class="dot" style="background:${z.custom ? '#db2777' : ZCOL[z.type] || '#475569'}"></span><span>${esc(z.name)} <span class="muted">${esc(z.lower)}–${esc(z.upper)}</span></span></label>`).join('')}</div>`; }
 function zonePick(p, zs, nb) { if (!MAP || !L.popup) return; L.popup({ maxWidth: 320 }).setLatLng(p).setContent(zonePickHtml(zs, nb)).openOn(MAP); }
 // zone list: filter by name/id, type, selection, range; sort by distance, name, type or lower limit
-const ZF = { q: '', type: '', sel: '', all: false, sort: 'dist' };
+const ZTYPE_ORD = ['D', 'R', 'TSA', 'TRA', 'IND']; // order of the area type filter (staff 22 Nov)
+const ZF = { q: '', type: '', sel: '', all: true, sort: 'dist' }; // all the areas of Italy by default (staff 22 Nov)
 // mission level band (S.meta.levels = [bottom, upper] in FL, 600 = UNL): areas that overlap it, even partly (touching only = hidden); unknown (TBC) upper limit = shown
 const LVMAX = 600, lvBand = () => { const l = S.meta && S.meta.levels; return l && (l[0] > 0 || l[1] < LVMAX) ? l : null; };
 const lvTxt = v => v <= 0 ? 'SFC' : v >= LVMAX ? 'UNL' : 'FL' + String(v).padStart(3, '0');
@@ -3524,22 +3537,22 @@ function zfApply() { const res = new Set(S.reserved || []); let n = 0, m = 0;
   const c = $('#zfcount'); if (c) c.textContent = `${n} di ${m} mostrate`;
   document.querySelectorAll('button[data-trk]').forEach(b => { const t = TRK().find(x => x.id === b.dataset.trk); b.hidden = !!t && !trkLvOk(t); }); }
 function lvHtml() { const l = (S.meta && S.meta.levels) || [0, LVMAX], out = RES().filter(z => !z.custom && !lvOk(z));
-  return `<div class="card" style="margin-top:8px;padding:8px 10px"><div class="row" style="align-items:center;flex-wrap:wrap"><b style="font-size:13px">Quote della missione</b><span id="zlvtxt" style="font-size:13px">${lvTxt(l[0])} – ${lvTxt(l[1])}</span><span class="muted" style="font-size:12px;flex:1">nasconde le aree che non hanno quote in comune (quelle che le toccano solo al bordo comprese)</span><button class="b sm shrink" id="zlvall">Tutte le quote</button></div>
+  return `<div class="card" style="margin-top:8px;padding:8px 10px"><div class="row" style="align-items:center;flex-wrap:nowrap;gap:10px"><b style="font-size:13px;white-space:nowrap">Quote della missione</b><span id="zlvtxt" style="font-size:13px;white-space:nowrap;flex:1">${lvTxt(l[0])} – ${lvTxt(l[1])}</span><button class="b sm shrink" id="zlvall">Tutte le quote</button></div>
     <div class="row" style="align-items:center;gap:8px"><label style="margin:0;min-width:60px">Bottom</label><input type="range" id="zlvlo" min="0" max="${LVMAX}" step="5" value="${l[0]}" style="flex:1"></div>
     <div class="row" style="align-items:center;gap:8px"><label style="margin:0;min-width:60px">Upper</label><input type="range" id="zlvhi" min="0" max="${LVMAX}" step="5" value="${l[1]}" style="flex:1"></div>
     ${out.length ? `<div class="warn" style="margin-top:4px">Aree riservate fuori dalle quote della missione: ${out.map(z => esc(z.name)).join(', ')}</div>` : ''}
     ${lvBand() && (S.trkSel || []).some(id => { const t = TRK().find(x => x.id === id); return t && !(trkZones(t).length ? trkZones(t).some(lvOk) : lvOk({ lower: 'FL' + t.lo, upper: 'FL' + t.hi })); }) ? `<div class="warn" style="margin-top:4px">Track AAR scelte fuori dalle quote della missione: ${(S.trkSel || []).filter(id => { const t = TRK().find(x => x.id === id); return t && !(trkZones(t).length ? trkZones(t).some(lvOk) : lvOk({ lower: 'FL' + t.lo, upper: 'FL' + t.hi })); }).join(', ')}</div>` : ''}
-    <p class="muted" style="font-size:12px;margin:4px 0 0">Imposta prima le quote: "Proponile tu" sceglie solo tra le aree che le contengono.</p></div>`; }
+    <p class="muted" style="font-size:11.5px;margin:4px 0 0">Le aree senza quote in comune (anche solo al bordo) sono nascoste. Imposta prima le quote: "Proponile tu" sceglie solo tra le aree che le contengono.</p></div>`; }
 let lvSaveT = null;
 function lvInput(t) { const l = (S.meta.levels || [0, LVMAX]).slice(); if (t.id === 'zlvlo') l[0] = +t.value; else l[1] = +t.value;
   if (l[0] >= l[1]) { if (t.id === 'zlvlo') l[0] = Math.max(0, l[1] - 5); else l[1] = Math.min(LVMAX, l[0] + 5); t.value = t.id === 'zlvlo' ? l[0] : l[1]; }
   S.meta.levels = l; const tx = $('#zlvtxt'); if (tx) tx.textContent = `${lvTxt(l[0])} – ${lvTxt(l[1])}`; zfApply(); zfMapLater(); clearTimeout(lvSaveT); lvSaveT = setTimeout(save, 400); }
 function zoneTableHtml(near, res) {
-  const list = zfList(near), types = [...new Set(list.filter(z => !z.custom).map(z => z.type))].sort(), shown = list.filter(z => zfMatch(z, res)).length;
+  const list = zfList(near), types = [...new Set(list.filter(z => !z.custom).map(z => z.type))].sort((a, b) => ((ZTYPE_ORD.indexOf(a) + 1) || 99) - ((ZTYPE_ORD.indexOf(b) + 1) || 99) || (a < b ? -1 : 1)), shown = list.filter(z => zfMatch(z, res)).length;
   const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`;
   return `<div class="row" style="flex-wrap:wrap;align-items:flex-end;margin-top:6px;gap:6px">
     <div style="flex:2 1 160px"><label>🔍 Cerca area (nome, sigla o attività)</label><input id="zfq" type="search" value="${esc(ZF.q)}" placeholder="es. R49, Quirra, INDIA, TSA 73" autocomplete="off"></div>
-    <div style="flex:1 1 90px"><label>Tipo</label><select id="zftype">${opt('', 'Tutti', ZF.type)}${types.map(t => opt(t, t, ZF.type)).join('')}${CUS().length ? opt('custom', 'Custom', ZF.type) : ''}</select></div>
+    <div style="flex:1 1 90px"><label>Tipo</label><select id="zftype">${opt('', 'Tutti', ZF.type)}${types.map(t => opt(t, t === 'IND' ? 'INDIA' : t, ZF.type)).join('')}${CUS().length ? opt('custom', 'Custom', ZF.type) : ''}</select></div>
     <div style="flex:1 1 110px"><label>Stato</label><select id="zfsel">${opt('', 'Tutte', ZF.sel)}${opt('on', 'Selezionate', ZF.sel)}${opt('off', 'Non selezionate', ZF.sel)}</select></div>
     <div style="flex:1 1 120px"><label>Ordina per</label><select id="zfsort">${opt('dist', 'Distanza dal teatro', ZF.sort)}${opt('name', 'Nome', ZF.sort)}${opt('type', 'Tipo', ZF.sort)}${opt('lo', 'Limite inferiore', ZF.sort)}</select></div>
     <div style="flex:1 1 120px"><label>Elenco</label><select id="zfall">${opt('', 'Vicino al teatro', ZF.all ? 'x' : '')}${opt('1', 'Tutta Italia', ZF.all ? '1' : '')}</select></div></div>
@@ -3652,7 +3665,6 @@ function wBody(id) {
       <div class="row"><div><label><span class="dot" style="background:var(--blue)"></span>Fazione BLUE</label><input id="fblue" value="${esc(S.factions.blue)}"></div>
       <div><label><span class="dot" style="background:var(--red)"></span>Fazione RED</label><input id="fred" value="${esc(S.factions.red)}"></div><button class="b shrink" id="rfac">🎲</button></div>
       <div class="chips">${Object.entries(CATS).filter(([k, v]) => !v.evt).map(([k, v]) => `<label class="chip"><input type="checkbox" data-cat="${k}" ${S.cats.includes(k) ? 'checked' : ''}>${esc(v.it)}</label>`).join('')}</div>
-      ${heldPickHtml()}
       ${borderHtml()}`;
     case 'c2': return `<label class="chip" style="margin-bottom:8px"><input type="checkbox" id="authon" ${authOn() ? 'checked' : ''}> Autenticazione richiesta (tabella di autenticazione + RAMROD nel briefing)</label>${authOn() && S.meta.ramrod ? `<span class="muted" style="font-size:12px"> RAMROD dell'evento: <b>${esc(S.meta.ramrod)}</b></span>` : ''}` + c2Card();
     case 'gen': return GEN() ? genDoneHtml() : genAskHtml();
@@ -3668,26 +3680,33 @@ function genAskHtml() {
     <div class="row" style="flex-wrap:wrap"><button class="b primary shrink" id="genauto">Proponile tu e genera</button><button class="b shrink" id="genman">Uso le mie (${RES().length}) e genera</button></div>`;
 }
 const baseWarn = k => NOBASE.includes(k) ? 'Non proposto come base dallo staff: usalo solo se serve davvero.' : SCHOOL[k] ? `Base scuola (${SCHOOL[k].it}): pista corta, solo addestramento basico di navigazione.` : '';
-function basePickHtml() { if (!S.bases) basesFromList(); const g = geom(), all = !!S.baseAll;
-  const cand = Object.keys(AIRPORTS).map(k => [k, dist(ap(k), g.front)]).filter(([k, d]) => S.bases[k] || d < (all ? 450 : 220)).sort((a, b) => (!!S.bases[b[0]] - !!S.bases[a[0]]) || a[1] - b[1]).slice(0, all ? 80 : 24);
-  const tag = k => ({ MIL: 'MIL', CIV: 'CIV', JOINT: 'MIL/CIV' })[AIRPORTS[k][3]] || AIRPORTS[k][3];
-  const chips = (k, key, cur) => `<div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0">${[{ k: 'ALL', it: 'Tutti i ruoli' }, ...baseGroups(k)].map(gr => `<label style="display:inline-flex;gap:4px;align-items:center;font-size:11px;border:1px solid var(--line);border-radius:12px;padding:2px 8px;cursor:pointer"><input type="checkbox" style="width:auto;margin:0" data-brole="${k}:${key}:${gr.k}" ${(cur || ['ALL']).includes(gr.k) ? 'checked' : ''}>${esc(gr.it)}</label>`).join('')}</div>`;
-  const sum = (k, r) => (r || ['ALL']).includes('ALL') ? (isCivAp(k) ? 'tutti i ruoli civili' : 'tutti i ruoli') : r.map(x => (ROLE_GROUPS.find(g => g.k === x) || {}).it || x).join(', ');
-  return `<div class="card" style="margin-top:10px"><b style="font-size:13px">Basi di partenza e arrivo</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Per ogni aeroporto scegli chi lo usa (BLUE, giocatori RED o entrambi) e i ruoli. Una sola base con "Tutti i ruoli" va bene per tutto l'evento. Gli aeroporti civili sono solo per scopi civili. La prima base BLUE (★) è la principale.</p>
-    ${cand.map(([k, d]) => { const b = S.bases[k], side = b ? b.side : '';
-      return `<div style="border-top:1px solid var(--line);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:150px"><b>${k}</b> ${S.blueBases[0] === k ? '★' : ''} <span class="muted" style="font-size:11px">${esc(AIRPORTS[k][0])} · ${tag(k)} · ${Math.round(d / 1.852)} NM dal fronte</span>${baseWarn(k) ? `<div class="warnline" style="font-size:11px;color:#b45309">⚠ ${esc(baseWarn(k))}</div>` : ''}</div>
-        ${b && ['BLUE', 'BOTH'].includes(side) && S.blueBases[0] !== k ? `<button class="b sm shrink" data-bmain="${k}">★ Principale</button>` : ''}<select data-bside="${k}" style="width:140px">${[['', '— non usata'], ['BLUE', 'BLUE'], ['RED', 'RED (giocatori)'], ['BOTH', 'BLUE + RED']].map(([v, l]) => `<option value="${v}" ${side === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-        ${b && ['BLUE', 'BOTH'].includes(side) ? `<details${(S.bOpen || '') === k + 'roles' ? ' open' : ''} data-bopen="${k}roles"><summary style="font-size:12px;cursor:pointer">BLUE: ${esc(sum(k, b.roles))}</summary>${chips(k, 'roles', b.roles)}</details>` : ''}
-        ${b && ['RED', 'BOTH'].includes(side) ? `<details${(S.bOpen || '') === k + 'rroles' ? ' open' : ''} data-bopen="${k}rroles"><summary style="font-size:12px;cursor:pointer;color:#b91c1c">RED (giocatori): ${esc(sum(k, b.rroles))}</summary>${chips(k, 'rroles', b.rroles)}</details>` : ''}</div>`; }).join('')}
-    <button class="b sm shrink" id="baseall" style="margin-top:6px">${all ? 'Mostra solo i vicini' : 'Mostra più aeroporti'}</button></div>`; }
-function heldPickHtml() { const g = geom(), toR = dest(g.front, g.dir + 180, 50), toB = dest(g.front, g.dir, 50);
-  const cand = Object.keys(AIRPORTS).filter(k => S.redBases.includes(k) || (dist(ap(k), g.front) < 200 && dist(ap(k), toR) < dist(ap(k), toB))).sort((a, b) => (isCivAp(a) - isCivAp(b)) || dist(ap(a), g.front) - dist(ap(b), g.front)).slice(0, 16);
-  return `<div style="margin-top:8px"><label><span class="dot" style="background:var(--red)"></span>Aeroporti occupati da RED (scenario, nessun giocatore)</label><div class="chips">${cand.map(k => `<label class="chip"><input type="checkbox" data-rheld="${k}" ${S.redBases.includes(k) ? 'checked' : ''}>${k} <span class="muted" style="font-size:11px">${esc(AIRPORTS[k][0])}${isCivAp(k) ? ' · civile' : ''}</span></label>`).join('') || '<span class="muted">nessun aeroporto sul lato RED</span>'}</div></div>`; }
+// ---- bases of the assets (staff 22–23 Nov): only the departure / arrival bases, several, all equal; no meaning in the story ----
+// RED-held airfields of the story = the 1–2 military aerodromes on the RED side of the border nearest to the front (computed)
+function redHeld() { if (!thChosen() || !borderGeom()) return []; const g = geom(), base = new Set(S.blueBases || []);
+  const c = Object.keys(AIRPORTS).filter(k => ['MIL', 'JOINT'].includes(AIRPORTS[k][3]) && !base.has(k) && !noProp(k) && borderSide(ap(k)) === 'RED').map(k => [k, dist(ap(k), g.front)]).sort((a, b) => a[1] - b[1]);
+  return c.filter((x, i) => i === 0 || x[1] < 250).slice(0, 2).map(x => x[0]); }
+function basesSet(list) { S.blueBases = [...new Set(list)].filter(k => AIRPORTS[k]); S.basesSet = true; S.bases = {}; S.blueBases.forEach(k => S.bases[k] = { roles: ['ALL'] }); S.baseOrd = S.blueBases.slice(); S.c2sel = null;
+  if (S.t && S.t.flights) { assignBases(S.t.flights, geom()); } save(); renderAll(); }
+const baseUse = k => S.t && S.t.flights ? S.t.flights.filter(f => f.base === k).length : 0;
+function basePickHtml() { const g = geom(), sel = (S.blueBases || []).filter(k => AIRPORTS[k]), q = String(S.baseQ || '').trim().toUpperCase();
+  const tag = k => ({ MIL: 'MIL', CIV: 'CIV', JOINT: 'MIL/CIV', EXT: '' })[AIRPORTS[k][3]] || '';
+  const chips = sel.map(k => { const n = baseUse(k), w = baseWarn(k); return `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ivao);background:#eef2ff;border-radius:16px;padding:3px 4px 3px 10px;margin:2px" title="${esc(w)}"><b>${k}</b><span style="font-size:12px">${esc(apShort(k))}</span>${n ? `<span class="muted" style="font-size:11px">· ${n} flight</span>` : ''}${w ? '<span style="color:#b45309" aria-label="avviso">⚠</span>' : ''}<button class="b sm" data-bdel="${k}" aria-label="Togli ${k}" style="padding:0 7px;border-radius:12px">×</button></span>`; }).join('');
+  const res = q.length >= 2 ? Object.keys(AIRPORTS).filter(k => AIRPORTS[k][3] !== 'EXT' && !sel.includes(k) && (k.includes(q) || String(AIRPORTS[k][0]).toUpperCase().includes(q))).slice(0, 8) : [];
+  const sug = Object.keys(AIRPORTS).filter(k => ['MIL', 'JOINT'].includes(AIRPORTS[k][3]) && !sel.includes(k) && !noProp(k) && borderSide(ap(k)) !== 'RED').sort((a, b) => dist(ap(a), g.front) - dist(ap(b), g.front)).slice(0, 6);
+  return `<div class="card" style="margin-top:10px"><b style="font-size:13px">Basi degli assetti</b><p class="muted" style="font-size:12px;margin:2px 0 6px">Gli aeroporti da cui partono e dove atterrano i flight dei partecipanti (BLUE e RED). Non contano nella storia dell'esercitazione: il lato di ogni aeroporto lo dà il confine.${sel.length > 1 ? ' Con più basi il generatore mette ogni flight nella più adatta; la cambi nella tabella dei flight.' : ''}</p>
+    <div style="display:flex;flex-wrap:wrap;align-items:center">${chips || '<span class="muted" style="font-size:12px">Nessuna base scelta.</span>'}</div>
+    <div class="row" style="margin-top:6px;align-items:center;gap:6px"><input id="bq" value="${esc(S.baseQ || '')}" placeholder="Aggiungi: codice ICAO o nome" autocomplete="off" style="flex:1"></div>
+    ${res.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${res.map(k => `<button class="b sm" data-badd="${k}">+ ${k} <span class="muted">${esc(apShort(k))} · ${tag(k)}</span></button>`).join('')}</div>` : q.length >= 2 ? '<p class="muted" style="font-size:12px;margin:4px 0">Nessun aeroporto trovato.</p>' : ''}
+    ${sug.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:6px"><span class="muted" style="font-size:11.5px">Vicine al fronte:</span>${sug.map(k => `<button class="b sm" data-badd="${k}" title="${esc(AIRPORTS[k][0])}">+ ${k}</button>`).join('')}</div>` : ''}
+    ${!PROF().sober && redHeld().length ? `<p class="muted" style="font-size:11.5px;margin:6px 0 0">Aeroporti RED nella storia (dal confine): ${redHeld().map(k => `<b style="color:${AP_RED}">${k}</b> ${esc(apShort(k))}`).join(', ')}</p>` : ''}</div>`; }
+// base of a flight in the flights table: buttons with the chosen bases (only with more than one base)
+function flightBaseHtml(f) { const b = (S.blueBases || []).filter(k => AIRPORTS[k]); if (b.length < 2) return esc(f.base || '-');
+  return `<span style="white-space:nowrap">${b.map(k => `<button class="b sm${f.base === k ? ' primary' : ''}" data-fbase="${f.id}|${k}" style="padding:1px 6px;margin:1px" aria-pressed="${f.base === k}">${k}</button>`).join('')}</span>`; }
 function genDoneHtml() {
   const R = REL();
   return `<h3 style="margin:4px 0">Basi</h3>
-  <label><span class="dot" style="background:var(--blue)"></span>Basi BLUE (ICAO, separati da virgola)</label><input id="bb" value="${esc(S.blueBases.join(', '))}">
-  ${R.threats ? `<label><span class="dot" style="background:var(--red)"></span>Aeroporti in mano RED</label><input id="rb" value="${esc(RB().join(', '))}">` : ''}
+  <label>Basi degli assetti (ICAO, separati da virgola)</label><input id="bb" value="${esc(S.blueBases.join(', '))}">
+  ${R.threats && RB().length ? `<p class="muted" style="font-size:12px;margin:4px 0">Aeroporti RED nella storia (dal confine): ${esc(RB().join(', '))}</p>` : ''}
   <h3 style="margin:12px 0 4px">Background</h3><textarea id="bg" style="min-height:150px">${esc(S.background)}</textarea>
   <div class="row"><span></span><button class="b sm shrink" id="regbg">Rigenera solo il testo</button></div>
   <h3 style="margin:12px 0 4px">${PROF().sober ? 'Zone dell\'evento' : 'Zone di minaccia'}</h3>
@@ -3855,7 +3874,7 @@ function renderTailor() {
   let h = `<h2>Fase 3 · Adattamento</h2>
   <p class="muted">Il motore raggruppa i piloti in flight, assegna i task in base alle capacità dei velivoli e genera solo le minacce a cui qualcuno può rispondere, dimensionate sulla difficoltà.</p>
   <div class="row"><div><label>H-hour (UTC)</label><input id="hh" placeholder="es. 19:00Z" value="${esc(S.meta.hHour)}"></div><div><label>Data evento</label><input id="edate" placeholder="es. 12 DEC 2026" value="${esc(S.meta.date)}"></div></div>
-  ${borderGeom() ? `<div class="card" style="margin:8px 0">${borderHtml()}</div>` : ''}
+  ${borderHtml()}
   <div class="row" style="margin-top:10px"><button class="b primary" id="dotail">${t ? 'Ri-adatta da zero' : 'Adatta scenario ai partecipanti'}</button>${t ? '<button class="b" id="regen">Rigenera minacce dai task</button>' : ''}</div>`;
   if (!t) return h;
   { const wantCas = reqTasks().includes('CAS') && !offT('CAS'), hasCas = t.flights.some(f => f.task === 'CAS');
@@ -3868,7 +3887,7 @@ function renderTailor() {
   h += aspIssuesHtml();
   h += `<div class="card" style="font-size:12.5px"><b>Revisione:</b> ${esc(revLabel())}${curRev() ? ' del ' + esc(curRev().date) : ''}. Quando il tabellone è definitivo emetti una nuova revisione nella scheda Export: il masterplan riporterà lo storico.</div>`;
   h += `<h2>Flight BLUE (${t.flights.length})</h2><table><tr><th>Callsign</th><th>Tipo</th><th>#</th><th>Base</th><th>Task</th><th>Freq</th>${gcaOn() ? '<th>Recupero</th>' : ''}<th>Carico</th></tr>
-  ${t.flights.map(f => `<tr><td class="blue">${esc(f.cs)}</td><td>${esc(f.type)}</td><td>${f.size}</td><td style="width:70px"><input data-edit="flight" data-id="${f.id}" data-f="base" value="${esc(f.base || '')}"></td>
+  ${t.flights.map(f => `<tr><td class="blue">${esc(f.cs)}</td><td>${esc(f.type)}</td><td>${f.size}</td><td style="width:70px">${(S.blueBases || []).filter(k => AIRPORTS[k]).length > 1 ? flightBaseHtml(f) : `<input data-edit="flight" data-id="${f.id}" data-f="base" value="${esc(f.base || '')}">`}</td>
    <td><select data-edit="flight" data-id="${f.id}" data-f="task">${taskOpts(f.task)}</select></td><td style="width:78px"><input data-edit="flight" data-id="${f.id}" data-f="freq" value="${esc(f.freq || 'TBD')}"></td>${gcaOn() ? `<td style="width:120px">${f.task === 'STANDBY' ? '' : `<select data-gcafl="${esc(f.cs)}">${Object.entries(GCA_MODE).map(([k, l]) => `<option value="${k}" ${gcaMode(f) === k ? 'selected' : ''}>${esc(l[0])}</option>`).join('')}</select>`}</td>` : ''}<td style="font-size:11.5px;max-width:240px">${esc(loTxt(f.lo, false))} <button class="b sm shrink" data-loopen="${esc(f.cs)}" title="Modifica il carico">✎</button></td></tr>${LOOPEN === f.cs ? `<tr><td colspan="${gcaOn() ? 8 : 7}" style="background:#f8fafc"><b style="font-size:12px">Carico di ${esc(f.cs)} (${esc(f.type)}) – proposto per ${esc(ROLES[f.task] || f.task)}</b>${loEditorHtml(f)}<div class="muted" style="font-size:11px">Catalogo dei carichi per tipo da fonti pubbliche: lo verifica lo staff. Le armi aria-suolo del carico sono quelle proposte nelle 9-line CAS.</div></td></tr>` : ''}`).join('')}</table>
   <p class="muted">Se cambi un task premi "Rigenera minacce dai task".</p>
   <h2>Minacce RED (${t.threats.length})</h2><table><tr><th>ID</th><th>Minaccia</th><th>Risposta</th><th>Stato</th><th></th></tr>
@@ -4000,14 +4019,14 @@ const FPLAC = { 'F-35A': ['F35', 'M', 420, 250], 'F-35B': ['F35', 'M', 420, 250]
   'HH-60W Jolly Green II': ['H60', 'L', 130, -15], 'MH-60M Black Hawk (SOAR)': ['H60', 'L', 130, -15], 'MH-47G Chinook (SOAR)': ['H47', 'M', 130, -15], 'CH-53E / CH-53K': ['H53', 'M', 130, -15], 'MV-22 / CV-22 Osprey': ['V22', 'M', 240, 120],
   'AW169': ['A169', 'L', 130, -15], 'AH-129 Mangusta': ['A129', 'L', 120, -15], 'AH-64 Apache': ['H64', 'L', 120, -15], 'A400M': ['A400', 'H', 330, 240], 'C-130J': ['C30J', 'M', 300, 200], 'C-27J': ['C27J', 'M', 280, 180], 'C-17': ['C17', 'H', 420, 300],
   'KC-767': [null, 'H', 430, 260], 'A330 MRTT': ['A332', 'H', 430, 260], 'KC-46': [null, 'H', 430, 260], 'KC-135': ['K35R', 'H', 420, 260], 'KC-130J': ['C30J', 'M', 290, 200], 'HC-130J Combat King II': ['C30J', 'M', 290, 200], 'MC-130J Commando II': ['C30J', 'M', 290, 200],
-  'E-3 Sentry': ['E3CF', 'H', 360, 290], 'E-2 Hawkeye': ['E2', 'M', 280, 250], 'G550 CAEW': ['GLF5', 'M', 430, 300], 'P-72A': [null, 'M', 250, 170], 'P-8 Poseidon': ['P8', 'M', 400, 250], 'MQ-9 Reaper': [null, 'M', 170, 180],
+  'E-3 Sentry': ['E3CF', 'H', 360, 290], 'E-2 Hawkeye': ['E2', 'M', 280, 250], 'G550 CAEW': ['GLF5', 'M', 430, 300], 'P-180 Avanti': ['P180', 'L', 320, 250], 'Falcon 900': ['F900', 'M', 450, 350], 'P-72A': [null, 'M', 250, 170], 'P-8 Poseidon': ['P8', 'M', 400, 250], 'MQ-9 Reaper': [null, 'M', 170, 180],
   'AW109 / H145 / H135 (light twin helo)': ['A109', 'L', 130, -15], 'AS350 / H125 (light single helo)': ['AS50', 'L', 110, -15], 'AW189 / S-92 / H175 (heavy SAR helo)': ['A189', 'M', 140, -15], 'Bell 412 / UH-1 (utility helo)': ['B412', 'L', 120, -15],
   'S-64 Skycrane / heavy firefighting helo': ['S64', 'M', 90, -15], 'CL-415 Canadair': ['CL2T', 'M', 180, -40], 'AT-802 Fire Boss': ['AT8T', 'L', 160, -30], 'PC-12 / King Air (light utility)': ['PC12', 'L', 260, 150],
   'Air ambulance jet (Learjet / PC-24)': ['LJ35', 'M', 430, 350], 'ATR 72 / Dash 8 (regional transport)': ['AT72', 'M', 270, 200] };
 const FPL_CIV = new Set(['AW109 / H145 / H135 (light twin helo)', 'AS350 / H125 (light single helo)', 'AW189 / S-92 / H175 (heavy SAR helo)', 'Bell 412 / UH-1 (utility helo)', 'S-64 Skycrane / heavy firefighting helo', 'CL-415 Canadair', 'AT-802 Fire Boss', 'PC-12 / King Air (light utility)', 'Air ambulance jet (Learjet / PC-24)', 'ATR 72 / Dash 8 (regional transport)']);
 const fplAc = f => { if (f.acx && !AC.find(x => x.type === f.type)) { const c = f.acx.cat || 'OTHER', d = FPLAC[[...AC].find(x => x.cat === c) ? [...AC].find(x => x.cat === c).type : ''] || []; return { a: { type: f.type, cat: c }, desig: /^[A-Z][A-Z0-9]{1,3}$/.test(String(f.acx.desig || '').toUpperCase()) && String(f.acx.desig).toUpperCase() !== 'ZZZZ' ? String(f.acx.desig).toUpperCase() : null, wake: f.acx.wake || 'M', tas: +f.acx.tas || CAT_TAS[c] || 300, lvl: d[3] != null ? d[3] : (c === 'HELO' ? -15 : 150) }; } // type typed by the user (missione semplice)
   const a = resolveType(f.type) || AC.find(x => x.type === f.type) || { type: f.type, cat: 'FIGHTER' }; const d = FPLAC[a.type] || (a.cat === 'HELO' ? [null, 'L', 120, -15] : [null, 'M', 360, 200]); return { a, desig: d[0], wake: d[1], tas: d[2], lvl: d[3] }; };
-const FPL_STS = { SAR: 'SAR', MEDEVAC: 'MEDEVAC', HEMS: 'HOSP', HOSPITAL: 'HOSP', AIB: 'FFR', HUMAN: 'HUM' };
+const FPL_STS = { CALIB: 'FLTCHK', SAR: 'SAR', MEDEVAC: 'MEDEVAC', HEMS: 'HOSP', HOSPITAL: 'HOSP', AIB: 'FFR', HUMAN: 'HUM' };
 const lvlTok = l => l < 0 ? 'A' + String(-l).padStart(3, '0') : 'F' + String(l).padStart(3, '0');
 const lvlParse = s => { const u = String(s || '').toUpperCase(), m = u.match(/FL\s?(\d{2,3})/); if (m) return +m[1]; const a = u.match(/(\d{3,5})\s?FT/); return a ? -Math.max(5, Math.round(+a[1] / 100)) : null; };
 const fplArea = z => z && /^LI-[A-Z]{1,3}\d/i.test(z.id) && z.type !== 'IND' ? z.id.replace(/^LI-/, 'LI').replace(/[^A-Z0-9/]/gi, '').toUpperCase().slice(0, 11) : null;
@@ -4103,7 +4122,7 @@ function fplPanelHtml() { const all = fplAll(), f = fplSelF(); if (!f) return ''
   <div class="card" style="margin-top:6px"><div class="row" style="align-items:baseline"><b style="flex:1">${esc(f.cs)} · ${esc(dep)} → ${esc(arr)}</b><span class="muted" style="font-size:11.5px">${f.size} × ${esc(f.type)} · ${tot} NM · ${hhmm(mins)} · ${esc(p.out.f8)}</span></div>
     ${table}
     <div class="row" style="align-items:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap"><div style="flex:1 1 200px"><input data-fplq="${f.id}" placeholder="Cerca un punto: nome, codice o coordinate (4530N01230E)" autocomplete="off"></div>
-      <button class="b sm shrink ${FADD ? 'primary' : ''}" id="faddpt" title="Ogni clic sulla mappa aggiunge un punto dove allunga meno la rotta">${FADD ? 'Clic sulla mappa… (fine)' : '+ Punti dalla mappa'}</button>${R.pts.length ? `<button class="b sm shrink" data-fplclear="${f.id}" title="Togli tutti i punti">Svuota</button>` : ''}</div>
+      <button class="b sm shrink ${FADD ? 'primary' : ''}" id="faddpt" title="Ogni clic sulla mappa aggiunge un punto in coda alla rotta">${FADD ? 'Clic sulla mappa… (fine)' : '+ Punti dalla mappa'}</button>${R.pts.length ? `<button class="b sm shrink" data-fplclear="${f.id}" title="Togli tutti i punti">Svuota</button>` : ''}</div>
     <div id="fplres-${f.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>${radHelpHtml(f)}
     <p class="muted" style="font-size:11px;margin:4px 0 0">Mappa: trascina un tratto per aggiungere un punto, trascina un punto per spostarlo, doppio clic per toglierlo. Tipi: ${Object.entries(LEGT).map(([k, v]) => `<span title="${esc(v.d)}" style="white-space:nowrap"><span style="display:inline-block;width:12px;height:3px;background:${v.col};vertical-align:middle;margin-right:3px"></span>${k}</span>`).join(' ')}</p></div>
   <div class="card" style="margin-top:6px"><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 8px">${FPLSHOW.map(([k, l]) => `<div><label style="white-space:nowrap">${l}</label><input data-fpl="${f.id}:${k}" value="${esc(p.out[k])}" style="font-family:monospace"></div>`).join('')}</div>
@@ -4186,7 +4205,7 @@ function drawNav() { if (!MAP || typeof L === 'undefined') return; if (!NAVL) NA
     const lbl = L0.lbl && (z >= 7 || RA.includes(c)) ? `<span class="navlbl">${esc(p.k === 'R' || p.k === 'G' ? navName(p) : p.id)}</span>` : '';
     const m = add(L.marker(p.pos, { icon: L.divIcon({ className: 'navsym', html: navSvg(c, 18, fraOn) + lbl, iconSize: [18, 18], iconAnchor: [9, 9] }), keyboard: false, zIndexOffset: -500 }));
     m.bindTooltip(`${esc(navName(p))} – ${navTypeTxt(p)}${p.k === 'V' ? ' · ' + esc(p.x) : ''}${p.k === 'M' ? ' · ' + esc(p.x) : ''} · ${icaoLL(p.pos)}`);
-    if (fs) { m.bindPopup(() => navPopup(p, fs)); m.on('click', () => { if (FADD || !routeHas(fs)) { MAP.closePopup && MAP.closePopup(); routeInsertBest(fs, rpPt(p)); } }); } }
+    if (fs) { m.bindPopup(() => navPopup(p, fs)); m.on('click', () => { if (FADD || !routeHas(fs)) { MAP.closePopup && MAP.closePopup(); routeAppend(fs, rpPt(p)); } }); } }
   if (cnt) cnt.textContent = `${shown} punti visibili${zoomHid ? ` · altri ${zoomHid} nascosti (più di 1500 punti nella vista: ${Object.entries(capped).map(([k, n]) => `${n} ${NAVC[k][1]}`).join(', ')}) – zooma per vederli` : ''}${fs ? ` · rotta aperta: ${fs.cs}` : ''}.`; }
 // search box of the route editor: ident prefix, VRP code / name, gate name, coordinates (4530N01230E, 453012N0123045E, 45.5 12.3)
 function navSearch(q, near) { q = String(q || '').trim().toUpperCase(); if (q.length < 2) return []; const out = [];
@@ -4197,7 +4216,7 @@ function navSearch(q, near) { q = String(q || '').trim().toUpperCase(); if (q.le
   return out.slice(0, 9); }
 function navPopup(p, f) { const pts = routeOf(f).pts;
   return `<div style="font-size:12.5px;min-width:200px"><b>${esc(navName(p))}</b> <span class="muted">${navTypeTxt(p)}</span><br>
-    <button class="b sm" style="margin:6px 0 4px" data-navadd="${p.i}">Aggiungi alla rotta di ${esc(f.cs)}</button><br>
+    <button class="b sm" style="margin:6px 0 4px" data-navadd="${p.i}">Aggiungi come punto ${pts.length + 1} di ${esc(f.cs)}</button><br>
     ${pts.length ? `<span>Sostituisci il punto </span><select data-navrepsel style="width:auto">${pts.map((x, i) => `<option value="${i}">${i + 1} · ${esc(x.name)}</option>`).join('')}</select> <button class="b sm" data-navrep="${p.i}">OK</button>` : ''}</div>`; }
 // routes on the map: the selected flight editable (legs coloured by type, numbered draggable points, drag a leg to add a point), the other routes thin
 function drawRoutes(add) { if (!S.t || MODE !== 'staff') return; const edit = routeEditOn(), sel = edit ? fplSelF() : null; if (!edit && !isFree()) return;
@@ -4214,7 +4233,7 @@ function drawRoutes(add) { if (!S.t || MODE !== 'staff') return; const edit = ro
     m.on('dblclick', () => routeDel(f, i)); });
   void line; }
 // map click while a route is open: "+ Punti dalla mappa" on, or the route still empty → a point where it adds the least distance
-function routeMapClick(p) { if (!routeEditOn()) return false; const f = fplSelF(); if (!f || !(FADD || !routeHas(f))) return false; if (Date.now() - LEGDRAG < 400) return true; routeInsertBest(f, snapPt(p, snapR())); return true; }
+function routeMapClick(p) { if (!routeEditOn()) return false; const f = fplSelF(); if (!f || !(FADD || !routeHas(f))) return false; if (Date.now() - LEGDRAG < 400) return true; routeAppend(f, snapPt(p, snapR())); return true; }
 function fplResHtml(f, q) { const P = routeOf(f).pts, near = P.length ? P[Math.floor(P.length / 2)].pos : routeEnds(f)[0], r = navSearch(q, near);
   if (!r.length) return String(q || '').trim().length >= 2 ? '<span class="muted" style="font-size:12px">Nessun punto trovato.</span>' : '';
   return r.map(x => x.coord ? `<button class="b sm" data-fpladd="${f.id}|c|${x.coord.join(',')}">⌖ ${icaoLL(x.coord)}</button>` : `<button class="b sm" data-fpladd="${f.id}|p|${x.p.i}" title="${esc(navTypeTxt(x.p))} · ${icaoLL(x.p.pos)}">${navSvgP(x.p, 14)} ${esc(navName(x.p))}</button>`).join(''); }
@@ -4249,14 +4268,15 @@ const FREE_MIS = [ // key, card label (English names, staff 22 Nov), event, Engl
   ['MAR', 'Maritime Patrol', 'MAR', 'Maritime patrol', 'C'], ['AEW', 'AEW / Air Defence', 'AEW', 'AEW orbit', 'C'],
   ['AIRMOB', 'Air Mobility', 'AIRMOB', 'Air mobility', 'M'], ['CSAR', 'Combat Search and Rescue', 'CSAR', 'Combat search and rescue', 'M'], ['SAR', 'Search and Rescue', 'SAR', 'Search and rescue', 'M'],
   ['MED', 'Medical', 'MEDEVAC', 'Medical', 'M'], ['AIB', 'Aerial Firefighting', 'AIB', 'Aerial firefighting', 'M'],
-  ['NAV', 'Navigation', 'NAVI', 'Navigation', 'N']];
+  ['NAV', 'Navigation', 'NAVI', 'Navigation', 'N'], ['CALIB', 'Calibration', 'NAVI', 'Calibration flight check', 'N']];
 const FREE_GRP = [['C', 'Combat'], ['M', 'Air Mobility & Rescue'], ['N', 'Navigation & Training']];
 const FREE_SUB = { AIRMOB: [['AIRLIFT', 'Airlift / Cargo'], ['AIRDROP', 'Airdrop'], ['INSERT', 'Helicopter Insertion'], ['HUMAN', 'Humanitarian Aid'], ['AAR', 'Air-to-Air Refuelling']],
-  MED: [['MEDEVAC', 'MEDEVAC'], ['HEMS', 'HEMS'], ['HOSPITAL', 'Inter-Hospital Transfer']], MAR: [['MPA', 'Maritime Patrol'], ['ANTISHIP', 'Anti-Surface Warfare']] };
+  MED: [['MEDEVAC', 'MEDEVAC'], ['HEMS', 'HEMS'], ['HOSPITAL', 'Inter-Hospital Transfer']], MAR: [['MPA', 'Maritime Patrol'], ['ANTISHIP', 'Anti-Surface Warfare']],
+  CALIB: [['CNAV', 'VOR / TACAN / NDB'], ['CILS', 'ILS'], ['CPAPI', 'PAPI'], ['CPAR', 'PAR']] };
 // mission key used by the engine: the option of the card when the card has options (Air Mobility, Medical); Maritime Patrol keeps MAR (MPA / anti-surface is the role)
 const freeKey = () => { const F = (S && S.free) || {}, l = FREE_SUB[F.mis]; if (!l || F.mis === 'MAR') return F.mis; return l.some(x => x[0] === F.sub) ? F.sub : l[0][0]; };
-const FREE_EVK = { AIRLIFT: 'AIRMOB', AIRDROP: 'AIRMOB', INSERT: 'AIRMOB', HUMAN: 'HUMAN', AAR: 'AAR', MEDEVAC: 'MEDEVAC', HEMS: 'HEMS', HOSPITAL: 'HOSPITAL' };
-const FREE_ROLES = { CAS: ['CAS'], NAV: ['IFRNAV'], AAR: ['RECEIVER', 'AAR', 'HAARRCV', 'HAAR'], AEW: ['AEW', 'DCA'], ID: ['QRA', 'TARGET'], STRIKE: ['STRIKE', 'SEAD'], SAR: ['SAR'], AIB: ['AIB'],
+const FREE_EVK = { CNAV: 'NAVI', CILS: 'NAVI', CPAPI: 'NAVI', CPAR: 'NAVI', AIRLIFT: 'AIRMOB', AIRDROP: 'AIRMOB', INSERT: 'AIRMOB', HUMAN: 'HUMAN', AAR: 'AAR', MEDEVAC: 'MEDEVAC', HEMS: 'HEMS', HOSPITAL: 'HOSPITAL' };
+const FREE_ROLES = { CNAV: ['CALIB'], CILS: ['CALIB'], CPAPI: ['CALIB'], CPAR: ['CALIB'], CAS: ['CAS'], NAV: ['IFRNAV'], AAR: ['RECEIVER', 'AAR', 'HAARRCV', 'HAAR'], AEW: ['AEW', 'DCA'], ID: ['QRA', 'TARGET'], STRIKE: ['STRIKE', 'SEAD'], SAR: ['SAR'], AIB: ['AIB'],
   MAR: ['MPA', 'ANTISHIP'], CSAR: ['CSAR', 'RESCORT'], AIRLIFT: ['AIRLIFT'], AIRDROP: ['AIRDROP'], INSERT: ['INSERT'], HUMAN: ['HUMAN'], MEDEVAC: ['MEDEVAC'], HEMS: ['HEMS'], HOSPITAL: ['HOSPITAL'] };
 const freeName = () => { const F = (S && S.free) || {}, m = freeMis(F.mis), l = FREE_SUB[F.mis], o = l && l.find(x => x[0] === (F.sub || l[0][0])); return o ? o[1] : (m ? m[3] : 'Training mission'); };
 const freeMis = k => FREE_MIS.find(m => m[0] === k) || null;
@@ -4286,19 +4306,28 @@ function freePlaces() { const F = S.free; if (!F) return; (F.flights || []).forE
   if (!c || (AIRPORTS[c] && AIRPORTS[c][3] !== 'EXT') || (k === 'arr' && x.arr === x.dep)) return; if (pl && pl.pos) AIRPORTS[c] = [pl.name || freeCode(c), pl.pos[0], pl.pos[1], 'EXT']; })); }
 const freeApOk = (x, k) => { if (k === 'arr' && x.arr === x.dep) k = 'dep'; const c = x[k]; return !!c && ((AIRPORTS[c] && AIRPORTS[c][3] !== 'EXT') || !!(x[k + 'P'] && x[k + 'P'].pos)); };
 // first flight by mission (staff 22 Nov): AIB = CL-415 "CAN" from a civil airport, AAR = KC-767 tanker at LIRE, AEW = G550 CAEW at LIRE
-const FREE_FIRST = { AIB: { type: 'CL-415 Canadair', cs: 'CAN 25', civ: true }, AAR: { type: 'KC-767', base: 'LIRE' }, AEW: { type: 'G550 CAEW', base: 'LIRE' } };
+const FREE_FIRST = { AIB: { type: 'CL-415 Canadair', base: 'LIRA' }, AAR: { type: 'KC-767', base: 'LIRE' }, AEW: { type: 'G550 CAEW', base: 'LIRE' }, MPA: { type: 'P-72A', base: 'LICZ' },
+  STRIKE: { type: 'F-35A', base: 'LIPL' }, ID: { type: 'EF-2000 Typhoon', base: 'LIRS' }, AIRLIFT: { type: 'C-130J', base: 'LIRP' }, AIRDROP: { type: 'C-130J', base: 'LIRP' },
+  INSERT: { type: 'HH-101', base: 'LIRM' }, HUMAN: { type: 'Falcon 900', base: 'LIRA' }, CALIB: { type: 'P-180 Avanti', base: 'LIRE' } }; // first flight by mission (staff 22 Nov)
+const freeFirstFor = () => { const F = FREE(), k = freeKey(); if (F.mis === 'MAR') return (F.sub || 'MPA') === 'MPA' ? FREE_FIRST.MPA : null; if (F.mis === 'CALIB') return FREE_FIRST.CALIB; return FREE_FIRST[k] || null; };
 const civNear = p => Object.keys(AIRPORTS).filter(k => AIRPORTS[k][3] === 'CIV').sort((a, b) => dist(ap(a), p) - dist(ap(b), p))[0];
-function freeNewFlight() { const F = FREE(), key = freeKey(), first = !F.flights.length && FREE_FIRST[key] && AC.find(x => x.type === FREE_FIRST[key].type) ? FREE_FIRST[key] : null;
+// callsign of a flight of the simple mission: from the staff's list (base + aircraft), otherwise the generic pools; kept when the user typed it
+function freeCs(x, used) { const F = FREE(), calib = F.mis === 'CALIB'; let c = csFromList(x.dep, x.type, x.task, used, calib);
+  if (!c && freeKey() === 'AAR' && x.task === 'HAARRCV' && CSN) c = csNum('TIGER', used); // HAAR at Cervia: the HH-101 of Grazzanise (staff 22 Nov)
+  if (!c) { const a = AC.find(q => q.type === x.type) || { cat: 'OTHER' }, pool = CS_POOL[a.cat] || CS_POOL.OTHER || ['TRAINER']; for (let i = 0; !c || used.has(c); i++) c = `${pool[i % pool.length]} ${1 + Math.floor(i / pool.length)}`; }
+  return c; }
+function freeCsAuto(x) { const F = FREE(); if (x.cs && x.cs !== x.csAuto) return; const used = new Set(F.flights.filter(q => q !== x).map(q => q.cs)); x.cs = x.csAuto = freeCs(x, used); }
+function freeNewFlight() { const F = FREE(), key = freeKey(), ff = freeFirstFor(), first = !F.flights.length && ff && AC.find(x => x.type === ff.type) ? ff : null;
   const types = freeTypes(key), n = F.flights.length, type = first ? first.type : types[0] || 'EF-2000 Typhoon', a = AC.find(x => x.type === type) || { cat: 'FIGHTER' };
-  const pool = CS_POOL[a.cat] || CS_POOL.OTHER || ['TRAINER'], used = new Set(F.flights.map(f => f.cs)); let cs = first && first.cs || ''; for (let i = 0; !cs || used.has(cs); i++) cs = `${pool[(n + i) % pool.length]} ${1 + Math.floor((n + i) / pool.length)}`;
-  const f0 = F.flights[0]; let dep = (f0 && f0.dep) || 'LIPS'; if (first && first.base) dep = first.base; else if (first && first.civ) dep = civNear(ap(dep) || [42.5, 12.5]);
-  return { id: uid(), cs, type, size: ['FIGHTER', 'ATTACK'].includes(a.cat) && F.mis !== 'NAV' ? 2 : 1, dep, arr: (f0 && !first && f0.arr) || dep, depP: f0 && !first && f0.depP, arrP: f0 && !first && f0.arrP, form: true, task: freeTaskFor(key, type) }; }
-// HAAR (AAR mission with a helicopter): HH-101 at LIPC Cervia (staff 22 Nov) – only while the user has not typed the bases
+  const f0 = F.flights[0]; let dep = (f0 && f0.dep) || 'LIPS'; if (first) dep = first.base;
+  const x = { id: uid(), cs: '', type, size: ['FIGHTER', 'ATTACK'].includes(a.cat) && F.mis !== 'NAV' ? 2 : 1, dep, arr: (f0 && !first && f0.arr) || dep, depP: f0 && !first && f0.depP, arrP: f0 && !first && f0.arrP, form: true, task: freeTaskFor(key, type) };
+  x.cs = x.csAuto = freeCs(x, new Set(F.flights.map(f => f.cs))); return x; }
+// HAAR (AAR mission with a helicopter): HH-101 at LIPC Cervia, callsign TIGER (staff 22 Nov) – only while the user has not typed the bases
 function freeHaar(x, role) { if (freeKey() !== 'AAR') return; const a = freeAc(x), helo = a && a.cat === 'HELO';
   if (role && x.task === 'HAARRCV' && !helo && AC.find(q => q.type === 'HH-101')) x.type = 'HH-101';
-  if ((x.task === 'HAARRCV' || (freeAc(x) || {}).cat === 'HELO') && !x.apMan) { const same = !x.arr || x.arr === x.dep; x.dep = 'LIPC'; if (same) x.arr = 'LIPC'; } }
+  if ((x.task === 'HAARRCV' || (freeAc(x) || {}).cat === 'HELO') && !x.apMan) { const same = !x.arr || x.arr === x.dep; x.dep = 'LIPC'; if (same) x.arr = 'LIPC'; } freeCsAuto(x); }
 // AIB: once the fire area is chosen, departure / arrival move to the civil airport nearest to it (only while the user has not typed them)
-function freeAibBase() { const F = FREE(); if (freeKey() !== 'AIB') return; const z = freeZones()[0]; if (!z) return; const c = civNear(centroid(z.poly));
+function freeAibBase() { return; /* v1.33: the Canadair stays at its real base, the fire is generated near it (staff 22 Nov) */ const F = FREE(); if (freeKey() !== 'AIB') return; const z = freeZones()[0]; if (!z) return; const c = civNear(centroid(z.poly));
   F.flights.forEach(x => { if (x.apMan || !c) return; const same = !x.arr || x.arr === x.dep; x.dep = c; if (same) x.arr = c; }); }
 // ---- areas: suggestions for the mission, free choice of any area, several areas (staff 22 Nov) ----
 const isLowArea = z => /^AT\s/i.test(z.name || '') || /^LI-AT/.test(z.id || '') || (z.use || []).includes('LOWLEVEL');
@@ -4355,6 +4384,7 @@ function freeBuild0() { const F = FREE(), mis = freeMis(F.mis); if (!mis || !F.f
   if (flights.some(f => f.task === 'QRA')) qraSetup(flights);
   const el = generateElements(flights); if (!F.thr) el.threats = el.threats.filter(x => x.status === 'TARGET' && x.flight && flights.some(f => f.id === x.flight)); // simulated threats off: only the targets of the flights
   S.t = { flights, ...el, c2: buildC2(flights, assigned), ...buildTexts(flights, assigned, el) };
+  if (F.mis === 'CALIB') calApply(S.t);
   assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   if (F.routeOld && flights[0]) { const R0 = routeOf(flights[0]); R0.pts = F.routeOld.pts || []; R0.legs = F.routeOld.legs || []; delete F.routeOld; routeOf(flights[0]); } // v1.30 navigation route → flight plan of the first flight
   routeSync(); F.built = Date.now(); save(); demSoon(); return true; }
@@ -4378,6 +4408,62 @@ function apCanvas(c, x, y, k, o = {}) { const kind = apKind(k), s = (o.big ? 30 
   if (kind === 'MIL') { circ(o.red ? 7.5 : 8.5, M); circ(2.5, '#fff'); }
   else if (kind === 'JOINT') { const h = (o.red ? 8.5 : 10.2) * s; c.fillStyle = '#fff'; c.fillRect(x - h, y - h, 2 * h, 2 * h); c.strokeStyle = M; c.lineWidth = 2.4 * s; c.strokeRect(x - h, y - h, 2 * h, 2 * h); circ(5.4, '#fff', C, 2.4); circ(1.8, C); }
   else { circ(o.red ? 6.8 : 7.5, '#fff', C, 2.6); circ(2.4, C); } }
+// ---- radio callsigns of the Italian units (staff list, data/callsigns.json – tools/callsign_build.py): by base + aircraft, two digits (staff 22 Nov) ----
+let CSN = null;
+async function csInit() { try { const r = await fetch('data/callsigns.json', { cache: 'no-cache' }); if (r.ok) CSN = await r.json(); } catch (e) { } }
+function csRow(base, type, calib) { if (!CSN || !base) return null; const rows = CSN.units.filter(u => u.bases.includes(base) && u.ac.includes(type));
+  return (calib ? rows.find(u => u.calib) : null) || rows.find(u => !u.calib) || null; }
+const csNum = (word, used) => { for (let n = 1; n < 100; n++) { const c = `${word} ${String(n).padStart(2, '0')}`; if (!used.has(c)) return c; } return `${word} 99`; };
+// callsign of a new flight: QRA callsign of the base for an interceptor, Canadair number of the base, unit callsign of base + aircraft; null = not in the list
+function csFromList(base, type, task, used, calib) { if (!CSN) return null; used = used || new Set();
+  if (task === 'QRA' && CSN.qra[base]) return csNum(CSN.qra[base], used).replace(' ', '');
+  if (type === 'CL-415 Canadair') { const c = CSN.can.filter(x => x.base === base).concat(CSN.can.filter(x => !x.base)).map(x => x.cs.replace('CAN', 'CAN ')).find(c => !used.has(c)); return c || null; }
+  const r = csRow(base, type, calib); return r ? csNum(r.oat, used) : null; }
+// field 7 from the radio callsign: short FPL form of the list (FRECCIA 01 → FRECC01) or the GAT callsign (IAM0401) when the plan is all GAT
+function csFpl(cs, gatOnly, base) { const m = /^([A-Z]+) ?(\d{2})$/.exec(String(cs || '').toUpperCase().trim()); if (!CSN || !m) return null; const [, w, nn] = m;
+  if (Object.values(CSN.qra).includes(w) || w === 'CAN') return w + nn;
+  const rows = CSN.units.filter(u => u.oat === w); const r = rows.find(u => u.bases.includes(base)) || rows[0]; if (!r) return null;
+  if (gatOnly && r.gat) return r.gat.replace(/x+/, x => nn.padStart(x.length, '0'));
+  return r.fpl.includes('xx') ? r.fpl.replace('xx', nn) : r.fpl + nn; }
+// events: callsigns of the flights from the list (after the bases are assigned)
+function csApplyList(flights) { if (!CSN) return; const used = new Set(); flights.forEach(f => { f.cs0 = f.cs0 || f.cs; const c = csFromList(f.base, f.type, f.task, used); if (c) { f.cs = c; } used.add(f.cs); }); }
+// ---- Calibration ("radiomisure", FLIGHTCHECK of the Aeronautica Militare – staff 22 Nov): only military aerodromes, checks filtered by what each aerodrome has ----
+const CAL_FAC = { // ILS (staff list), PAR (IVAO GCA / PAR position), radio aids of the aerodrome (staff-checked list); PAPI everywhere, angle known by the planner
+  LIPA: { ils: 1, aids: ['AVI:TACAN'] }, LIPI: { par: 1, aids: ['RIV:TACAN', 'RIV:NDB'] }, LIPS: { ils: 1, par: 1, aids: ['ISA:TACAN', 'TVS:VOR'] }, LIPL: { ils: 1, par: 1, aids: ['GHE:TACAN'] },
+  LIPC: { ils: 1, par: 1, aids: ['CEV:TACAN'] }, LIMN: { ils: 1, aids: ['CAM:TACAN'] }, LIRP: { ils: 1, aids: ['PIS:VOR', 'PIN:TACAN'] }, LIRS: { ils: 1, par: 1, aids: ['GRO:VOR', 'GRO:TACAN'] },
+  LIRV: { aids: [] }, LIRE: { ils: 1, aids: ['TPR:VORTAC'] }, LIRG: { aids: [] }, LIRL: { ils: 1, aids: ['LAT:VOR'] }, LIRM: { par: 1, aids: ['GRA:TACAN', 'GRA:NDB'] },
+  LIED: { ils: 1, aids: ['DEC:TACAN', 'DEC:NDB'] }, LIBA: { ils: 1, aids: ['MNL:TACAN'] }, LIBV: { ils: 1, par: 1, aids: ['GDC:VOR', 'GIO:TACAN'] }, LIBN: { ils: 1, par: 1, aids: ['LCC:VORTAC'] },
+  LICZ: { ils: 1, aids: ['NSY:VORTAC', 'SIG:TACAN', 'SIG:NDB'] }, LICT: { ils: 1, aids: ['TRP:VOR', 'TRP:NDB'] } };
+const CAL_CHK = { CNAV: ['VOR / TACAN / NDB', ad => CAL_FAC[ad].aids.length > 0], CILS: ['ILS', ad => !!CAL_FAC[ad].ils], CPAPI: ['PAPI', () => true], CPAR: ['PAR', ad => !!CAL_FAC[ad].par] };
+const CAL = () => { const F = FREE(); F.cal = F.cal || { ad: '', rwy: '', aid: '', land: 'base' }; return F.cal; };
+const calOk = () => { const F = FREE(), c = CAL(), k = freeKey(); return !!(c.ad && CAL_FAC[c.ad] && CAL_CHK[k] && CAL_CHK[k][1](c.ad) && (k !== 'CNAV' || c.aid)); };
+function calCardHtml() { const F = FREE(), c = CAL(), k = freeKey(), chk = CAL_CHK[k] || CAL_CHK.CPAPI, x = F.flights[0], base = x ? freeCode(x.dep) : 'LIRE';
+  const ads = Object.keys(CAL_FAC), ok = ads.filter(a => chk[1](a)), no = ads.filter(a => !chk[1](a));
+  const btn = a => `<button class="b sm${c.ad === a ? ' primary' : ''}" data-calad="${a}" title="${esc(AIRPORTS[a][0])}" style="padding:3px 8px">${a}</button>`;
+  const aids = c.ad && CAL_FAC[c.ad] ? CAL_FAC[c.ad].aids.map(s => s.split(':')) : [];
+  return `<div class="card" style="margin-top:8px;border-color:var(--ivao)"><b>Controllo ${esc(chk[0])}</b>
+    <div style="margin-top:6px"><label>Aeroporto da controllare</label><div style="display:flex;flex-wrap:wrap;gap:4px">${ok.map(btn).join('')}</div>
+      ${no.length ? `<p class="muted" style="font-size:11px;margin:4px 0 0">Senza ${esc(chk[0])}: ${no.join(', ')}</p>` : ''}</div>
+    ${c.ad ? `<div style="display:grid;grid-template-columns:${k === 'CNAV' ? 'minmax(0,1fr)' : '90px minmax(0,1fr)'};gap:8px;margin-top:8px;align-items:end">
+      ${k === 'CNAV' ? `<div><label>Radioassistenza</label><div style="display:flex;flex-wrap:wrap;gap:4px">${aids.map(([id, kd]) => `<button class="b sm${c.aid === id + ':' + kd ? ' primary' : ''}" data-calaid="${id}:${kd}">${id} ${kd}</button>`).join('')}</div></div>`
+        : `<div><label>Pista</label><input id="calrwy" value="${esc(c.rwy || '')}" placeholder="es. 13" maxlength="3" style="text-transform:uppercase"></div><div class="muted" style="font-size:11.5px">${k === 'CPAPI' ? "L'angolo del PAPI lo conosce chi pianifica: non lo mette il generatore." : k === 'CPAR' ? 'Frequenza GCA / PAR dai dati ATC (TBC se manca).' : 'Avvicinamenti sul localizzatore e sul sentiero di discesa.'}</div>`}</div>
+    <div style="margin-top:8px"><label>Dopo i controlli</label>${optGrid('calland', [['ad', `Atterra a ${c.ad}`, ''], ['base', `Rientra a ${base}`, '']], c.land)}</div>` : ''}</div>`; }
+// mission elements: the checks at the aerodrome (serials, final / arc / radials on the map)
+function calApply(t) { const F = FREE(), c = CAL(), k = freeKey(), f = t.flights[0]; if (!f || !c.ad || !ap(c.ad)) return; const A = ap(c.ad), N = (p, b, nm) => dest(p, b, nm * NMK);
+  const rwy = parseInt(c.rwy, 10), crs = rwy >= 1 && rwy <= 36 ? rwy * 10 : null, mv = +casCfg().magvar || 0, inb = crs != null ? (crs + mv + 360) % 360 : null; // runway → true course of the final
+  t.serials = (t.serials || []).filter(r => r.kind !== 'NAVI'); t.airspace = t.airspace.filter(a => !(a.type === 'ROUTE' && a.flight === f.id)); t.objectives = t.objectives || [];
+  const SR = (title, text, success) => t.serials.push({ id: 'S' + (t.serials.length + 1), kind: 'CALIB', title, flights: [f.id], text, success });
+  const fin = nm => inb != null ? t.airspace.push({ id: 'CAL-FIN', type: 'ROUTE', flight: f.id, name: `Final RWY ${c.rwy} (${nm} NM)`, pts: [N(A, (inb + 180) % 360, nm), A.slice()], names: [`${nm} NM final`, c.ad] }) : null;
+  const ad = `${c.ad} ${AIRPORTS[c.ad][0]}`, twr = baseTwr ? baseTwr(c.ad) : null, twrTxt = twr && twr.freq ? `${twr.cs} ${twr.freq}` : 'TWR (frequency TBC)';
+  if (k === 'CNAV') { const [id, kd] = (c.aid || ':').split(':'), q = navRes(id, A), P = q ? q.pos : A, fr = q && /^[\d.]+/.test(q.x) ? q.x.split(' ')[0] : '';
+    const r1 = Math.round(bearing(P, dest(A, 0, 1)) / 10) * 10 || 360, arc = []; for (let a = -60; a <= 60; a += 10) arc.push(N(P, (r1 + a + 360) % 360, 10));
+    t.airspace.push({ id: 'CAL-ARC', type: 'ROUTE', flight: f.id, name: `${id} ${kd} 10 DME arc`, pts: arc, names: arc.map(() => '') });
+    t.airspace.push({ id: 'CAL-RAD', type: 'ROUTE', flight: f.id, name: `${id} ${kd} radial ${String(r1).padStart(3, '0')}`, pts: [N(P, r1, 25), P.slice(), N(P, (r1 + 180) % 360, 25)], names: ['25 NM', id, '25 NM'] });
+    SR(`Flight check – ${id} ${kd}`, `Flight check of the ${kd} ${id}${fr ? ' (' + fr + ')' : ''} at ${ad}: fly the 10 DME arc from radial ${String((r1 + 300) % 360).padStart(3, '0')} to radial ${String((r1 + 60) % 360).padStart(3, '0')} at the assigned level, then radial ${String(r1).padStart(3, '0')} inbound from 25 NM and outbound to 25 NM on the reciprocal. Record bearing / DME errors at each 10° step. Coordinate with ${twrTxt}.`, `Arc and radials flown within ±1 NM / ±2°, errors recorded, the aid declared within tolerance or not.`); }
+  if (k === 'CILS') { fin(10); SR(`Flight check – ILS RWY ${c.rwy || 'TBC'}`, `ILS check of runway ${c.rwy || 'TBC'} at ${ad}: approaches on the localizer from 10 NM (alignment and width: fly the course and both sides of it) and on the glide path (angle and structure down to the threshold), go-around and radar vectors back to 10 NM final between the runs. Coordinate with ${twrTxt}.`, `Localizer and glide path checked on every run, deviations recorded, the ILS declared within tolerance or not.`); }
+  if (k === 'CPAPI') { fin(7); SR(`PAPI calibration – RWY ${c.rwy || 'TBC'}`, `PAPI calibration of runway ${c.rwy || 'TBC'} at ${ad}: straight-in approaches starting at 5–7 NM final, several runs at the constant PAPI angle (set by the planner), checking the transition of each light; go-around and circuit back to 7 NM final after each run. Coordinate with ${twrTxt}.`, `Every run flown at a constant angle, the light transitions recorded, the PAPI declared correctly set or not.`); }
+  if (k === 'CPAR') { fin(10); const r = recChain(c.ad); SR(`PAR check – RWY ${c.rwy || 'TBC'}`, `PAR check of runway ${c.rwy || 'TBC'} at ${ad}: precision approaches flown with the GCA / PAR controller (${r && r.txt ? r.txt : 'frequency TBC'}), comparing the controller's azimuth / elevation information with the aircraft position on each run; go-around and radar circuit back between the runs.`, `Several PAR approaches flown, the radar declared within tolerance or not.`); }
+  f.task = 'CALIB'; }
 // ---- RAD (EUROCONTROL Route Availability Document, Italian part, data/rad.json – tools/rad_build.py): connection points of IGAT departures / arrivals (staff 22 Nov) ----
 let RAD = null, HELI = null;
 // hospital helipads (OpenStreetMap, tools/helipad_build.py via GitHub Actions): [name, city, lat, lon, emergency]
@@ -4439,6 +4525,8 @@ function routeSync() { if (!S.t || !isFree() || FREE().mis !== 'NAV') return; S.
 function routeSet(f, fn) { if (!f) return; fn(routeOf(f)); routeOf(f); routeSync(); save(); renderPanel(); drawMap(); demSoon(); }
 const routeEnds = f => { const d = (f.base && ap(f.base)) || geom().front; return [d, ap(f.arr || f.base) || d]; };
 // insert a point where it adds the least distance
+// a new point goes at the end of the route, in the order it is flown (staff 22 Nov); only dragging a leg inserts in the middle
+function routeAppend(f, pt) { routeInsertAt(f, pt, routeOf(f).pts.length); }
 function routeInsertBest(f, pt) { routeSet(f, R => { const [d, a] = routeEnds(f), seq = [d, ...R.pts.map(p => p.pos), a]; let bi = 0, bc = 1e12;
   for (let i = 0; i < seq.length - 1; i++) { const c = dist(seq[i], pt.pos) + dist(pt.pos, seq[i + 1]) - dist(seq[i], seq[i + 1]); if (c < bc) { bc = c; bi = i; } }
   R.pts.splice(bi, 0, pt); R.legs.splice(bi, 0, { ...R.legs[bi] }); }); }
@@ -4495,7 +4583,7 @@ function fplFromRoute(f, s, M, icao) { const R = routeOf(f, s), legs = routeLegs
     else oa = workZ.map(z => `${fplArea(z) || String(z.name).toUpperCase().replace(/[^A-Z0-9]/g, '')} FROM ${fplClock(W.win[0])} TO ${fplClock(W.win[1])}`); if (oa.length) r18.push('OPAREA/' + oa.join(' ')); }
   if (stayN) r18.push(`STAYINFO1/${(W.kind === 'TRACK' ? 'AIR REFUELLING' : (ROLES[f.task] || f.task) + ' TRAINING').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()}`);
   if (oat && !icao) r18.push(gat ? 'RMK/OAT GAT' : 'RMK/OAT');
-  const cs = String(f.cs || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cs = csFpl(f.cs, !oat, freeCode(f.base)) || String(f.cs || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const sug = { f7: cs, f8: rules + (oat ? 'M' : 'G'), f9: `${f.size > 1 ? f.size : ''}${s.A.desig || 'ZZZZ'}/${s.A.wake}`, f10: anyI ? (['TANKER', 'AEW', 'TRANSPORT', 'MPA'].includes(s.A.a.cat) ? 'SDFGHIRWY/S' : 'SDFGRY/S') : 'SY/S',
     f13: `${s.dep}${fplClock(0)}`, f15, f16: `${s.dest}${hhmm(eet)}${s.altn ? ' ' + s.altn : ''}`, f18: r18.join(' ') || '0' };
   const out = {}; Object.keys(sug).forEach(k => { out[k] = M[k] != null && M[k] !== '' ? M[k] : sug[k]; });
@@ -4512,7 +4600,7 @@ const fplDocTxt = p => p.noRoute ? p.icaoTxt + '\nRoute to be filed by the fligh
 // ZZZZ / unknown aerodromes in field 18 (DEP/ DEST/ name and position)
 function fplZZ(k) { if (!k || !AIRPORTS[k] || AIRPORTS[k][3] !== 'EXT' || !/^ZZZZ/.test(k)) return ''; const a = AIRPORTS[k]; return `${String(a[0] || 'ZZZZ').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 20)} ${icaoLL([a[1], a[2]])}`; }
 function freeStepBar(st) { return `<div style="display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap">${[['Missione', 'Cosa voglio volare'], ['Aereo e basi', 'Con cosa e da dove'], ['Dove', 'Dove'], ['Piano di volo', 'Piano di volo'], ['Pacchetto', 'Pacchetto']].map(([t, tt], i) => `<button class="b sm${st === i + 1 ? ' primary' : ''}" data-fstep="${i + 1}" title="${tt}" ${i + 1 > freeReach() ? 'disabled' : ''} style="flex:1 1 auto;min-width:0;font-size:11.5px;padding:6px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i + 1} · ${t}</button>`).join('')}</div>`; }
-function freeReach() { const F = FREE(); if (!F.mis || (F.mis === 'ID' && !F.rr)) return 1; if (!F.flights.length || F.flights.some(x => !freeAc(x) || !freeApOk(x, 'dep') || !freeApOk(x, 'arr'))) return 2; return F.built ? 5 : 3; }
+function freeReach() { const F = FREE(); if (!F.mis || (F.mis === 'ID' && !F.rr)) return 1; if (!F.flights.length || F.flights.some(x => !freeAc(x) || !freeApOk(x, 'dep') || !freeApOk(x, 'arr')) || (F.mis === 'CALIB' && !calOk())) return 2; return F.built ? 5 : 3; }
 function freeHtml() { const F = FREE(), st = Math.min(F.step, freeReach());
   let h = `<div class="row" style="align-items:center"><div class="muted" style="font-size:11px;letter-spacing:.08em;font-weight:700;flex:1">MISSIONE SEMPLICE</div><button class="b sm shrink" data-kindreset="1">← Cambia tipo di missione</button></div>${freeStepBar(st)}`;
   if (st === 1) h += freeStep1(); else if (st === 2) h += freeStep2(); else if (st === 3) h += freeStep3(); else if (st === 4) h += freeStep4(); else h += freeStep5();
@@ -4548,7 +4636,7 @@ function freeStep2() { const F = FREE(); if (!F.flights.length) F.flights.push(f
   const card = (x, i) => { const a = freeAc(x), pf = { cs: x.cs, type: x.type, task: x.task, size: x.size, acx: x.acx }; pf.lo = ((S.loMan || {})[x.cs] && S.loMan[x.cs].type === x.type && S.loMan[x.cs].task === x.task) ? S.loMan[x.cs].lo : loDefault(pf);
     const w = [x.dep, x.arr].filter((b, j, arr) => b && arr.indexOf(b) === j && AIRPORTS[b] && AIRPORTS[b][3] !== 'EXT').map(b => baseWarn(b) && (!SCHOOL[b] || !baseOk(b, x.task, { type: x.type, cat: a && a.cat })) ? `${b}: ${baseWarn(b)}` : '').filter(Boolean);
     const unk = !AC.find(q => q.type === x.type), ax = x.acx || {};
-    return `<div class="card fcard" style="margin-top:8px;padding:8px 10px"><div style="display:grid;grid-template-columns:96px minmax(0,1fr) 52px 26px;gap:6px;align-items:end">
+    return `<div class="card fcard" style="margin-top:8px;padding:8px 10px"><div style="display:grid;grid-template-columns:128px minmax(0,1fr) 52px 26px;gap:6px;align-items:end">
       <div><label>Nominativo</label><input data-ff="${x.id}" data-k="cs" value="${esc(x.cs)}"></div>
       <div><label>Aereo</label><input data-ff="${x.id}" data-k="type" list="aclist" value="${esc(x.type)}" autocomplete="off"></div>
       <div><label>N.</label><select data-ff="${x.id}" data-k="size">${[1, 2, 3, 4].map(n => `<option ${n === x.size ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
@@ -4570,6 +4658,7 @@ function freeStep2() { const F = FREE(); if (!F.flights.length) F.flights.push(f
   return `<h2>Con cosa e da dove</h2>
   <datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist><datalist id="aplist">${Object.keys(AIRPORTS).filter(k => AIRPORTS[k][3] !== 'EXT').sort().map(k => `<option value="${k}">${esc(AIRPORTS[k][0])}</option>`).join('')}<option value="ZZZZ">Nave / posto senza codice ICAO</option></datalist>
   ${F.flights.map(card).join('')}
+  ${F.mis === 'CALIB' ? calCardHtml() : ''}
   <button class="b sm shrink" id="fadd" style="margin-top:8px">+ Aggiungi un flight</button>
   <div style="display:grid;grid-template-columns:minmax(0,1fr) 80px 100px;gap:6px;margin-top:12px"><div><label>Data</label><input id="fdate" value="${esc(F.date)}" placeholder="12 DEC 2026"></div><div><label>Decollo (UTC)</label><input id="fhh" value="${esc(F.hh)}" placeholder="19:00"></div><div><label>In area (min)</label><input id="fdur" type="number" min="10" max="240" value="${esc(F.dur)}"></div></div>
   <p class="muted" style="font-size:11.5px;margin:4px 0">Partenza / arrivo: codice ICAO (anche estero) o ZZZZ per una nave o un posto senza codice. Aereo: scegli dall'elenco o scrivi un tipo diverso. Catalogo dei carichi da fonti pubbliche, da verificare.</p>
@@ -4716,7 +4805,7 @@ document.addEventListener('change', e => { const t = e.target, d = t.dataset || 
     else if (k === 'type') { const v = t.value.trim(), a = v ? resolveType(v) : null; if (a && a.type) { x.type = a.type; delete x.acx; } else if (v) { x.type = v; x.acx = x.acx || { desig: '', cat: 'OTHER', wake: 'M', tas: 300 }; } x.task = freeTaskFor(freeKey(), x.type, x); freeHaar(x); }
     else if (k === 'dep' || k === 'arr') { const v = t.value.toUpperCase().trim(); if (!v) return renderPanel(); x[k] = v; x.apMan = true; if (k === 'dep' && (!x.arr || x.arr === x._dep0)) x.arr = v; x._dep0 = x.dep; if (k === 'dep') F.areas = null; freePlaces(); }
     else { x[k] = k === 'cs' ? t.value.toUpperCase().trim() : t.value; if (k === 'task') freeHaar(x, true); }
-    F.built = 0; save(); renderPanel(); return; }
+    if (k !== 'cs') freeCsAuto(x); F.built = 0; save(); renderPanel(); return; }
   if (t.id === 'fdate' || t.id === 'fhh' || t.id === 'fdur') { F[{ fdate: 'date', fhh: 'hh', fdur: 'dur' }[t.id]] = t.id === 'fdate' ? t.value.toUpperCase().trim() : t.value.trim(); F.built = 0; save(); return; } });
 
 /* ---------- event handling (delegated) ---------- */
@@ -4742,14 +4831,30 @@ document.addEventListener('click', e => { const a = e.target.closest('[data-goto
 document.addEventListener('click', e => { const t = e.target.closest('[data-navadd],[data-navrep],[data-rpup],[data-rpdel],[data-fpladd],[data-fplclear],[data-radadd],#faddpt'); if (!t || !S || !S.t || MODE !== 'staff') return;
   const fp = id => S.t.flights.find(x => x.id === id), sel = fplSelF(), d = t.dataset;
   if (t.id === 'faddpt') { FADD = !FADD; renderPanel(); if (FADD) toast('Clicca sulla mappa o su un punto di navigazione per aggiungerlo alla rotta'); return; }
-  if (d.navadd) { if (!sel) return; MAP && MAP.closePopup && MAP.closePopup(); routeInsertBest(sel, rpPt(NAV.pts[+d.navadd])); toast('Punto aggiunto alla rotta'); return; }
+  if (d.navadd) { if (!sel) return; MAP && MAP.closePopup && MAP.closePopup(); const n = routeOf(sel).pts.length + 1; routeAppend(sel, rpPt(NAV.pts[+d.navadd])); toast(`Aggiunto come punto ${n}`); return; }
   if (d.navrep) { if (!sel) return; const sl = t.parentElement.querySelector('[data-navrepsel]'), k = +(sl ? sl.value : 0); MAP && MAP.closePopup && MAP.closePopup(); routeSet(sel, R => { if (R.pts[k]) R.pts[k] = rpPt(NAV.pts[+d.navrep]); }); toast('Punto sostituito'); return; }
   if (d.rpup) { const [id, i] = d.rpup.split('|'); return routeMove(fp(id), +i, -1); }
   if (d.rpdel) { const [id, i] = d.rpdel.split('|'); return routeDel(fp(id), +i); }
   if (d.radadd) { const [id, k, pid] = d.radadd.split('|'), f = fp(id); if (!f) return; const near = routeEnds(f)[k === 'dep' ? 0 : 1], q = navRes(pid, near); if (!q) return toast(`${pid} non trovato nei dati di navigazione`);
     const R = routeOf(f); routeInsertAt(f, rpPt(q), k === 'dep' ? 0 : R.pts.length); toast(`${pid} aggiunto alla rotta`); return; }
   if (d.fplclear) { const f = fp(d.fplclear); return routeSet(f, R => { R.pts = []; R.legs = R.legs.slice(0, 1); }); }
-  if (d.fpladd) { const [id, k, v] = d.fpladd.split('|'), f = fp(id); if (!f) return; const pt = k === 'c' ? rpCoord(v.split(',').map(Number)) : rpPt(NAV.pts[+v]); routeInsertBest(f, pt); toast(`${pt.name} aggiunto alla rotta`); } });
+  if (d.fpladd) { const [id, k, v] = d.fpladd.split('|'), f = fp(id); if (!f) return; const pt = k === 'c' ? rpCoord(v.split(',').map(Number)) : rpPt(NAV.pts[+v]); routeAppend(f, pt); toast(`${pt.name} aggiunto alla rotta`); } });
+// calibration: aerodrome to check, radio aid, runway, landing (v1.33)
+const calArr = () => { const F = FREE(), c = CAL(); F.flights.forEach(x => { x.arr = c.land === 'ad' && c.ad ? c.ad : x.dep; }); F.built = 0; };
+document.addEventListener('click', e => { const t = e.target.closest('[data-calad],[data-calaid]'); if (!t || !S || !isFree()) return; const c = CAL();
+  if (t.dataset.calad) { c.ad = t.dataset.calad; c.aid = ''; const a = CAL_FAC[c.ad].aids; if (a.length === 1) c.aid = a[0]; }
+  if (t.dataset.calaid) c.aid = t.dataset.calaid;
+  calArr(); save(); renderPanel(); drawMap(); });
+document.addEventListener('change', e => { const t = e.target; if (!S || !isFree()) return; const c = CAL();
+  if (t.id === 'calrwy') { c.rwy = t.value.toUpperCase().replace(/[^0-9LRC]/g, '').slice(0, 3); FREE().built = 0; save(); renderPanel(); }
+  if (t.dataset && t.dataset.calland) { c.land = t.dataset.calland; calArr(); save(); renderPanel(); drawMap(); } });
+// bases of the assets: add / remove, search, base of a flight (v1.33)
+document.addEventListener('click', e => { const t = e.target.closest('[data-badd],[data-bdel],[data-fbase]'); if (!t || !S || MODE !== 'staff') return; const d = t.dataset;
+  if (d.badd) { S.baseQ = ''; basesSet([...(S.blueBases || []), d.badd]); if (baseWarn(d.badd)) toast(d.badd + ': ' + baseWarn(d.badd)); return; }
+  if (d.bdel) { basesSet((S.blueBases || []).filter(k => k !== d.bdel)); return; }
+  if (d.fbase) { const [id, k] = d.fbase.split('|'), f = S.t && S.t.flights.find(x => x.id === id); if (!f) return; f.base = k; S.baseMan = Object.assign({}, S.baseMan, { [f.cs0 || f.cs]: k }); // keyed by the generated callsign (stable when the flights are regenerated)
+    if (f.cs0 && CSN) { const c = csFromList(k, f.type, f.task, new Set(S.t.flights.filter(x => x !== f).map(x => x.cs))); if (c) f.cs = c; } save(); renderAll(); } });
+let BQT = null; document.addEventListener('input', e => { const t = e.target; if (t.id !== 'bq' || !S) return; S.baseQ = t.value; clearTimeout(BQT); BQT = setTimeout(() => { const pos = t.selectionStart; renderPanel(); const n = document.getElementById('bq'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { } } }, 200); });
 // leg type / level of a route (data-rl="<flight id>|<leg>")
 document.addEventListener('change', e => { const t = e.target, d = t.dataset; if (!d || d.rl == null || !S || !S.t) return; const [id, i] = d.rl.split('|'), f = S.t.flights.find(x => x.id === id); if (!f) return;
   routeSet(f, R => { const L0 = R.legs[+i]; if (!L0) return; if (d.k === 'type') { L0.type = t.value; const T = legT(t.value); if (t.value !== 'BOAT' && !T.ifr && L0.lvl > (T.oat ? 285 : 195)) L0.lvl = T.oat ? 145 : 115; if (T.ifr && L0.lvl < 0) L0.lvl = 100; }
@@ -4834,10 +4939,6 @@ document.addEventListener('change', e => {
   if (t.dataset.aartrk && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aartrk); if (f) { f.trkSel = t.value || ''; asgApply(); } return; }
   if (t.dataset.aarwin && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarwin); if (f) { f.win = t.value === '' ? '' : Math.max(3, Math.min(30, Math.round(+t.value))); asgApply(); } return; }
   if (t.dataset.aarrcv && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.aarrcv); if (f) { f.tanker = t.value; f.tankerMan = true; asgApply(); } return; }
-  if (t.dataset.bside) { const k = t.dataset.bside; S.bases = S.bases || {}; if (!t.value) delete S.bases[k]; else S.bases[k] = Object.assign({ roles: ['ALL'], rroles: ['ALL'] }, S.bases[k] || {}, { side: t.value }); syncBases(); save(); renderAll(); if (t.value && baseWarn(k)) toast(k + ': ' + baseWarn(k)); return; }
-  if (t.dataset.brole) { const [k, key, gr] = t.dataset.brole.split(':'), b = S.bases && S.bases[k]; if (!b) return; S.bOpen = k + key; let r = (b[key] || ['ALL']).filter(x => x !== 'ALL');
-    if (gr === 'ALL') r = t.checked ? ['ALL'] : []; else r = t.checked ? [...new Set([...r, gr])] : r.filter(x => x !== gr); b[key] = r.length ? r : ['ALL']; syncBases(); save(); renderAll(); return; }
-  if (t.dataset.rheld) { const k = t.dataset.rheld; S.basesSet = true; S.redBases = t.checked ? [...new Set([...S.redBases, k])] : S.redBases.filter(x => x !== k); save(); renderAll(); return; }
   if (t.dataset.tl && S.t) { S.meta.tl = Object.assign({}, S.meta.tl || {}, { [t.dataset.tl]: Math.max(0, Math.round(+t.value || 0)) }); asgApply(); return; }
   if (t.dataset.asgp && S.t) { const f = S.t.flights.find(x => x.id === t.dataset.asgp); if (f) { f.passes = Math.max(1, Math.min(6, Math.round(+t.value || 1))); asgApply(); } return; }
   if (t.dataset.asgt && S.t) { const [fid, ks] = t.dataset.asgt.split(':'), k = +ks, f = S.t.flights.find(x => x.id === fid), v = t.value; if (!f) return; f.casTasks = f.casTasks || [];
@@ -4878,8 +4979,7 @@ document.addEventListener('change', e => {
   if (id === 'hh') S.meta.hHour = t.value;
   if (id === 'edate') S.meta.date = t.value;
   if (id === 'thname' && S.thCustom) { S.thCustom.name = t.value.trim() || 'Teatro disegnato'; S.thCustom.region = `the exercise area ${S.thCustom.name} drawn by the staff`; save(); renderPanel(); return; }
-  if (id === 'bb' || id === 'rb') { const v = t.value.toUpperCase().split(/[\s,;]+/).filter(x => AIRPORTS[x]); if (id === 'bb') { S.bases = S.bases || {}; Object.keys(S.bases).forEach(k => { if (['BLUE', 'BOTH'].includes(S.bases[k].side) && !v.includes(k)) { if (S.bases[k].side === 'BOTH') S.bases[k].side = 'RED'; else delete S.bases[k]; } });
-      v.forEach(k => { if (!S.bases[k]) S.bases[k] = { side: 'BLUE', roles: ['ALL'], rroles: ['ALL'] }; else if (S.bases[k].side === 'RED') S.bases[k].side = 'BOTH'; }); S.baseOrd = [...v, ...(S.baseOrd || []).filter(k => !v.includes(k))]; syncBases(); } else S.redBases = v; save(); renderAll(); return; }
+  if (id === 'bb') { basesSet(t.value.toUpperCase().split(/[\s,;]+/).filter(x => AIRPORTS[x])); return; }
   if (id === 'csvfile' && t.files[0]) { t.files[0].text().then(txt => { const rows = parseCSV(txt); if (rows.length < 2) return toast('CSV vuoto'); CSV_PENDING = { rows, map: rows[0].map(guessField) }; renderPanel(); }); return; }
   if (id === 'jsonfile' && t.files[0]) { t.files[0].text().then(txt => { try { const j = JSON.parse(txt); const ps = Array.isArray(j) ? j : j.pilots || []; ps.forEach(p => addPilot({ ...p, typeRaw: p.typeRaw || p.aircraft || p.type })); (j.controllers || []).forEach(addCtrl); save(); renderPanel(); toast('Roster importato'); } catch (err) { toast('JSON non valido'); } }); return; }
   if (id === 'jimp' && t.files[0]) { t.files[0].text().then(txt => { try { const j = JSON.parse(txt); if (!j.meta || !j.zones) throw 0; S = j; save(); renderAll(true); toast('Scenario importato'); } catch (err) { toast('File scenario non valido'); } }); return; }
@@ -4907,7 +5007,6 @@ document.addEventListener('click', e => {
   if (t.dataset.bullpick) { setBull(t.dataset.bullpick); if (MAP) MAP.closePopup(); save(); renderPanel(); drawMap(); toast(`Bullseye della missione: ${t.dataset.bullpick}`); return; }
   if (t.dataset.cor) { const z = CORS().find(x => x.id === t.dataset.cor), st = new Set(S.cor || []); if (z) { st.has(z.id) ? st.delete(z.id) : (st.add(z.id), z.excl && st.delete(z.excl)); S.cor = [...st]; save(); renderPanel(); drawMap(); } return; }
   if (t.dataset.jpack) { exportJtacPack(t.dataset.jpack, t); return; }
-  if (t.dataset.bmain) { const k = t.dataset.bmain; S.baseOrd = [k, ...(S.baseOrd || []).filter(x => x !== k)]; syncBases(); save(); renderAll(); return; }
   if (t.id === 'baseall') { S.baseAll = !S.baseAll; renderPanel(); return; }
   if (t.dataset.casvis && S.cas) { const h = casView().hide; if (h[t.dataset.casvis]) delete h[t.dataset.casvis]; else h[t.dataset.casvis] = true; save(); renderPanel(); drawMap(); return; }
   if (t.dataset.casall && S.cas) { const [jid, how] = t.dataset.casall.split(':'), J = S.cas.jtacs.find(x => x.id === jid), h = casView().hide; if (J) J.tasks.forEach(T => { if (how === 'hide') h[T.id] = true; else delete h[T.id]; }); save(); renderPanel(); drawMap(); return; }
@@ -4945,7 +5044,7 @@ document.addEventListener('click', e => {
     case 'aspaip': defaultAirspace(); renderAll(); toast('Zone AIP caricate'); return;
     case 'aspauto': S.reserved = autoReserve(); save(); renderAll(); return;
     case 'resauto': S.resMode = 'auto'; S.reserved = autoReserve(); S.cor = autoCor(); save(); renderAll(); toast('Aree proposte dal generatore'); return;
-    case 'bedit': BEDIT = !BEDIT; if (BEDIT && !((S.border || []).length >= 2)) { S.border = borderAuto(); save(); } renderPanel(); drawMap(); if (BEDIT) toast('Modifica il confine sulla mappa'); return;
+    case 'bedit': borderEditToggle(); return;
     case 'breset': S.border = null; BEDIT = false; save(); renderPanel(); drawMap(); toast('Confine automatico ripristinato'); return;
     case 'resman': toManual(); save(); renderAll(); toast('Selezioni tu le aree: il generatore non le cambia'); return;
     case 'zfon': case 'zfoff': { const set = new Set(S.reserved || []); document.querySelectorAll('tr[data-zrow]:not([hidden])').forEach(tr => t.id === 'zfon' ? set.add(tr.dataset.zrow) : set.delete(tr.dataset.zrow));
@@ -5738,14 +5837,14 @@ async function buildMasterplanPdf(tocPages, assets, mapPng, jsel) {
   sec('Airports');
   if (mpOn('apt')) {
   para(PROF().sober ? 'Airports used during the event:' : 'Airports used by BLUE forces during the event:');
-  const bases = [...new Set([...(t ? t.flights.map(f => f.base) : []), ...S.blueBases.slice(0, t ? 1 : 99), ...Object.keys(S.bases || {}).filter(k => S.bases[k].side === 'RED' && !PROF().sober)])].filter(i => i && AIRPORTS[i]);
+  const bases = [...new Set([...(t ? t.flights.map(f => f.base) : []), ...S.blueBases])].filter(i => i && AIRPORTS[i]);
   const rwyData = {}; String(mp.runways || '').split('\n').map(l => l.split(';').map(x => x.trim())).filter(a => a.length >= 2 && AIRPORTS[a[0].toUpperCase()]).forEach(a => (rwyData[a[0].toUpperCase()] = rwyData[a[0].toUpperCase()] || []).push(a.slice(1)));
   for (const icao of bases) {
     const [name] = AIRPORTS[icao]; const short = name.replace(/\s+(AB|NAS)$/, '');
     h5(name);
     rich([{ t: 'ICAO: ', f: F.bold }, { t: icao }]);
     { const bi = baseInfo(icao), rl = r => (r || ['ALL']).includes('ALL') ? (isCivAp(icao) ? 'all civil roles' : 'all roles') : r.map(k => (ROLE_GROUPS.find(g => g.k === k) || {}).en || k).join(', ');
-      if (S.bases && S.bases[icao]) rich([{ t: 'Used by: ', f: F.bold }, { t: bi.side === 'BOTH' ? `BLUE (${rl(bi.roles)}) and RED players (${rl(bi.rroles)})` : bi.side === 'RED' ? `RED players (${rl(bi.rroles)})` : `BLUE – ${rl(bi.roles)}` }]); }
+      if (t && t.flights.some(f => f.base === icao)) rich([{ t: 'Used by: ', f: F.bold }, { t: t.flights.filter(f => f.base === icao).map(f => f.cs).join(', ') }]); void bi; void rl; }
     const chartUrl = mp.charts ? mp.charts.replace(/\{ICAO\}/g, icao) : '';
     // staff 20 Nov: ENAV charts exist only for civil / joint aerodromes; military ones -> IVAO Italy military vSOP only
     if (chartUrl) rich([{ t: 'Charts: ', f: F.bold }, { t: chartUrl, link: chartUrl }]); else if (AIRPORTS[icao][3] !== 'MIL') rich([{ t: 'Charts: ', f: F.bold }, { t: 'current AIP Italia (ENAV), AD 2 ' + icao }]);
@@ -6197,7 +6296,7 @@ function initPublicMap() {
   drawLandOn(PMAP);
   const add = l => l.addTo(PMAP), pts = [];
   { const bd = borderGeom(); if (bd) { add(L.polygon(bd.red, { stroke: false, fillColor: '#ef4444', fillOpacity: .07, interactive: false })); add(L.polygon(bd.blue, { stroke: false, fillColor: '#3b82f6', fillOpacity: .05, interactive: false }));
-    add(L.polyline(bd.line, { color: '#7f1d1d', weight: 3, dashArray: '12 6' })).bindTooltip(`BLUE / RED boundary – ${S.factions.blue} | ${S.factions.red}`); } }
+    { const bl = add(L.polyline(bd.line, { color: '#7f1d1d', weight: 3, dashArray: '12 6' })); bl.bindTooltip(BEDIT || MODE !== 'staff' ? `BLUE / RED boundary – ${S.factions.blue} | ${S.factions.red}` : 'Confine BLUE / RED – clic per modificarlo', { sticky: true }); if (MODE === 'staff' && !isFree()) bl.on('click', () => { if (!BEDIT) borderEditToggle(); }); } } }
   if (bullShown() && !(S.t && S.t.airspace.some(a => a.type === 'BULLSEYE'))) { const bp = bullPos(); pts.push(bp); add(L.circle(bp, { radius: 18520, color: '#D97706', weight: 1, fill: false })); add(L.marker(bp, { icon: icon('#f59e0b', '◎', S.meta.bullseye, 'circle', 16) })).bindTooltip(`Bullseye ${S.meta.bullseye}`); }
   S.blueBases.forEach(i => { const p = ap(i); if (p) { pts.push(p); apMarker(add, i); } });
   RB().forEach(i => { const p = ap(i); if (p) { pts.push(p); apMarker(add, i, { red: true }); } });
@@ -6326,12 +6425,12 @@ document.addEventListener('change', e => { const t = e.target; if (t.id !== 'evi
    ===================================================================== */
 initMap();
 route();
-heliInit();
+heliInit(); csInit();
 radInit().then(() => { if (S && S.t && MODE === 'staff' && (TAB === 'fpl' || isFree())) renderPanel(); });
 navInit().then(() => { NAVG = null; AWYIDX = null; if (MAP && S && S.navOn) drawNav(); if ((TAB === 'fpl' || isFree()) && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 levelInit(); renderEvBadge();
-window.APP = { AC, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AC, ap, basesSet, borderSide, get ZF() { return ZF; }, get BEDIT() { return BEDIT; }, RB, calApply, calOk, CAL_FAC, csFromList, csFpl, get CSN() { return CSN; }, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>

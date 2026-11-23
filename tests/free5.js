@@ -5,7 +5,7 @@ const { chromium } = require(ENV.PW);
 (async()=>{const b=await chromium.launch({executablePath:ENV.CHROME,args:['--no-sandbox']});const ctx=await b.newContext({viewport:{width:1280,height:900}});const page=await ctx.newPage();const errs=[];page.on('pageerror',e=>errs.push('PAGEERR '+e.message));
 await page.route('**/*',r=>{const u=r.request().url(); if(u.includes('leaflet.min.js'))return r.fulfill({path:ENV.LMOCK}); if(u.includes('pdf-lib.min.js'))return r.fulfill({path:ENV.PDFLIB}); if(u.startsWith(ENV.BASE))return r.continue(); return r.abort();});
 await page.goto(ENV.BASE+'/index.html'); await page.waitForTimeout(1500); const fail=[];
-await page.waitForFunction(()=>!!APP.NAV&&!!APP.RAD,{timeout:15000}).catch(()=>fail.push('navdb / rad not loaded'));
+await page.waitForFunction(()=>!!APP.NAV&&!!APP.RAD&&!!APP.CSN,{timeout:15000}).catch(()=>fail.push('navdb / rad not loaded'));
 // symbols
 const sy=await page.evaluate(()=>({ civ:APP.apSvg('LIPZ'), mil:APP.apSvg('LIPS'), joint:APP.apSvg('LIPX'), red:APP.apSvg('LIPI',{red:true}), k:[APP.apKind('LIPZ'),APP.apKind('LIPS'),APP.apKind('LIPX')] }));
 if(sy.k.join()!=='CIV,MIL,JOINT') fail.push('aerodrome kinds '+sy.k);
@@ -15,19 +15,15 @@ if([sy.civ,sy.mil,sy.joint,sy.red].some(x=>/<line/.test(x))) fail.push('a line t
 // defaults
 await page.evaluate(()=>{ APP.S=APP.newScenario(); APP.renderAll(); }); await page.click('[data-kind="free"]');
 const def=async(mis,sub)=>{ await page.evaluate(([m,s])=>{ const F=APP.FREE(); F.mis=m; F.sub=s||''; F.flights=[]; F.areas=null; F.built=0; APP.S.fpl=null; F.step=2; APP.renderAll(); },[mis,sub]); await page.waitForTimeout(150); return page.evaluate(()=>{ const x=APP.FREE().flights[0]; return { type:x.type, cs:x.cs, dep:x.dep, arr:x.arr, task:x.task }; }); };
-const aib=await def('AIB'); if(aib.type!=='CL-415 Canadair'||!/^CAN /.test(aib.cs)||(await page.evaluate(k=>APP.AIRPORTS[k][3],aib.dep))!=='CIV') fail.push('AIB default '+JSON.stringify(aib));
-await page.click('.b.primary[data-fstep="3"]'); await page.waitForTimeout(1000);
-const aib3=await page.evaluate(()=>{ const x=APP.FREE().flights[0], z=APP.freeZones()[0]; if(!z) return {none:true}; const c=z.poly.reduce((a,p)=>[a[0]+p[0]/z.poly.length,a[1]+p[1]/z.poly.length],[0,0]);
-  const civ=Object.keys(APP.AIRPORTS).filter(k=>APP.AIRPORTS[k][3]==='CIV').sort((a,b)=>Math.hypot(APP.AIRPORTS[a][1]-c[0],APP.AIRPORTS[a][2]-c[1])-Math.hypot(APP.AIRPORTS[b][1]-c[0],APP.AIRPORTS[b][2]-c[1]))[0]; return { dep:x.dep, civ }; });
-if(!aib3.none&&aib3.dep!==aib3.civ) fail.push('AIB base not the civil airport nearest to the area '+JSON.stringify(aib3));
+const aib=await def('AIB'); if(aib.type!=='CL-415 Canadair'||aib.cs!=='CAN 07'||aib.dep!=='LIRA') fail.push('AIB default '+JSON.stringify(aib));
 const aar=await def('AIRMOB','AAR'); if(aar.type!=='KC-767'||aar.dep!=='LIRE'||aar.arr!=='LIRE'||aar.task!=='AAR') fail.push('AAR default '+JSON.stringify(aar));
 const aew=await def('AEW'); if(aew.type!=='G550 CAEW'||aew.dep!=='LIRE'||aew.task!=='AEW') fail.push('AEW default '+JSON.stringify(aew));
 const ind=await page.evaluate(()=>{ const F=APP.FREE(); const a=APP.freeCands().map(x=>x.z.type); F.flights[0].type='EF-2000 Typhoon'; F.flights[0].task='DCA'; const b=APP.freeCands().map(x=>x.z.type); return {a,b}; });
 if(ind.a[0]!=='IND'||ind.b.includes('IND')) fail.push('INDIA areas only for AEW aircraft '+JSON.stringify(ind));
 // HAAR: helicopter role -> HH-101 at LIPC
 await def('AIRMOB','AAR'); await page.selectOption('[data-ff][data-k="task"]','HAARRCV').catch(()=>fail.push('no role select in AAR'));
-await page.waitForTimeout(150); const haar=await page.evaluate(()=>{ const x=APP.FREE().flights[0]; return { type:x.type, dep:x.dep, arr:x.arr }; });
-if(haar.type!=='HH-101'||haar.dep!=='LIPC'||haar.arr!=='LIPC') fail.push('HAAR default '+JSON.stringify(haar));
+await page.waitForTimeout(150); const haar=await page.evaluate(()=>{ const x=APP.FREE().flights[0]; return { type:x.type, dep:x.dep, arr:x.arr, cs:x.cs }; });
+if(haar.type!=='HH-101'||haar.dep!=='LIPC'||haar.arr!=='LIPC'||!/^TIGER \d\d$/.test(haar.cs||'')) fail.push('HAAR default '+JSON.stringify(haar));
 // typed base stays
 await page.fill('[data-k="dep"]','LIPA'); await page.dispatchEvent('[data-k="dep"]','change'); await page.waitForTimeout(100);
 await page.selectOption('[data-ff][data-k="task"]','RECEIVER').catch(()=>{}); await page.selectOption('[data-ff][data-k="task"]','HAARRCV').catch(()=>{}); await page.waitForTimeout(100);
