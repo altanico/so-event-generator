@@ -3,6 +3,7 @@
 ## Next build
 
 - [ ] **Bug – calibration: arrival keeps the old aerodrome** (staff 23 Nov, screenshot): when a check is added / removed and the chosen aerodrome no longer has all the checks, the aerodrome is cleared but the flight's arrival stays on it (e.g. arrival LIPI with no aerodrome chosen). Fix: when the aerodrome is cleared, put the arrival back to the departure (`calArr()` in the check-box handler). Test.
+- [ ] **Calibration callsigns 66–69** (staff 23 Nov): the FLIGHTCHECK flights take the numbers **66, 67, 68, 69** (radio FLIGHTCHECK 66…69, field 7 FLTCK66…FLTCK69) instead of 01, 02…; first flight 66, next ones in order; after 69 back to the normal two-digit numbering. Keep it as data (`numbers` on the FLIGHTCHECK row of `data/callsigns.json`, set in `tools/callsign_build.py`) so other units can get fixed numbers too. Test.
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
