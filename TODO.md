@@ -2,7 +2,7 @@
 
 ## Next build
 
-(nothing yet)
+- [ ] **"← Cambia tipo di missione" also in the multi-participant modes** (staff 23 Nov): a simple mission has the button on screen 1 (`data-kindreset`), "Missione con più partecipanti" (internal event, `isInternal()`) has no way back to the start screen. Add the same button, in the same place and style, on the first screen of the internal event – and of the official event (SOG / staff levels) – that brings back the choice of the mission type. If the event already has content (scenario generated, flights, participants), ask for confirmation first ("Il lavoro fatto resta salvato in 'Eventi salvati'?" – or what the simple mission does today: same behaviour for all kinds). Test (internal → button → start screen; official at staff level → same).
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
