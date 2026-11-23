@@ -25,6 +25,13 @@
   - Same warnings as today (RAD points for IGAT, VGAT above FL195…) but as hints, never blocking.
 - [ ] **Say that the generated flight plan is only a basic aid**: in the flight plan panel and on the kneeboard / flight-plan file a short note – "Suggested route only: aircraft performance, levels, airway availability, RAD / CDR and SID / STAR are not checked – check and file with your own planning tool." Test (paste a full FPL and a route only → nav log and field 15 follow the pasted text; unknown point → warning, kept; note present).
 
+- [ ] **En-route frequencies along the whole route, as if the flight had full ATC coverage** (staff 23 Nov, example LIRE → LIPS: only LIRR_MIL_CTR listed, Padova missing): today the C2 / frequency list of a simple mission is built around the departure base. Build it **along the route** (generated or pasted), in the order the flight meets the units:
+  - departure aerodrome (TWR, APP / GCA), then every ACC / sector crossed (from `acc.json` / `atc.json` geometry and the leg levels), then the APP of the TMAs crossed when the leg is low enough, then the arrival aerodrome (APP, TWR) – one row per unit, in order, with "whichever is online" groups as today; frequencies only from the ATC data, never invented (TBC);
+  - **OAT legs (IOAT / VGAT / BOAT) → military units** (the MIL sector of each ACC: e.g. LIRR_MIL_CTR, then the Padova MIL sector… and the military APP / TWR of the military aerodromes along the route);
+  - **GAT legs (IGAT / VFR GAT) → civil units** (LIRR / LIPP / LIMM / LIBB civil CTR sectors, civil APP), **even when the aircraft is military**;
+  - a mixed plan (OAT ↔ GAT change point) switches from one set to the other at the change point; the kneeboard nav log can show the unit for each leg;
+  - kneeboard part 1 and the frequency list follow this list (each frequency once; the checked aerodrome of a Calibration stays in part 2). Test (LIRE → LIPS OAT: Roma MIL then Padova MIL; same route as GAT: civil sectors; frequencies only from the data).
+
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
 Waiting for the data: the staff looks for the list of the Italian HEMS bases and hospital helipads (the OpenStreetMap download by `helipads.yml` failed three times on 22 Nov: Overpass 502 / 504). Start only when the staff gives the list and says so.
