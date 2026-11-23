@@ -8,6 +8,8 @@
   - drawing: orbit labelled with the bearings (QDM / QDR), no "DME"; table "Orbit 10 NM (GNSS)" and "QDM / QDR"; VOR / TACAN keep radials and DME.
 - [ ] **Bug – calibration: NDB frequency taken from the TACAN with the same name** (same message: "NDB RIV (110.00)"): at LIPI the TACAN RIV (110.00, 37X) and the NDB RIV (371 kHz) share the ident and the aid is looked up by ident only. Look it up by ident **and** kind, so the NDB shows **371.0 kHz** (serial, kneeboard, checklist). Test (LIPI RIV NDB → 371 kHz, no "radial", no "DME"; RIV TACAN still CH 37X / 110.00).
 
+- [ ] **Kneeboard: no half-empty first page** (staff 23 Nov, Calibration kneeboard: page 1 has only the flight data and "Loadout"): today every block starts a new page (`page()`), so short blocks leave pages almost empty. Fill the pages: page 1 = flight data, then **flight plan (field list / FPL), nav log, frequencies and emergencies** flowing one after the other, a new page only when the next block does not fit (a table that does not fit continues on the next page with its header repeated). The pages that must stand alone keep their own page: the Calibration check pages (one per check), CAS / JTAC sections, the map. Same A5, ≥ 9 pt rules. Applies to every simple-mission kneeboard. Test (Calibration kneeboard: FPL and frequencies on page 1; page count down).
+
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
 Waiting for the data: the staff looks for the list of the Italian HEMS bases and hospital helipads (the OpenStreetMap download by `helipads.yml` failed three times on 22 Nov: Overpass 502 / 504). Start only when the staff gives the list and says so.
