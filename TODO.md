@@ -2,7 +2,7 @@
 
 ## Next build
 
-(empty – write the next requests here)
+- [ ] **Bug – calibration: arrival keeps the old aerodrome** (staff 23 Nov, screenshot): when a check is added / removed and the chosen aerodrome no longer has all the checks, the aerodrome is cleared but the flight's arrival stays on it (e.g. arrival LIPI with no aerodrome chosen). Fix: when the aerodrome is cleared, put the arrival back to the departure (`calArr()` in the check-box handler). Test.
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
