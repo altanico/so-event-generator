@@ -32,6 +32,8 @@
   - a mixed plan (OAT ↔ GAT change point) switches from one set to the other at the change point; the kneeboard nav log can show the unit for each leg;
   - kneeboard part 1 and the frequency list follow this list (each frequency once; the checked aerodrome of a Calibration stays in part 2). Test (LIRE → LIPS OAT: Roma MIL then Padova MIL; same route as GAT: civil sectors; frequencies only from the data).
 
+- [ ] **Step 2 (simple mission): date / take-off / time-in-area panel** (staff 23 Nov, screenshot: "Decollo (UTC)" on two lines pushes its box down, boxes not aligned and of different sizes, help text about departure / arrival / aircraft far from those fields): one row of three boxes of the **same height, aligned at the bottom**, short one-line labels ("Data", "Decollo UTC", "In area (min)"), columns sized to the content (date wider, time and minutes equal), inputs centred; on a narrow screen the three boxes wrap cleanly. The help line ("Partenza / arrivo: codice ICAO… ZZZZ…; aereo…; catalogo dei carichi…") moves under the flights table where those fields are. Test (labels on one line, the three inputs at the same top / height).
+
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
 Waiting for the data: the staff looks for the list of the Italian HEMS bases and hospital helipads (the OpenStreetMap download by `helipads.yml` failed three times on 22 Nov: Overpass 502 / 504). Start only when the staff gives the list and says so.
