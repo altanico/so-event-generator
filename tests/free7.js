@@ -18,7 +18,7 @@ const par=await page.evaluate(()=>({ ser:APP.S.t.serials.filter(r=>r.kind==='CAL
 if(!/LIPI_G_APP 127\.525/.test(par.ser)||!/LIPI_G_APP 127\.525/.test(par.c2)||!/LIPI_TWR/.test(par.c2)) fail.push('LIPI PAR ATC '+JSON.stringify(par));
 if(!/FLTCK66/.test(par.f7||'')) fail.push('field 7 '+par.f7);
 const k1=await kneeTxt();
-if(!/LIPI_G_APP 127\.525/.test(k1.txt)) fail.push('kneeboard without the GCA frequency');
+if(!/LIPI_G_APP/.test(k1.txt)||!/127\.525/.test(k1.txt)) fail.push('kneeboard without the GCA frequency');
 if(/KNOCK IT OFF/i.test(k1.txt)||!/MAYDAY/.test(k1.txt)) fail.push('calibration emergencies');
 if(/Loadout/.test(k1.txt)) fail.push('loadout in the calibration kneeboard');
 if(!k1.fields.some(n=>/CPAR_PASS$/.test(n))||!k1.fields.some(n=>/CPAR_FAIL$/.test(n))||!k1.fields.some(n=>/CPAR_remarks$/.test(n))||!k1.fields.some(n=>/CPAR_step1$/.test(n))) fail.push('form fields '+k1.fields);

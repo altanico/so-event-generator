@@ -93,6 +93,12 @@ The generator never proposes a route: every flight plan starts as departure → 
 - Events: "Basi degli assetti" = only the departure / arrival bases of the participants (several, all equal, no meaning in the story); the base of each flight is automatic or chosen in the flights table. The RED airfields of the story are computed from the border.
 - Simple mission "Calibration" (Navigation & Training): FLIGHTCHECK P-180 from LIRE; one or more checks (VOR / TACAN / NDB, ILS, PAPI, PAR) at one of the 19 military aerodromes, filtered by what each aerodrome has.
 
+## Route frequencies, pasted flight plans, two-part kneeboard (v1.36)
+
+- The frequency list of a simple mission follows the route as if the flight had full ATC coverage: departure TWR / APP, the area units leg by leg (OAT legs → MIL sector of each ACC; GAT legs → civil ACC sectors, even with a military aircraft), the APP of aerodromes passed at low level, arrival APP / TWR. Frequencies only from the ATC data.
+- A flight plan made with another tool can be pasted in the flight plan panel (whole ICAO message, route only, or the IVAO `.fpl` file): it replaces the generated plan for that flight, field 15 is filed as pasted, unknown points are listed as warnings. The generated plan is only a basic aid (no performance, level, airway, RAD / CDR or SID / STAR check) – the outputs say so.
+- Kneeboard of a simple mission: part 1 = transit flight (flight plan, nav log, frequencies, emergencies from page 1), part 2 = the mission (Calibration: overview, "Calibration ATC", one page per check). Each frequency is written once. NDB checks use orbit / QDM / QDR, never radials or DME.
+
 ## Simple missions and calibration kneeboard (v1.35)
 
 - A simple mission has no exercise name: its outputs use callsign + mission + date (e.g. `FLIGHTCHECK66_Calibration_KNEEBOARD.pdf`). KNOCK IT OFF only for tactical training; other missions: MAYDAY / PAN PAN, 7700, follow ATC.

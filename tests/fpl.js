@@ -41,12 +41,12 @@ if(aw2.awyOn!==1||aw2.awyOff!==0) fail.push('airways layer automatic with IGAT '
 const pr=await page.evaluate(()=>{ const v=APP.NAV.pts.find(p=>p.id==='VOR08'&&p.x==='LIPS'); if(!v) return 'no VOR08'; const s=APP.snapPt(v.pos,3); return { proc:APP.navProc(v), snapped:s.id }; });
 if(pr==='no VOR08'||!pr.proc||pr.snapped==='VOR08') fail.push('procedure point snapped '+JSON.stringify(pr));
 // ICAO OAT format
-await page.evaluate(()=>{ document.querySelector('#panel details').open=true; }); await page.check('#fploat'); await page.waitForTimeout(200);
+await page.evaluate(()=>{ document.querySelector('#panel details[data-fplmore]').open=true; }); await page.check('#fploat'); await page.waitForTimeout(200);
 const r2=await page.evaluate(()=>APP.fplAll().filter(({p})=>p.s.oat).map(({p})=>p.out)); if(r2.some(o=>!/\bOAT\b/.test(o.f15)||/RMK\/OAT/.test(o.f18))) fail.push('ICAO format '+JSON.stringify(r2[0]));
-await page.evaluate(()=>{ document.querySelector('#panel details').open=true; }); await page.uncheck('#fploat'); await page.waitForTimeout(200);
+await page.evaluate(()=>{ document.querySelector('#panel details[data-fplmore]').open=true; }); await page.uncheck('#fploat'); await page.waitForTimeout(200);
 // open a card, edit field 18 by hand, it stays after re-render and after a re-tailor of the same flights; restore
 const fid=await page.evaluate(()=>APP.S.t.flights[0].id); await page.click(`[data-fplsel="${fid}"]`); await page.waitForTimeout(200);
-await page.evaluate(()=>{ document.querySelector('#panel details').open=true; }); await page.fill(`[data-fpl="${fid}:f18"]`,'STS/STATE RMK/TEST EDIT'); await page.dispatchEvent(`[data-fpl="${fid}:f18"]`,'change'); await page.waitForTimeout(200);
+await page.evaluate(()=>{ document.querySelector('#panel details[data-fplmore]').open=true; }); await page.fill(`[data-fpl="${fid}:f18"]`,'STS/STATE RMK/TEST EDIT'); await page.dispatchEvent(`[data-fpl="${fid}:f18"]`,'change'); await page.waitForTimeout(200);
 const ed=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id); return APP.fplBuild(f).icaoTxt; },fid); if(!/RMK\/TEST EDIT/.test(ed)) fail.push('manual edit not kept');
 if(await page.$eval(`[data-fplreset="${fid}"]`,e=>e.disabled)) fail.push('edited flag');
 const ed2=await page.evaluate(id=>{ const f=APP.S.t.flights.find(x=>x.id===id); f.id='NEWID'; const t=APP.fplBuild(f).icaoTxt; f.id=id; APP.fplBuild(f); return t; },fid); if(!/RMK\/TEST EDIT/.test(ed2)) fail.push('manual edit lost when the flight is regenerated (new id, same callsign)');

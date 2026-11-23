@@ -3997,7 +3997,7 @@ const navPub = p => 'VNFAR'.includes(p.k) && !(p.k === 'F' && p.x[0] === 'H'); /
 const navFra = p => p.k === 'F' && p.x.includes('*');
 const navName = p => p.k === 'G' ? p.x.split('|')[1] : p.k === 'R' ? `${p.id} ${p.x}` : p.id;
 function navNear(pos, maxNm, filt) { if (!NAV || !pos) return null; let b = null, bd = maxNm * NMK; for (const p of NAV.pts) { if (filt && !filt(p)) continue; const d = dist(pos, p.pos); if (d < bd) { bd = d; b = p; } } return b; }
-function navRes(id, near) { if (!NAV) return null; const c = NAV.by[String(id).toUpperCase()]; if (!c) return null; return near ? c.slice().sort((a, b) => dist(a.pos, near) - dist(b.pos, near))[0] : c[0]; }
+function navRes(id, near, kind) { if (!NAV) return null; let c = NAV.by[String(id).toUpperCase()]; if (!c) return null; if (kind) { const k = kind === 'NDB' ? 'N' : 'V', c2 = c.filter(p => p.k === k); if (c2.length) c = c2; } return near ? c.slice().sort((a, b) => dist(a.pos, near) - dist(b.pos, near))[0] : c[0]; }
 // published point an IP / CP corresponds to (staff 21 Nov: the name stays tactical) – "IP LANCIA (corresponds to RISOM)"
 const pubRef = pos => { const p = navNear(pos, 1, navPub); return p ? (p.k === 'R' ? `VRP ${p.id} ${p.x}` : p.k === 'V' ? `${p.id} ${/TACAN/.test(p.x) ? 'TACAN' : 'VOR'}` : p.k === 'N' ? `${p.id} NDB` : p.id) : null; };
 const pubCor = c => { const r = c && c.pos ? pubRef(c.pos) : null; return r ? ` (corresponds to ${r})` : ''; };
@@ -4100,7 +4100,7 @@ const fplAll = () => S.t ? S.t.flights.map(f => ({ f, p: fplBuild(f) })) : [];
 // plans for the documents: computed in the staff app, taken from the published payload on the public page
 const fplDocs = () => MODE !== 'staff' ? (S.fplTxt || []).map(x => ({ cs: x.cs, size: x.size || '', type: x.type || '', txt: x.txt })) : fplAll().map(({ f, p }) => ({ cs: f.cs, size: f.size, type: f.type, txt: fplDocTxt(p) }));
 const fplIcao = () => MODE !== 'staff' && S.fplTxt ? S.fplFmt === 'ICAO' : !!fplStore().icao;
-function fplTextFile() { const L = [`${opTitle()} – flight plans`, `${S.meta.date || 'Date TBD'} · H-hour ${S.meta.hHour || 'TBD'} · ${fplStore().icao ? 'OAT in ICAO format (field 15)' : 'Italian OAT format (field 18 RMK/OAT)'}`, `Navigation data: ${NAV ? NAV.src : 'not loaded'}. Routes are built by each flight; the other fields are suggestions: check and adapt before filing.`, ''];
+function fplTextFile() { const L = [`${opTitle()} – flight plans`, `${S.meta.date || 'Date TBD'} · H-hour ${S.meta.hHour || 'TBD'} · ${fplStore().icao ? 'OAT in ICAO format (field 15)' : 'Italian OAT format (field 18 RMK/OAT)'}`, `Navigation data: ${NAV ? NAV.src : 'not loaded'}. Routes are built by each flight; the other fields are suggestions: check and adapt before filing.`, FPL_AID, ''];
   fplAll().forEach(({ f, p }) => { L.push(`${f.cs} – ${f.size} × ${f.type} – ${ROLES[f.task] || f.task}`, p.icaoTxt, 'Route: ' + (p.noRoute ? 'to be filed by the flight' : [p.s.dep, ...p.pts.map(x => x.name + (x.k && !navPub(x) ? ' (unpublished)' : '')), p.s.dest].join(' – ')), ''); });
   return L.join('\n'); }
 // ---------- UI: flight plan of one flight at a time (tab "4 · Piani di volo" of events, step 4 of the simple mission) – v1.31 clean layout ----------
@@ -4126,6 +4126,10 @@ function fplPanelHtml() { const all = fplAll(), f = fplSelF(); if (!f) return ''
       <button class="b sm shrink ${FADD ? 'primary' : ''}" id="faddpt" title="Ogni clic sulla mappa aggiunge un punto in coda alla rotta">${FADD ? 'Clic sulla mappa… (fine)' : '+ Punti dalla mappa'}</button>${R.pts.length ? `<button class="b sm shrink" data-fplclear="${f.id}" title="Togli tutti i punti">Svuota</button>` : ''}</div>
     <div id="fplres-${f.id}" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>${radHelpHtml(f)}
     <p class="muted" style="font-size:11px;margin:4px 0 0">Mappa: trascina un tratto per aggiungere un punto, trascina un punto per spostarlo, doppio clic per toglierlo. Tipi: ${Object.entries(LEGT).map(([k, v]) => `<span title="${esc(v.d)}" style="white-space:nowrap"><span style="display:inline-block;width:12px;height:3px;background:${v.col};vertical-align:middle;margin-right:3px"></span>${k}</span>`).join(' ')}</p></div>
+  <details class="card" data-fplpastebox style="margin-top:6px" ${p.pasted ? 'open' : ''}><summary style="cursor:pointer;font-size:13px"><b>Incolla un piano di volo</b> <span class="muted" style="font-weight:400">fatto con altri strumenti (SimBrief, Little Navmap, IVAO Altitude…)</span>${p.pasted ? ` <span style="color:#0f766e;font-weight:600">· in uso (${esc(p.pasted)})</span>` : ''}</summary>
+    <p class="muted" style="font-size:11.5px;margin:4px 0">Messaggio ICAO completo <code>(FPL-…)</code>, solo la rotta (campo 15, es. <code>N0320F250 TAQ DCT BOA UM726 VIC</code>, anche con <code>-</code> e il campo 16) oppure il file <code>.fpl</code> di IVAO. Il piano incollato sostituisce quello generato per questo volo (mappa, nav log, kneeboard); il campo 15 resta come l'hai scritto.</p>
+    <textarea data-fplpaste="${f.id}" style="min-height:54px;font-family:monospace" placeholder="(FPL-…) oppure la rotta"></textarea>
+    <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap;align-items:stretch"><button class="b sm primary shrink" data-fplpasteok="${f.id}" style="min-height:30px">Usa questo piano</button><label class="b sm shrink" style="margin:0;cursor:pointer;display:inline-flex;align-items:center;min-height:30px;font-size:inherit;font-weight:600">File .fpl…<input type="file" accept=".fpl,.txt" data-fplfile="${f.id}" style="display:none"></label>${p.pasted ? `<button class="b sm shrink" data-fplundo="${f.id}">Torna al piano generato</button>` : ''}</div></details>
   <div class="card" style="margin-top:6px"><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 8px">${FPLSHOW.map(([k, l]) => `<div><label style="white-space:nowrap">${l}</label><input data-fpl="${f.id}:${k}" value="${esc(p.out[k])}" style="font-family:monospace"></div>`).join('')}</div>
     <details data-fplmore style="margin-top:6px" ${FPLMORE_OPEN ? 'open' : ''}><summary style="cursor:pointer;font-size:12.5px">Altri campi (8, 9, 10, 15, 18)</summary>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 8px;margin-top:4px">${FPLMORE.map(([k, l]) => `<div><label style="white-space:nowrap">${l}</label><input data-fpl="${f.id}:${k}" value="${esc(p.out[k])}" style="font-family:monospace"></div>`).join('')}</div>
@@ -4135,6 +4139,7 @@ function fplPanelHtml() { const all = fplAll(), f = fplSelF(); if (!f) return ''
       <button class="b sm shrink" data-fplreset="${f.id}" ${p.man ? '' : 'disabled'} style="margin-top:4px">Ripristina i campi proposti</button></details>
     ${warn.length ? `<div style="margin-top:6px">${warn.map(x => `<div style="font-size:11.5px;color:#b45309">⚠ ${esc(x)}</div>`).join('')}</div>` : ''}
     <pre style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:12px;white-space:pre-wrap;margin:6px 0" data-fpltxt="${f.id}">${esc(p.icaoTxt)}</pre>
+    ${p.pasted ? '' : `<p class="muted" style="font-size:11px;margin:0 0 6px">Il piano generato è solo un aiuto di base: non controlla prestazioni dell'aereo, livelli, disponibilità delle aerovie, RAD / CDR, SID / STAR. Verificalo e invialo con il tuo strumento di pianificazione, oppure incolla qui sopra un piano fatto altrove.</p>`}
     <button class="b sm primary shrink" data-fplcopy="${f.id}">Copia il piano</button></div>`; }
 function renderFpl() {
   if (!S.t) return `<h2>Fase 4 · Piani di volo</h2><div class="warn">Prima adatta lo scenario ai partecipanti (fase 3).</div>`;
@@ -4390,7 +4395,7 @@ function freeBuild0() { const F = FREE(), mis = freeMis(F.mis); if (!mis || !F.f
   assignFreqs(true); loApply(S.t); applyCAS(S.t); applyPR(S.t); applySAR(S.t); applyAIB(S.t); applyGCI(S.t); aarApply(S.t); gcaApply(S.t); applyAuth(S.t); fitAirspace(S.t); casDeconfAll();
   if (F.mis === 'CALIB') calApply(S.t);
   if (F.routeOld && flights[0]) { const R0 = routeOf(flights[0]); R0.pts = F.routeOld.pts || []; R0.legs = F.routeOld.legs || []; delete F.routeOld; routeOf(flights[0]); } // v1.30 navigation route → flight plan of the first flight
-  routeSync(); F.built = Date.now(); save(); demSoon(); return true; }
+  routeSync(); freeC2Sync(); F.built = Date.now(); save(); demSoon(); return true; }
 // ---- aerodrome symbols (staff 22 Nov, mockup "Mockup – simboli aeroporti"): civil = teal open circle with a dot, military = anthracite filled circle with a white dot,
 // joint = the civil symbol in an anthracite square, enemy (RED-held) = its type in red with a dashed ring (red ONLY for enemy bases), departure / arrival = bigger on a white disc ----
 const AP_CIV = '#0f766e', AP_MIL = '#1e293b', AP_RED = '#dc2626';
@@ -4464,22 +4469,24 @@ function aidInfo(q, kd) { const x = String((q && q.x) || ''), ch = (/(\d+[XY])\b
 function calKneePages(ctx) { const { pdf, page, head, txt, table, room, rgb, R, B, M, PW, PH, ML, CW, BLUE, GREY, f } = ctx; const cal = S.t.cal; if (!cal || !cal.checks) return;
   const form = pdf.getForm(), safe = s => String(s).replace(/[^A-Za-z0-9]/g, '');
   cal.checks.forEach((c, n) => { page(`Check ${n + 1}/${cal.checks.length} - ${c.short}`);
-    head(c.title); table([{ h: 'Item', w: .34 }, { h: 'Value', w: .66 }], c.data, { s: 10 });
+    const nf = t => String(t).replace(/\s\d{3}\.\d{2,3}(?!\s*MHz)/g, '');
+    head(c.title); table([{ h: 'Item', w: .34 }, { h: 'Value', w: .66 }], c.data.filter(r => !/^(ATC|GCA \/ PAR|Radar pattern|TWR)$/.test(r[0])).map(r => [r[0], nf(r[1])]), { s: 10 });
     head('Checklist'); c.steps.forEach((st, i) => { room(18); const pg = ctx.pg(), y = ctx.y();
       const cb = form.createCheckBox(`${safe(f.cs)}_${c.k}_step${i + 1}`); cb.addToPage(pg, { x: ML, y: PH - y - 12, width: 11, height: 11, borderWidth: 1, borderColor: GREY });
-      txt(`${i + 1}. ${st}`, { x: 18, s: 10, after: 2 }); });
+      txt(`${i + 1}. ${nf(st)}`, { x: 18, s: 10, after: 2 }); });
     // drawing
     head('Drawing'); const H = 120; room(H + 6); const pg = ctx.pg(), by = PH - ctx.y() - H, bx = ML, k = 1;
     pg.drawRectangle({ x: bx, y: by, width: CW, height: H, borderColor: rgb(.8, .83, .9), borderWidth: .6 });
     const L = (x1, y1, x2, y2, o = {}) => pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: o.w || 1.2, color: o.c || BLUE, dashArray: o.d });
     const T = (t, x, y, s = 9, fnt = R, c = rgb(0, 0, 0)) => pg.drawText(String(t), { x, y, size: Math.max(9, s), font: fnt, color: c });
-    if (c.k === 'CNAV') { const cx = bx + CW / 2, cy = by + H / 2, sc = (H / 2 - 6) / 13, P = (b, nm) => [cx + nm * sc * Math.sin(b * Math.PI / 180), cy + nm * sc * Math.cos(b * Math.PI / 180)], rr = b => 'R' + String(((b % 360) + 360) % 360).padStart(3, '0');
+    if (c.k === 'CNAV') { const cx = bx + CW / 2, cy = by + H / 2, sc = (H / 2 - 6) / 13, P = (b, nm) => [cx + nm * sc * Math.sin(b * Math.PI / 180), cy + nm * sc * Math.cos(b * Math.PI / 180)], rr = b => (c.ndb ? 'QDR ' : 'R') + String(((b % 360) + 360) % 360 || 360).padStart(3, '0');
       const r2 = c.r1 + 180, a1 = P(c.r1, 13), a2 = P(r2, 13); L(a1[0], a1[1], a2[0], a2[1], { w: 1.4, c: rgb(.49, .23, .93) });
       let prev = null; for (let a = -60; a <= 60; a += 5) { const p = P(c.r1 + a, 10); if (prev) L(prev[0], prev[1], p[0], p[1], { w: 2.2 }); prev = p; }
-      for (let a = -60; a <= 60; a += 10) { const p1 = P(c.r1 + a, 9.4), p2 = P(c.r1 + a, 10.6), q = P(c.r1 + a, 12); L(p1[0], p1[1], p2[0], p2[1], { w: 1 }); if (a && a % 30 === 0) T(rr(c.r1 + a), q[0] - 11, q[1] - 4, 9, R, BLUE); }
+      for (let a = -60; a <= 60; a += 10) { const p1 = P(c.r1 + a, 9.4), p2 = P(c.r1 + a, 10.6), q = P(c.r1 + a, 12); L(p1[0], p1[1], p2[0], p2[1], { w: 1 }); if (a && a % 30 === 0) T(rr(c.r1 + a), q[0] - (c.ndb ? 20 : 11), q[1] - 4, 9, R, BLUE); }
       pg.drawCircle({ x: cx, y: cy, size: 4, borderColor: BLUE, borderWidth: 1.4 }); const lb = P(c.r1 + 180 + 60, 3.5); T(`${c.aidId} ${c.aidKd}`, lb[0] - 20, lb[1] - 4, 9, B);
-      const ta = P(c.r1, 12.2), tb = P(r2, 12.2); T(`${rr(c.r1)} in / out to 25 NM`, Math.min(ta[0] + 4, bx + CW - 128), ta[1] + 4, 9, B, rgb(.49, .23, .93)); T(rr(r2), tb[0] + 4, tb[1] - 12, 9, R, rgb(.49, .23, .93));
-      T('arc: 10 DME', bx + 28, by + H - 24, 9, B, BLUE);
+      const ta = P(c.r1, 12.2), tb = P(r2, 12.2), lab = c.ndb ? `QDM ${String(((c.r1 + 180) % 360) || 360).padStart(3, '0')} in / ${rr(c.r1 + 180)} out, 25 NM` : `${rr(c.r1)} in / out to 25 NM`;
+      T(rr(c.r1), ta[0] + 4, ta[1] - 4, 9, B, rgb(.49, .23, .93)); T(lab, bx + CW - 6 - R.widthOfTextAtSize(lab, 9), by + H - 14, 9, B, rgb(.49, .23, .93)); T(rr(r2), tb[0] + 4, tb[1] - 12, 9, R, rgb(.49, .23, .93));
+      T(c.ndb ? 'orbit: 10 NM (GNSS)' : 'arc: 10 DME', bx + 28, by + H - 24, 9, B, BLUE);
       L(bx + 14, by + H - 30, bx + 14, by + H - 12, { c: rgb(0, 0, 0) }); T('N', bx + 10, by + H - 42, 9, B); T('not to scale', bx + CW - 62, by + 6, 9, R, GREY); }
     else { // final: plan view on top, profile below (the angle is left blank: the planner fills it)
       const xT = bx + CW - 30, xL = bx + 16, nm = (xT - xL) / (c.fin || 10), yP = by + H - 34, yG = by + 12, w = 10, hG = H * 0.33;
@@ -4500,6 +4507,12 @@ function calKneePages(ctx) { const { pdf, page, head, txt, table, room, rgb, R, 
     const rm = form.createTextField(`${safe(f.cs)}_${c.k}_remarks`); rm.enableMultiline(); rm.addToPage(pg2, { x: ML, y: y0 - 40, width: CW, height: 34, borderWidth: .8, borderColor: GREY }); rm.setFontSize(10);
     ctx.addY(58); void k; void M; void PW; }); }
 // mission elements: the checks at the aerodrome (serials, final / arc / radials on the map)
+// ATC positions of the checked aerodrome (APP, TWR, GCA for a PAR check): rows of the Calibration part, also when the route list already has them (staff 23 Nov: each frequency once)
+function calC2(t) { const c = CAL(), ks = calChk(); if (!c.ad || !ap(c.ad)) return; const twr = baseTwr(c.ad), app = baseApp(c.ad), gca = baseGca(c.ad);
+  t.c2 = (t.c2 || []).filter(r => r.key !== 'CAL' || r.rte);
+  [[app, `APP ${c.ad} (flight check)`], [twr, `TWR ${c.ad} (flight check)`], ...(ks.includes('CPAR') ? [[gca.known ? gca : null, `GCA / PAR ${c.ad} (PAR check)`]] : [])].forEach(([o, role]) => { if (!o || !o.cs) return;
+    const r = t.c2.find(x => x.cs === o.cs); if (r) { if (r.key !== 'CAL') { r.rte = r.key; r.key = 'CAL'; r.role = role; } return; }
+    t.c2.push({ key: 'CAL', role, cs: o.cs, freq: o.freq || 'TBC', fixed: true, real: true, controller: '— not staffed —' }); }); }
 function calApply(t) { const F = FREE(), c = CAL(), ks = calChk(), f = t.flights[0]; if (!f || !c.ad || !ap(c.ad)) return; const A = ap(c.ad), N = (p, b, nm) => dest(p, b, nm * NMK);
   const rwy = parseInt(c.rwy, 10), crs = rwy >= 1 && rwy <= 36 ? rwy * 10 : null, mv = +casCfg().magvar || 0, inb = crs != null ? (crs + mv + 360) % 360 : null; // runway → true course of the final
   t.serials = (t.serials || []).filter(r => r.kind !== 'NAVI'); t.airspace = t.airspace.filter(a => !(a.type === 'ROUTE' && a.flight === f.id)); t.objectives = t.objectives || []; t.cal = { ad: c.ad, checks: [] };
@@ -4508,17 +4521,22 @@ function calApply(t) { const F = FREE(), c = CAL(), ks = calChk(), f = t.flights
   const ad = `${c.ad} ${AIRPORTS[c.ad][0]}`, twr = baseTwr(c.ad), app = baseApp(c.ad), gca = baseGca(c.ad), pos = (o, d) => o && o.cs ? `${o.cs} ${o.freq || 'TBC'}` : d;
   const twrTxt = pos(twr, `${c.ad} TWR (frequency TBC)`), appTxt = pos(app, `${c.ad} APP (frequency TBC)`), gcaTxt = gca.known ? `${gca.cs} ${gca.freq}` : `${c.ad} GCA / PAR (frequency TBC)`;
   // ATC positions of the checked aerodrome in the frequency list (from the ATC data, TBC when missing – staff 23 Nov)
-  t.c2 = (t.c2 || []).filter(r => r.key !== 'CAL'); const have = new Set(t.c2.map(r => r.cs));
-  [[app, `APP ${c.ad} (flight check)`], [twr, `TWR ${c.ad} (flight check)`], ...(ks.includes('CPAR') ? [[gca.known ? gca : null, `GCA / PAR ${c.ad} (PAR check)`]] : [])].forEach(([o, role]) => { if (o && o.cs && !have.has(o.cs)) t.c2.push({ key: 'CAL', role, cs: o.cs, freq: o.freq || 'TBC', real: true, controller: '— not staffed —' }); });
-  if (ks.includes('CNAV')) { const [id, kd] = (c.aid || ':').split(':'), q = navRes(id, A), P = q ? q.pos : A, fr = q && /^[\d.]+/.test(q.x) ? q.x.split(' ')[0] : '';
+  calC2(t);
+  if (ks.includes('CNAV')) { const [id, kd] = (c.aid || ':').split(':'), q = navRes(id, A, kd), P = q ? q.pos : A, ndb = kd === 'NDB';
     const r1 = Math.round(bearing(P, dest(A, 0, 1)) / 10) * 10 || 360, arc = []; for (let a = -60; a <= 60; a += 10) arc.push(N(P, (r1 + a + 360) % 360, 10));
-    t.airspace.push({ id: 'CAL-ARC', type: 'ROUTE', flight: f.id, name: `${id} ${kd} 10 DME arc`, pts: arc, names: arc.map(() => '') });
-    t.airspace.push({ id: 'CAL-RAD', type: 'ROUTE', flight: f.id, name: `${id} ${kd} radial ${String(r1).padStart(3, '0')}`, pts: [N(P, r1, 25), P.slice(), N(P, (r1 + 180) % 360, 25)], names: ['25 NM', id, '25 NM'] });
-    const ai = aidInfo(q, kd), rr = x => String(x % 360).padStart(3, '0');
-    t.cal.checks.push({ k: 'CNAV', short: `${id} ${kd}`, title: `Flight check – ${id} ${kd}`, aidId: id, aidKd: kd, r1, fin: 25,
-      data: [['Aerodrome', ad], ['Radio aid', `${id} ${kd} – ${ai.txt}`], ['Arc', `10 DME, R${rr(r1 + 300)} → R${rr(r1 + 60)}`], ['Radial', `R${rr(r1)} in / out, 25 NM`], ['ATC', `${appTxt} · ${twrTxt}`]],
-      steps: [`Set ${id} ${kd} ${ai.txt}, identify the Morse code`, `Check-in with ${appTxt}: flight check, levels`, `Position at R${rr(r1 + 300)} 10 DME, level ______`, `Fly the 10 DME arc to R${rr(r1 + 60)}: record bearing / DME every 10°`, `Radial R${rr(r1)} inbound from 25 NM to the aid`, `Radial R${rr((r1 + 180) % 360)} outbound to 25 NM`, 'Report the result to ATC'] });
-    SR(`Flight check – ${id} ${kd}`, `Flight check of the ${kd} ${id} (${aidInfo(q, kd).txt}) at ${ad}: fly the 10 DME arc from radial ${String((r1 + 300) % 360).padStart(3, '0')} to radial ${String((r1 + 60) % 360).padStart(3, '0')} at the assigned level, then radial ${String(r1).padStart(3, '0')} inbound from 25 NM and outbound to 25 NM on the reciprocal. Record bearing / DME errors at each 10° step. Coordinate with ${twrTxt}.`, `Arc and radials flown within ±1 NM / ±2°, errors recorded, the aid declared within tolerance or not.`); }
+    const ai = aidInfo(q, kd), rr = x => String(((x % 360) + 360) % 360 || 360).padStart(3, '0');
+    // an NDB has no radials and no DME (staff 23 Nov): orbit at 10 NM (GNSS distance), inbound QDM / outbound QDR
+    const qdm = rr(r1 + 180), qdr = rr(r1 + 180); // inbound from the r1 side, outbound on the reciprocal side
+    t.airspace.push({ id: 'CAL-ARC', type: 'ROUTE', flight: f.id, name: ndb ? `${id} NDB orbit 10 NM` : `${id} ${kd} 10 DME arc`, pts: arc, names: arc.map(() => '') });
+    t.airspace.push({ id: 'CAL-RAD', type: 'ROUTE', flight: f.id, name: ndb ? `${id} NDB QDM ${qdm} / QDR ${qdr}` : `${id} ${kd} radial ${rr(r1)}`, pts: [N(P, r1, 25), P.slice(), N(P, (r1 + 180) % 360, 25)], names: ['25 NM', id, '25 NM'] });
+    if (ndb) { t.cal.checks.push({ k: 'CNAV', ndb: true, short: `${id} NDB`, title: `Flight check – ${id} NDB`, aidId: id, aidKd: kd, r1, fin: 25,
+        data: [['Aerodrome', ad], ['Radio aid', `${id} NDB – ${ai.txt}`], ['Orbit', `10 NM from the beacon (GNSS), QDR ${rr(r1 + 300)} → QDR ${rr(r1 + 60)}`], ['Track', `QDM ${qdm} inbound from 25 NM, QDR ${qdr} outbound to 25 NM`], ['ATC', `${appTxt} · ${twrTxt}`]],
+        steps: [`Set ${id} NDB ${ai.txt} on the ADF, identify the Morse code`, `Check-in with ${appTxt}: flight check, levels`, `Position at QDR ${rr(r1 + 300)} 10 NM (GNSS), level ______`, `Orbit at 10 NM to QDR ${rr(r1 + 60)}: record the ADF bearing error every 10°`, `Inbound QDM ${qdm} from 25 NM to the beacon, note the station passage`, `Outbound QDR ${qdr} to 25 NM`, 'Report the result to ATC'] });
+      SR(`Flight check – ${id} NDB`, `Flight check of the NDB ${id} (${ai.txt}) at ${ad}: orbit at 10 NM from the beacon (GNSS distance) from QDR ${rr(r1 + 300)} to QDR ${rr(r1 + 60)} at the assigned level, recording the ADF bearing error every 10°; then inbound QDM ${qdm} from 25 NM to the beacon (note the station passage) and outbound QDR ${qdr} to 25 NM. Coordinate with ${twrTxt}.`, `Orbit and tracks flown, ADF bearing errors recorded, the beacon declared within tolerance or not.`); }
+    else { t.cal.checks.push({ k: 'CNAV', short: `${id} ${kd}`, title: `Flight check – ${id} ${kd}`, aidId: id, aidKd: kd, r1, fin: 25,
+        data: [['Aerodrome', ad], ['Radio aid', `${id} ${kd} – ${ai.txt}`], ['Arc', `10 DME, R${rr(r1 + 300)} → R${rr(r1 + 60)}`], ['Radial', `R${rr(r1)} in / out, 25 NM`], ['ATC', `${appTxt} · ${twrTxt}`]],
+        steps: [`Set ${id} ${kd} ${ai.txt}, identify the Morse code`, `Check-in with ${appTxt}: flight check, levels`, `Position at R${rr(r1 + 300)} 10 DME, level ______`, `Fly the 10 DME arc to R${rr(r1 + 60)}: record bearing / DME every 10°`, `Radial R${rr(r1)} inbound from 25 NM to the aid`, `Radial R${rr(r1 + 180)} outbound to 25 NM`, 'Report the result to ATC'] });
+      SR(`Flight check – ${id} ${kd}`, `Flight check of the ${kd} ${id} (${ai.txt}) at ${ad}: fly the 10 DME arc from radial ${rr(r1 + 300)} to radial ${rr(r1 + 60)} at the assigned level, then radial ${rr(r1)} inbound from 25 NM and outbound to 25 NM on the reciprocal. Record bearing / DME errors at each 10° step. Coordinate with ${twrTxt}.`, `Arc and radials flown within ±1 NM / ±2°, errors recorded, the aid declared within tolerance or not.`); } }
   const rw = c.rwy || 'TBC', base = (k, short, title, finNm, extra, steps) => t.cal.checks.push({ k, short, title, rwy: c.rwy, fin: finNm, data: [['Aerodrome', ad], ['Runway', rw], ...extra], steps });
   if (ks.includes('CILS')) base('CILS', `ILS RWY ${rw}`, `ILS check – RWY ${rw}`, 10, [['ILS frequency', '______'], ['Final', '10 NM'], ['ATC', `${appTxt} · ${twrTxt}`]],
     ['Set the ILS frequency ______, identify', `Check-in with ${appTxt}`, `Radar vectors to 10 NM final RWY ${rw}`, 'Run 1 – localizer: on course, then both edges of the course', 'Run 2 – glide path: angle and structure down to the threshold', 'Go-around, radar circuit back to 10 NM final', 'Report the result to ATC']);
@@ -4588,7 +4606,7 @@ const routeHas = f => routeOf(f).pts.length > 0;
 // simple navigation mission: the engine's route element of the flight = the route of its flight plan (documents, serials)
 function routeSync() { if (!S.t || !isFree() || FREE().mis !== 'NAV') return; S.t.airspace.forEach(a => { if (a.type !== 'ROUTE') return; const f = S.t.flights.find(x => x.id === a.flight); if (!f) return;
   const R = routeOf(f), d = ap(f.base), r = ap(f.arr || f.base); a.pts = [d, ...R.pts.map(p => p.pos), r].filter(Boolean).map(p => p.slice()); a.names = [freeCode(f.base), ...R.pts.map(p => p.name), freeCode(f.arr || f.base)]; }); }
-function routeSet(f, fn) { if (!f) return; fn(routeOf(f)); routeOf(f); routeSync(); save(); renderPanel(); drawMap(); demSoon(); }
+function routeSet(f, fn) { if (!f) return; fn(routeOf(f)); routeOf(f); routeSync(); freeC2Sync(); save(); renderPanel(); drawMap(); demSoon(); }
 const routeEnds = f => { const d = (f.base && ap(f.base)) || geom().front; return [d, ap(f.arr || f.base) || d]; };
 // insert a point where it adds the least distance
 // a new point goes at the end of the route, in the order it is flown (staff 22 Nov); only dragging a leg inserts in the middle
@@ -4601,7 +4619,7 @@ function routeDel(f, i) { routeSet(f, R => { if (!R.pts[i]) return; R.pts.splice
 function routeMove(f, i, d) { routeSet(f, R => { const j = i + d; if (j < 0 || j >= R.pts.length) return; [R.pts[i], R.pts[j]] = [R.pts[j], R.pts[i]]; }); }
 function routeDrop(f, i, pos) { routeInsertAt(f, snapPt(pos, snapR()), i); }
 // legs of the route with times and checks; used by the FPL, nav log, map, booking e-mail, kneeboard
-function routeLegs(f) { const R = routeOf(f), A = fplAc(f), tas = A.tas || 300;
+function routeLegs(f) { const R = routeOf(f), A = fplAc(f), tas = R.spd || A.tas || 300;
   const [dep, arr] = routeEnds(f), seq = [dep, ...R.pts.map(p => p.pos), arr], names = [freeCode(f.base) || 'ZZZZ', ...R.pts.map(p => p.name), freeCode(f.arr || f.base) || 'ZZZZ'];
   const zs = RES().filter(z => z.poly), out = []; let t = 0; const mv = +casCfg().magvar || 0;
   for (let i = 1; i < seq.length; i++) { const l = R.legs[i - 1], T = legT(l.type), d = dist(seq[i - 1], seq[i]) / NMK, spd = l.type === 'BOAT' ? Math.min(tas, 420) : tas, mn = d / spd * 60;
@@ -4614,6 +4632,26 @@ function routeLegs(f) { const R = routeOf(f), A = fplAc(f), tas = A.tas || 300;
     out.push({ i, from: names[i - 1], to: names[i], a: seq[i - 1], b: seq[i], type: l.type, lvl: l.lvl, agl: l.agl, altFt, terrFt, nm: Math.round(d), min: Math.round(mn), t0: t, t1: t + mn, trk: Math.round(((bearing(seq[i - 1], seq[i]) - mv) % 360 + 360) % 360) || 360, warn: w, ifr: T.ifr, oat: T.oat });
     t += mn; }
   return out; }
+// ATC units along the route, as if the flight had full ATC coverage (staff 23 Nov): departure TWR / APP, the area units met leg by leg, the APP of the aerodromes
+// passed at low level, arrival APP / TWR. OAT legs → military units (MIL sector of each ACC, military APP); GAT legs → civil units, even with a military aircraft.
+// Frequencies only from the ATC data (TBC when missing).
+const accCivil = acc => POS().filter(p => p.icao === acc && p.type === 'CTR' && /_CTR$/.test(p.cs) && !/_MIL_/.test(p.cs));
+function routeUnits(f) { const legs = routeLegs(f), out = [], add = (cs, freq, role, leg, kind) => { if (!cs || out.some(o => o.cs === cs)) return; out.push({ cs, freq: freq || 'TBC', role, leg, kind }); };
+  const dep = freeCode(f.base), arr = freeCode(f.arr || f.base), adU = icao => { if (!icao || !AIRPORTS[icao] || apKind(icao) === 'EXT') return {}; return { t: baseTwr(icao), a: baseApp(icao) }; };
+  const d = adU(dep); if (d.t && d.t.cs) add(d.t.cs, d.t.freq, `Tower – ${dep}`, 0, 'TWR'); if (d.a && d.a.cs) add(d.a.cs, d.a.freq, `Approach – ${dep}${d.a.note ? ` (${d.a.note})` : ''}`, 0, 'APP');
+  const ads = Object.keys(AIRPORTS).filter(k => apKind(k) !== 'EXT' && ap(k));
+  legs.forEach(L => { const n = Math.max(1, Math.ceil(L.nm / 10)), low = L.type === 'BOAT' || Math.abs(+L.lvl || 0) < 100;
+    for (let k = 0; k <= n; k++) { const p = [L.a[0] + (L.b[0] - L.a[0]) * k / n, L.a[1] + (L.b[1] - L.a[1]) * k / n], acc = accOf(p) || 'LIRR';
+      if (low) ads.filter(x => x !== dep && x !== arr && (!L.oat || apKind(x) !== 'CIV') && dist(p, ap(x)) < 15 * NMK).forEach(x => { const a = baseApp(x); if (a && a.cs) add(a.cs, a.freq, `Approach – ${x} (crossing at low level)`, L.i, 'APP'); });
+      if (L.oat) add(milCtr(acc), atcFreq(milCtr(acc)), `Military area control – ${ACC_NAME[acc] || acc} ACC (OAT)`, L.i, 'CTR');
+      else { const cv = accCivil(acc); add(`${acc}_xx_CTR`, cv.length ? cv.map(c => `${c.cs.slice(5, -4)} ${c.freq}`).join(' · ') : 'TBC', `Civil area control – ${ACC_NAME[acc] || acc} ACC (GAT, sector in use)`, L.i, 'CTR'); } } });
+  const a = adU(arr); if (a.a && a.a.cs) add(a.a.cs, a.a.freq, `Approach – ${arr}${a.a.note ? ` (${a.a.note})` : ''}`, legs.length, 'APP'); if (a.t && a.t.cs) add(a.t.cs, a.t.freq, `Tower – ${arr}`, legs.length, 'TWR');
+  return out; }
+// simple missions: the frequency list follows the routes of the flights (replaces the base-centred APP / TWR / CTR rows)
+function freeC2Sync() { if (!S || !S.t || !isFree()) return; const t = S.t, old = new Map((t.c2 || []).map(r => [r.cs, r.controller]));
+  const keep = (t.c2 || []).filter(r => !(r.real && ['APP', 'TWR', 'TWR2', 'CTR', 'RTE'].includes(r.key)) && !r.rte), rows = [];
+  t.flights.forEach(f => { try { routeUnits(f).forEach(u => { if (!rows.some(r => r.cs === u.cs) && !keep.some(r => r.cs === u.cs)) rows.push({ key: 'RTE', kind: u.kind, role: u.role, cs: u.cs, freq: u.freq, fixed: true, real: true, controller: old.get(u.cs) || '— not staffed —' }); }); } catch (e) { } });
+  t.c2 = [...rows, ...keep]; if (FREE().mis === 'CALIB') calC2(t); }
 // area time windows along the route (minutes from take-off)
 function routeWins(legs, zs) { zs = zs || RES().filter(z => z.poly); const w = {}; (legs || []).forEach(L => zs.forEach(z => { if (pip(L.a, z.poly) || pip(L.b, z.poly)) { const o = w[z.id] || [L.t0, L.t1]; w[z.id] = [Math.min(o[0], L.t0), Math.max(o[1], L.t1)]; } })); return w; }
 // airway joining two points of the route (same segment of a lower airway of the sector file)
@@ -4654,6 +4692,7 @@ function fplFromRoute(f, s, M, icao) { const R = routeOf(f, s), legs = routeLegs
     f13: `${s.dep}${fplClock(0)}`, f15, f16: `${s.dest}${hhmm(eet)}${s.altn ? ' ' + s.altn : ''}`, f18: r18.join(' ') || '0' };
   const out = {}; Object.keys(sug).forEach(k => { out[k] = M[k] != null && M[k] !== '' ? M[k] : sug[k]; });
   if (!P.length) warn.unshift(`Rotta da creare: ${freeCode(f.base) === freeCode(f.arr || f.base) ? 'clicca sulla mappa o su un punto di navigazione' : 'trascina la linea partenza → arrivo sulla mappa, clicca un punto'} oppure cerca un punto`);
+  if (M.pasted) warn.unshift(...(M.pasted.warn || []));
   legs.forEach(L => warn.push(...L.warn)); warn.push(...radWarn(f, legs, P)); if (noAw.length) warn.push(`Tratt${noAw.length > 1 ? 'i' : 'o'} ${noAw.join(', ')} IGAT sotto FL195 in DCT: sotto FL195 la parte GAT IFR va su aerovia (aggiungi i punti dell'aerovia)`);
   if (igat) warn.push('Parte IGAT: valida la rotta con il tool EUROCONTROL (IFPS) prima di inviare il piano');
   if (out.f7.length > 7) warn.push(`Nominativo "${out.f7}" oltre 7 caratteri (campo 7)`);
@@ -4661,8 +4700,62 @@ function fplFromRoute(f, s, M, icao) { const R = routeOf(f, s), legs = routeLegs
   if (/STAY\d/.test(out.f15) && (/^[VZ]/.test(out.f8.toUpperCase()) || oat)) warn.push('STAY solo per voli IFR GAT: non serve su piani VFR o OAT');
   if (oat && icao && /RMK\/OAT/.test(out.f18)) warn.push('OAT ICAO Format attivo: RMK/OAT nel campo 18 non serve');
   const pts = P.map(p => ({ ...p })), nl = legs.map(L => ({ from: L.from, to: L.to, trk: L.trk, nm: L.nm, min: L.min, type: L.type, lvl: L.type === 'BOAT' ? `${L.agl} ft AGL${L.altFt ? ` (A${String(L.altFt / 100).padStart(3, '0')})` : ''}` : legLvlTxt(L) }));
-  return { s, pts, legs: nl, eet, out, sug, warn: [...new Set(warn)], man: FPLK.some(k => M[k] != null && M[k] !== ''), route: true, noRoute: !P.length, gat, igat, icaoTxt: `(FPL-${out.f7}-${out.f8}\n-${out.f9}-${out.f10}\n-${out.f13}\n-${out.f15}\n-${out.f16}\n-${out.f18})` }; }
+  return { s, pts, legs: nl, eet, out, sug, warn: [...new Set(warn)], pasted: M.pasted ? M.pasted.kind : '', man: FPLK.some(k => M[k] != null && M[k] !== ''), route: true, noRoute: !P.length, gat, igat, icaoTxt: `(FPL-${out.f7}-${out.f8}\n-${out.f9}-${out.f10}\n-${out.f13}\n-${out.f15}\n-${out.f16}\n-${out.f18})` }; }
 const fplDocTxt = p => p.noRoute ? p.icaoTxt + '\nRoute to be filed by the flight.' : p.icaoTxt;
+// ---- v1.36: flight plan pasted from another tool (staff 23 Nov: the generated plan is only a basic aid) ----
+// accepted: the whole ICAO FPL message "(FPL-…)", the IVAO .fpl file (Altitude, KEY=VALUE lines), or only the route (field 15, optionally "-" field 16)
+function fplParse(txt) { const T = String(txt || '').replace(/\r/g, '').trim(); if (!T) return null; const out = {};
+  if (/^\s*\[FLIGHTPLAN\]/im.test(T) || /^\s*(ROUTE|DEPICAO)\s*=/im.test(T)) { const v = {}; T.split('\n').forEach(l => { const m = l.match(/^\s*([A-Z0-9]+)\s*=\s*(.*)$/i); if (m) v[m[1].toUpperCase()] = m[2].trim().toUpperCase(); });
+    if (v.ID) out.f7 = v.ID; if (v.RULES || v.FLIGHTTYPE) out.f8 = (v.RULES || 'I') + (v.FLIGHTTYPE || 'G');
+    if (v.ACTYPE) out.f9 = `${+v.NUMBER > 1 ? v.NUMBER : ''}${v.ACTYPE}/${v.WAKECAT || 'M'}`; if (v.EQUIPMENT) out.f10 = `${v.EQUIPMENT}/${v.TRANSPONDER || 'S'}`;
+    if (v.DEPICAO) out.f13 = v.DEPICAO + (v.DEPTIME || '').padStart(4, '0').slice(0, 4);
+    if (v.ROUTE != null) { const sp = v.SPEED ? (v.SPEEDTYPE || 'N') + v.SPEED.padStart(4, '0') : '', lv = v.LEVEL ? (v.LEVELTYPE || 'F') + v.LEVEL.padStart(3, '0') : ''; out.f15 = `${sp}${lv} ${v.ROUTE}`.trim(); }
+    if (v.DESTICAO) out.f16 = `${v.DESTICAO}${(v.EET || '').padStart(4, '0')}${v.ALTICAO ? ' ' + v.ALTICAO : ''}${v.ALTICAO2 ? ' ' + v.ALTICAO2 : ''}`;
+    if (v.OTHER) out.f18 = v.OTHER; out.kind = 'IVAO .fpl'; return out; }
+  const flat = T.toUpperCase().replace(/\s+/g, ' ').trim();
+  if (/\(?\s*FPL\s*-/.test(flat)) { const body = flat.replace(/^.*?\(?\s*FPL\s*-/, '').replace(/\)\s*$/, ''), a = body.split(/\s*-\s*(?=[A-Z0-9])/);
+    ['f7', 'f8', 'f9', 'f10', 'f13', 'f15', 'f16'].forEach((k, i) => { if (a[i] != null && a[i].trim()) out[k] = a[i].trim(); });
+    if (a.length > 7) out.f18 = a.slice(7).join('-').trim(); out.kind = 'ICAO FPL'; return out; }
+  const [r, d] = flat.split(/\s+-\s*/); out.f15 = r.trim(); if (d && /^[A-Z]{4}\d{4}/.test(d.trim())) out.f16 = d.trim(); out.kind = out.f16 ? 'fields 15 – 16' : 'field 15'; return out; }
+// field 15 → route points and legs (speed / level changes, IFR / VFR and OAT / GAT switches, airways expanded); unknown points kept in the text, listed as warnings
+const COORD_RE = /^(\d{2})(\d{2})?([NS])(\d{3})(\d{2})?([EW])$/;
+function f15Route(f15, f, defType) { const tk = String(f15 || '').toUpperCase().split(/\s+/).filter(Boolean), pts = [], legs = [], warn = []; if (!tk.length) return null;
+  let lvl = null, ifr = legT(defType).ifr, oat = legT(defType).oat, i = 0, spd = null;
+  const spOf = x => { const m = String(x).match(/^([NKM])(\d{3,4})/); return !m ? null : m[1] === 'N' ? +m[2] : m[1] === 'K' ? Math.round(+m[2] / 1.852) : Math.round(+m[2] / 100 * 573); };
+  const lvOf = x => { const m = String(x).match(/([FAMS])(\d{3,4})$/); if (!m) return /VFR$/.test(x) ? 'VFR' : null; return m[1] === 'F' ? +m[2] : m[1] === 'A' ? -(+m[2]) : m[1] === 'S' ? Math.round(+m[2] * 10 * 3.2808 / 100) : Math.round(+m[2] * 10 * 3.2808 / 100); };
+  if (/^[NKM]\d{3,4}([FAMS]\d{3,4}|VFR)$/.test(tk[0])) { const v = lvOf(tk[0]); spd = spOf(tk[0]); if (v === 'VFR') ifr = false; else lvl = v; i = 1; }
+  const typ = () => oat ? (ifr ? 'IOAT' : 'VOAT') : (ifr ? 'IGAT' : 'VGAT'), cur = () => ({ type: typ(), lvl: lvl != null ? lvl : (legNew(typ(), f).lvl), agl: 1000 });
+  const dep = freeCode(f.base), arr = freeCode(f.arr || f.base), near = () => pts.length ? pts[pts.length - 1].pos : ap(f.base);
+  const push = p => { pts.push(p); legs.push(cur()); };
+  for (; i < tk.length; i++) { let t = tk[i]; if (t === 'DCT' || t === dep || t === arr) continue;
+    if (t === 'IFR' || t === 'VFR') { ifr = t === 'IFR'; continue; } if (t === 'OAT' || t === 'GAT') { oat = t === 'OAT'; continue; }
+    if (/^(STAY\d|[A-Z0-9]+\/\d{4}$)/.test(t) && !/\/[NKM]\d/.test(t)) continue;
+    let chg = null; const sl = t.indexOf('/'); if (sl > 0) { chg = t.slice(sl + 1); t = t.slice(0, sl); }
+    const m = t.match(COORD_RE); let p = null;
+    if (m) { const la = (+m[1] + (+m[2] || 0) / 60) * (m[3] === 'S' ? -1 : 1), lo = (+m[4] + (+m[5] || 0) / 60) * (m[6] === 'W' ? -1 : 1); p = { id: '', name: t, pos: [+la.toFixed(4), +lo.toFixed(4)], k: '' }; }
+    else if (NAV && NAV.awy && NAV.awy[t] && pts.length && tk[i + 1]) { // airway: the points between the last point and the next one
+      const nx = tk[i + 1].split('/')[0], seg = NAV.awy[t].find(sg => sg.includes(pts[pts.length - 1].id) && sg.includes(nx));
+      if (seg) { const a = seg.indexOf(pts[pts.length - 1].id), b = seg.indexOf(nx), ids = a < b ? seg.slice(a + 1, b) : seg.slice(b + 1, a).reverse(); ids.forEach(id => { const q = navRes(id, near()); if (q) push({ ...rpPt(q), awy: t }); }); }
+      else warn.push(`aerovia ${t}: tratto ${pts[pts.length - 1].id || pts[pts.length - 1].name} – ${nx} non trovato nei dati, unito in linea retta`);
+      continue; }
+    else if (/^[A-Z]{2,5}\d[A-Z]$/.test(t) && !navRes(t)) continue; // SID / STAR name: kept as written
+    else if (/^[A-Z]{1,3}\d{1,4}$/.test(t) && !navRes(t)) { warn.push(`aerovia ${t} non presente nei dati di navigazione: tratto disegnato in linea retta`); continue; }
+    else { const q = navRes(t, near()); if (q && dist(q.pos, near()) < 400 * NMK) p = rpPt(q); }
+    if (p) push(p); else warn.push(`punto non trovato: ${t} (resta nel campo 15, non è sulla mappa)`);
+    if (chg) { const v = lvOf(chg); if (v === 'VFR') ifr = false; else if (v != null) lvl = v; } }
+  legs.push(cur()); return { pts, legs, warn, spd }; }
+function fplPasteApply(f, txt) { const P = fplParse(txt); if (!P) return toast('Niente da incollare'); const M = fplMan(f) || (fplStore().man[f.id] = { cs: f.cs }), R = routeOf(f);
+  if (!M.pasted) M.routeGen = { pts: R.pts.map(p => ({ ...p })), legs: R.legs.map(l => ({ ...l })), man: Object.fromEntries(FPLK.filter(k => M[k] != null).map(k => [k, M[k]])) };
+  FPLK.forEach(k => { if (P[k] != null) M[k] = P[k]; });
+  const warn = []; if (P.f15) { const r = f15Route(P.f15, f, R.legs[0] ? R.legs[0].type : 'IOAT'); if (r) { R.pts = r.pts; R.legs = r.legs; if (r.spd) R.spd = r.spd; warn.push(...r.warn); } }
+  if (P.f13 && freeCode(f.base) && P.f13.slice(0, 4) !== freeCode(f.base)) warn.push(`partenza del piano incollato ${P.f13.slice(0, 4)} diversa da quella del volo (${freeCode(f.base)})`);
+  if (P.f16 && freeCode(f.arr || f.base) && P.f16.slice(0, 4) !== freeCode(f.arr || f.base)) warn.push(`arrivo del piano incollato ${P.f16.slice(0, 4)} diverso da quello del volo (${freeCode(f.arr || f.base)})`);
+  M.pasted = { txt: String(txt).slice(0, 4000), kind: P.kind, warn }; routeSet(f, () => { }); toast(`Piano incollato (${P.kind})`); }
+function fplPasteUndo(f) { const M = fplMan(f); if (!M || !M.pasted) return; const g = M.routeGen || { pts: [], legs: [] }; FPLK.forEach(k => delete M[k]); Object.assign(M, g.man || {});
+  delete M.pasted; delete M.routeGen; routeSet(f, R => { delete R.spd; R.pts = g.pts || []; R.legs = g.legs && g.legs.length ? g.legs : R.legs.slice(0, 1); }); }
+const FPL_AID = 'Suggested route only: aircraft performance, levels, airway availability, RAD / CDR and SID / STAR are not checked – check and file with your own planning tool.';
+document.addEventListener('change', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.fplfile || !S || !S.t) return; const f = S.t.flights.find(x => x.id === t.dataset.fplfile), fl = t.files && t.files[0]; if (!f || !fl) return;
+  const rd = new FileReader(); rd.onload = () => fplPasteApply(f, String(rd.result || '')); rd.readAsText(fl); t.value = ''; });
 // ZZZZ / unknown aerodromes in field 18 (DEP/ DEST/ name and position)
 function fplZZ(k) { if (!k || !AIRPORTS[k] || AIRPORTS[k][3] !== 'EXT' || !/^ZZZZ/.test(k)) return ''; const a = AIRPORTS[k]; return `${String(a[0] || 'ZZZZ').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 20)} ${icaoLL([a[1], a[2]])}`; }
 function freeStepBar(st) { return `<div style="display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap">${[['Missione', 'Cosa voglio volare'], ['Aereo e basi', 'Con cosa e da dove'], ['Dove', 'Dove'], ['Piano di volo', 'Piano di volo'], ['Pacchetto', 'Pacchetto']].map(([t, tt], i) => `<button class="b sm${st === i + 1 ? ' primary' : ''}" data-fstep="${i + 1}" title="${tt}" ${i + 1 > freeReach() ? 'disabled' : ''} style="flex:1 1 auto;min-width:0;font-size:11.5px;padding:6px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i + 1} · ${t}</button>`).join('')}</div>`; }
@@ -4727,10 +4820,10 @@ function freeStep2() { const F = FREE(); if (!F.flights.length) F.flights.push(f
   return `<h2>Con cosa e da dove</h2>
   <datalist id="aclist">${AC.map(a => `<option value="${esc(a.type)}">`).join('')}</datalist><datalist id="aplist">${Object.keys(AIRPORTS).filter(k => AIRPORTS[k][3] !== 'EXT').sort().map(k => `<option value="${k}">${esc(AIRPORTS[k][0])}</option>`).join('')}<option value="ZZZZ">Nave / posto senza codice ICAO</option></datalist>
   ${F.flights.map(card).join('')}
+  <p class="muted fhelp" style="font-size:11.5px;margin:4px 0">Partenza / arrivo: codice ICAO (anche estero) o ZZZZ per una nave o un posto senza codice. Aereo: scegli dall'elenco o scrivi un tipo diverso. Catalogo dei carichi da fonti pubbliche, da verificare.</p>
   ${F.mis === 'CALIB' ? calCardHtml() : ''}
   <button class="b sm shrink" id="fadd" style="margin-top:8px">+ Aggiungi un flight</button>
-  <div style="display:grid;grid-template-columns:minmax(0,1fr) 80px 100px;gap:6px;margin-top:12px"><div><label>Data</label><input id="fdate" value="${esc(F.date)}" placeholder="12 DEC 2026"></div><div><label>Decollo (UTC)</label><input id="fhh" value="${esc(F.hh)}" placeholder="19:00"></div><div><label>In area (min)</label><input id="fdur" type="number" min="10" max="240" value="${esc(F.dur)}"></div></div>
-  <p class="muted" style="font-size:11.5px;margin:4px 0">Partenza / arrivo: codice ICAO (anche estero) o ZZZZ per una nave o un posto senza codice. Aereo: scegli dall'elenco o scrivi un tipo diverso. Catalogo dei carichi da fonti pubbliche, da verificare.</p>
+  <div class="fwhen" style="display:grid;grid-template-columns:minmax(120px,1.4fr) minmax(84px,1fr) minmax(84px,1fr);gap:6px 8px;margin-top:12px;align-items:end"><div><label style="white-space:nowrap">Data</label><input id="fdate" value="${esc(F.date)}" placeholder="12 DEC 2026"></div><div><label style="white-space:nowrap">Decollo UTC</label><input id="fhh" value="${esc(F.hh)}" placeholder="19:00" style="text-align:center"></div><div><label style="white-space:nowrap">In area (min)</label><input id="fdur" type="number" min="10" max="240" value="${esc(F.dur)}" style="text-align:center"></div></div>
   <div class="row" style="margin-top:10px"><button class="b shrink" data-fstep="1">← Indietro</button><button class="b primary shrink" data-fstep="3" ${freeReach() < 3 ? 'disabled' : ''}>Avanti →</button></div>`; }
 function freeSummary() { const t = S.t; if (!t) return ''; const F = FREE(), out = [];
   if (S.cas && S.cas.jtacs.length) { const J = S.cas.jtacs[0], T = J.tasks.find(x => x.flight) || J.tasks[0]; if (T) { const tg = J.targets.find(x => x.id === T.target) || J.targets[0];
@@ -4809,39 +4902,45 @@ async function kneeboardPdf() { const { PDFDocument, rgb, StandardFonts } = PDFL
     if (o.hdr !== false) drawRow(cols.map(c => c.h), true, true); rows.forEach((r, i) => drawRow(r, false, i % 2 === 1)); y += 6; };
   for (const { f, p } of fplAll()) { hdr = `${f.cs}`;
     // 1 · mission, area, loadout
-    page(misName + (F.solo ? ' (solo)' : ''));
-    table([{ h: 'Date', w: .3 }, { h: 'Take-off', w: .2 }, { h: 'Aircraft', w: .3 }, { h: 'From - to', w: .2 }], [[S.meta.date || '', `${fplClock(0)}Z`, `${f.size} x ${f.type}`, `${freeCode(f.base) || 'ZZZZ'} - ${freeCode(f.arr || f.base) || 'ZZZZ'}`]]);
+    page('Part 1 - Transit flight');
+    txt(`${S.meta.date || ''}  -  T/O ${fplClock(0)}Z  -  ${f.size} x ${f.type}  -  ${freeCode(f.base) || 'ZZZZ'} -> ${freeCode(f.arr || f.base) || 'ZZZZ'}`, { f: B, s: 10.5, after: 2 });
     if (f.lo && F.mis !== 'CALIB') { head('Loadout'); txt(loTxt(f.lo)); }
-    const fr = RES(); if (fr.length) { head(fr.length > 1 ? 'Areas' : 'Area'); table([{ h: 'Area', w: .38 }, { h: 'Levels', w: .3 }, { h: 'ATS unit', w: .32 }], fr.map(z => [z.name, `${z.lower} - ${z.upper}`, zoneAtsTxt(z)])); }
-    if (F.mis === 'ID') { head('IVAO Rules & Regulations'); txt(RR_EN, { s: 10 }); }
-    if (f.rec) { head('Recovery'); txt(f.rec); }
-    // 2 · CAS: holding, check-in, 9-line
-    const J = S.cas && S.cas.jtacs.find(x => x.tasks.some(T => T.flight === f.id));
-    if (J) { const T = J.tasks.find(x => x.flight === f.id), n = casNine(J, T, S.t); page(`CAS - JTAC ${J.cs}`);
-      table([{ h: 'JTAC', w: .3 }, { h: 'Frequency', w: .3 }, { h: 'Block', w: .2 }, { h: 'Playtime', w: .2 }], [[J.cs, J.freq || 'TBD', T.block || 'low', `${T.playtime} min`]]);
-      head('Holding'); txt(`${patTxt(J)} on CP ${J.cps[0].name}${pubCor(J.cps[0])}`);
-      head(F.solo ? 'Check-in (to read)' : 'Check-in'); txt(casCheckIn(J, T).filter(Boolean).join(', ') + '.', { f: M, s: 10 });
-      head(`9-line${F.solo ? ' (scripted)' : ''} - ${casGamePlan(J, T)}`);
-      table([{ h: 'Line', w: .36 }, { h: 'Value', w: .64, f: M, s: 11 }], n.lines.map(([k, l, v]) => [`${k}  ${l}`, String(v)]), { s: 10 });
-      head('Remarks / restrictions'); txt('Remarks: ' + n.remarks.join('; '), { s: 10 }); txt('Restrictions: ' + n.restr.join('; '), { s: 10 });
-      if (F.solo) txt('Solo: fly the holding, read the check-in, then fly the 9-line as briefed (simulated attack inside the final attack headings), egress and report BDA to yourself.', { s: 9.5, c: GREY }); }
-    // 3 · other tasks
-    const ser = (S.t.serials || []).filter(r => r.flights.includes(f.id) && r.kind !== 'CAS');
-    if (F.mis === 'CALIB' && S.t.cal) calKneePages({ pdf, page, head, txt, table, room, rgb, R, B, M, PW, PH, ML, CW, BLUE, GREY, f, pg: () => pg, y: () => y, addY: d => { y += d; } });
-    else if (ser.length) { page('Tasks'); ser.forEach(r => { head(r.title); txt(r.text); if (r.success) txt('Success: ' + r.success, { s: 10, c: GREY }); }); }
-    // 4 · flight plan and nav log
-    page('Flight plan - nav log');
-    head('Flight plan'); p.icaoTxt.split('\n').forEach(l => txt(l, { f: M, s: 10, after: 0 })); y += 4;
-    if (p.noRoute) txt('Route: to be filed by the flight (not built yet in the generator).', { s: 10, c: rgb(.7, .3, 0) });
+    // part 1 – transit flight: flight plan, nav log, frequencies, emergencies flowing from page 1
+    const ser = (S.t.serials || []).filter(r => r.flights.includes(f.id) && r.kind !== 'CAS'), cal = F.mis === 'CALIB' && S.t.cal;
+    head('Flight plan'); fplDocTxt(p).split('\n').forEach(l => txt(l, { f: M, s: 10, after: 0 })); y += 2; txt(p.pasted ? `Flight plan pasted from another tool (${p.pasted}).` : 'Suggested route only: performance, levels, airways, RAD / CDR and SID / STAR not checked.', { s: 9, c: GREY, after: 2 });
     head('Nav log'); table([{ h: 'From', w: .2 }, { h: 'To', w: .2 }, { h: 'Trk M', w: .1 }, { h: 'NM', w: .09 }, { h: 'Min', w: .09 }, { h: 'Type', w: .12 }, { h: 'Level', w: .2 }],
       (p.legs || []).map(l => [l.from, l.to, String(l.trk).padStart(3, '0'), String(l.nm), String(l.min), l.type || '', l.lvl || '']), { s: 9.5 });
-    if (p.legs.some(l => l.type === 'BOAT')) txt('BOAT legs: below 2000 ft AGL, VFR, inside the AT / low-level areas only; altitudes from the terrain data (max elevation along the leg + AGL) - check obstacles on the chart.', { s: 9, c: GREY });
-    if (p.igat) txt('IGAT part: validate the route with the EUROCONTROL tool (IFPS) before filing.', { s: 9, c: GREY });
-    // 5 · frequencies and emergencies
-    page('Frequencies - emergencies');
-    head('Frequencies'); table([{ h: 'Station', w: .38 }, { h: 'Frequency', w: .24, f: M }, { h: 'Role', w: .38 }], (S.t.c2 || []).filter(c => c.freq && c.freq !== 'TBD').map(c => [c.cs, c.freq, c.role]).concat([['GUARD', '121.500 / 243.000', 'emergency']]));
-    head('Emergencies'); txt(freeTactical() ? 'Real emergency: KNOCK IT OFF, squawk 7700, follow ATC.' : 'Real emergency: MAYDAY / PAN PAN on the frequency in use, squawk 7700, follow ATC.'); txt('Lost comms: squawk 7600, continue as filed and land at the planned aerodrome.'); txt('Weather below minima: return to base.'); }
-  pages.forEach((q, i) => { const t = `${i + 1} / ${pages.length}`; q.pg.drawText(t, { x: PW - ML - R.widthOfTextAtSize(t, 9), y: 12, size: 9, font: R, color: GREY }); q.pg.drawText(clean(`${opTitle()}${isFree() ? ' - ' + (S.meta.date || '') : ''} - training only`), { x: ML, y: 12, size: 9, font: R, color: GREY }); });
+    const c2 = (S.t.c2 || []).filter(c => c.freq && c.freq !== 'TBD'), calRows = cal ? c2.filter(c => c.key === 'CAL').sort((a, b) => (/TWR/.test(a.cs) - /TWR/.test(b.cs))) : [], calCs = new Set(calRows.map(c => c.cs));
+    const short = r => String(r).replace(/\s*\(.*\)\s*$/, '').replace(/^Military area control – /, 'MIL – ').replace(/^Civil area control – /, 'Civil – ').replace(/^Approach – /, 'APP ').replace(/^Tower – /, 'TWR ').replace(/ ACC$/, '');
+    const tr = c2.filter(c => !calCs.has(c.cs)).map(c => [c.cs, c.key === 'RTE' && /_xx_CTR$/.test(c.cs) ? c.freq : c.freq.replace(/ \/ /g, '/'), short(c.role)]);
+    if (cal && calRows.length) tr.push([`${cal.ad} APP / TWR / GCA`, '-', 'see part 2']);
+    head(cal ? 'Frequencies - transit' : 'Frequencies'); table([{ h: 'Station', w: .33 }, { h: 'Frequency', w: .28, f: M, s: 9.5 }, { h: 'Role', w: .39 }], tr.concat([['GUARD', '121.500/243.000', 'emergency']]));
+    head('Emergencies'); table([{ h: 'Case', w: .22 }, { h: 'Action', w: .78 }], [['Real emergency', freeTactical() ? 'KNOCK IT OFF, squawk 7700, follow ATC' : 'MAYDAY / PAN PAN on the frequency in use, squawk 7700, follow ATC'], ['Lost comms', 'squawk 7600, continue as filed, land at the planned aerodrome'], ['Weather', 'below minima: return to base']], { s: 9.5, hdr: false });
+    // part 2 – the mission
+    if (cal) { page('Part 2 - Calibration'); head(`Calibration - ${ap(cal.ad) ? cal.ad + ' ' + (ap(cal.ad).name || '') : cal.ad}`);
+      table([{ h: '#', w: .08 }, { h: 'Check', w: .42 }, { h: 'Details', w: .5 }], cal.checks.map((c, i) => [String(i + 1), c.title, c.k === 'CNAV' ? c.data[1][1] : `RWY ${c.rwy || 'TBC'}, final ${c.fin} NM`]), { s: 10 });
+      head('Calibration ATC'); table([{ h: 'Station', w: .38 }, { h: 'Frequency', w: .24, f: M }, { h: 'Role', w: .38 }], calRows.map(c => [c.cs, c.freq, c.role]));
+      head('Sequence'); txt('Checks flown in the order above; between the checks stay with the radar controller. After the last check: ' + ((f.arr || f.base) === cal.ad ? `full stop at ${cal.ad}.` : `return to ${freeCode(f.arr || f.base)}.`), { s: 10 });
+      head('Results summary'); table([{ h: 'Check', w: .5 }, { h: 'PASS / FAIL', w: .2 }, { h: 'Page', w: .3 }], cal.checks.map((c, i) => [c.short, '', `Check ${i + 1}`]), { s: 10 });
+      calKneePages({ pdf, page, head, txt, table, room, rgb, R, B, M, PW, PH, ML, CW, BLUE, GREY, f, pg: () => pg, y: () => y, addY: d => { y += d; } }); }
+    else {
+      const fr = RES(); if (fr.length || F.mis === 'ID' || f.rec || ser.length) page('Part 2 - Mission');
+      if (fr.length) { head(fr.length > 1 ? 'Areas' : 'Area'); table([{ h: 'Area', w: .38 }, { h: 'Levels', w: .3 }, { h: 'ATS unit', w: .32 }], fr.map(z => [z.name, `${z.lower} - ${z.upper}`, zoneAtsTxt(z)])); }
+      if (F.mis === 'ID') { head('IVAO Rules & Regulations'); txt(RR_EN, { s: 10 }); }
+      if (f.rec) { head('Recovery'); txt(f.rec); }
+      // 2 · CAS: holding, check-in, 9-line
+      const J = S.cas && S.cas.jtacs.find(x => x.tasks.some(T => T.flight === f.id));
+      if (J) { const T = J.tasks.find(x => x.flight === f.id), n = casNine(J, T, S.t); page(`CAS - JTAC ${J.cs}`);
+        table([{ h: 'JTAC', w: .3 }, { h: 'Frequency', w: .3 }, { h: 'Block', w: .2 }, { h: 'Playtime', w: .2 }], [[J.cs, J.freq || 'TBD', T.block || 'low', `${T.playtime} min`]]);
+        head('Holding'); txt(`${patTxt(J)} on CP ${J.cps[0].name}${pubCor(J.cps[0])}`);
+        head(F.solo ? 'Check-in (to read)' : 'Check-in'); txt(casCheckIn(J, T).filter(Boolean).join(', ') + '.', { f: M, s: 10 });
+        head(`9-line${F.solo ? ' (scripted)' : ''} - ${casGamePlan(J, T)}`);
+        table([{ h: 'Line', w: .36 }, { h: 'Value', w: .64, f: M, s: 11 }], n.lines.map(([k, l, v]) => [`${k}  ${l}`, String(v)]), { s: 10 });
+        head('Remarks / restrictions'); txt('Remarks: ' + n.remarks.join('; '), { s: 10 }); txt('Restrictions: ' + n.restr.join('; '), { s: 10 });
+        if (F.solo) txt('Solo: fly the holding, read the check-in, then fly the 9-line as briefed (simulated attack inside the final attack headings), egress and report BDA to yourself.', { s: 9.5, c: GREY }); }
+      if (ser.length) { if (J) page('Part 2 - Tasks'); ser.forEach(r => { head(r.title); txt(r.text); if (r.success) txt('Success: ' + r.success, { s: 10, c: GREY }); }); } }
+  }
+  pages.forEach((q, i) => { const t = `${i + 1} / ${pages.length}`; q.pg.drawText(t, { x: PW - ML - R.widthOfTextAtSize(t, 9), y: 12, size: 9, font: R, color: GREY }); let ft = clean(`${opTitle()}${isFree() ? ' - ' + (S.meta.date || '') : ''} - training only`); while (ft.length > 20 && R.widthOfTextAtSize(ft, 9) > CW - 40) ft = ft.replace(/ - [^-]+(?= - \d)/, '') === ft ? ft.slice(0, -2) : ft.replace(/ - [^-]+(?= - \d)/, ''); q.pg.drawText(ft, { x: ML, y: 12, size: 9, font: R, color: GREY }); });
   return pdf; }
 async function exportFreeMap(btn) { if (btn) btn.disabled = true; try { const m = await renderMap('brief', { light: true, w: 1400, h: 900 }); if (m) await download(`${fileBase()}_MAP.png`, new Blob([dataUrlBytes(m)], { type: 'image/png' })); else toast('Mappa non disponibile'); } catch (e) { toast('Errore: ' + e.message); } if (btn) btn.disabled = false; }
 document.addEventListener('click', e => { const t = e.target.closest('[data-kind],[data-kindreset],[data-fmis],[data-fstep],[data-fdel],#fadd,#fregen,#fknee,#fmap,[data-copytxt],[data-fpick],[data-fmain]'); if (!t || MODE !== 'staff' || !S) return;
@@ -4901,7 +5000,7 @@ function facEdit(t, end) {
 }
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); const el = document.getElementById(a.dataset.goto); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 // flight plans tab (v1.22)
-document.addEventListener('click', e => { const t = e.target.closest('[data-navadd],[data-navrep],[data-rpup],[data-rpdel],[data-fpladd],[data-fplclear],[data-radadd],#faddpt'); if (!t || !S || !S.t || MODE !== 'staff') return;
+document.addEventListener('click', e => { const t = e.target.closest('[data-navadd],[data-navrep],[data-rpup],[data-rpdel],[data-fpladd],[data-fplclear],[data-radadd],[data-fplpasteok],[data-fplundo],#faddpt'); if (!t || !S || !S.t || MODE !== 'staff') return;
   const fp = id => S.t.flights.find(x => x.id === id), sel = fplSelF(), d = t.dataset;
   if (t.id === 'faddpt') { FADD = !FADD; renderPanel(); if (FADD) toast('Clicca sulla mappa o su un punto di navigazione per aggiungerlo alla rotta'); return; }
   if (d.navadd) { if (!sel) return; MAP && MAP.closePopup && MAP.closePopup(); const n = routeOf(sel).pts.length + 1; routeAppend(sel, rpPt(NAV.pts[+d.navadd])); toast(`Aggiunto come punto ${n}`); return; }
@@ -4910,6 +5009,8 @@ document.addEventListener('click', e => { const t = e.target.closest('[data-nava
   if (d.rpdel) { const [id, i] = d.rpdel.split('|'); return routeDel(fp(id), +i); }
   if (d.radadd) { const [id, k, pid] = d.radadd.split('|'), f = fp(id); if (!f) return; const near = routeEnds(f)[k === 'dep' ? 0 : 1], q = navRes(pid, near); if (!q) return toast(`${pid} non trovato nei dati di navigazione`);
     const R = routeOf(f); routeInsertAt(f, rpPt(q), k === 'dep' ? 0 : R.pts.length); toast(`${pid} aggiunto alla rotta`); return; }
+  if (d.fplpasteok) { const f = fp(d.fplpasteok), ta = document.querySelector(`[data-fplpaste="${d.fplpasteok}"]`); if (f && ta) fplPasteApply(f, ta.value); return; }
+  if (d.fplundo) { const f = fp(d.fplundo); if (f) fplPasteUndo(f); return; }
   if (d.fplclear) { const f = fp(d.fplclear); return routeSet(f, R => { R.pts = []; R.legs = R.legs.slice(0, 1); }); }
   if (d.fpladd) { const [id, k, v] = d.fpladd.split('|'), f = fp(id); if (!f) return; const pt = k === 'c' ? rpCoord(v.split(',').map(Number)) : rpPt(NAV.pts[+v]); routeAppend(f, pt); toast(`${pt.name} aggiunto alla rotta`); } });
 // calibration: aerodrome to check, radio aid, runway, landing (v1.33)
@@ -6508,7 +6609,7 @@ radInit().then(() => { if (S && S.t && MODE === 'staff' && (TAB === 'fpl' || isF
 navInit().then(() => { NAVG = null; AWYIDX = null; if (MAP && S && S.navOn) drawNav(); if ((TAB === 'fpl' || isFree()) && MODE === 'staff' && S) { renderPanel(); drawMap(); } });
 demInit().then(() => { demRefresh(); if (MAP) { applyMapStyle(); renderMapTools(); } }); loadLand(); loadAip().then(() => { if (MODE !== 'staff' || !S) return; if (AIPDATA && (!S.asp || ['demo', 'none'].includes(S.asp.source)) && !GEN()) defaultAirspace(); renderAll(); });
 levelInit(); renderEvBadge();
-window.APP = { AC, navPopup, tacVhf, fileBase, opTitle, get NAVL() { return NAVL; }, newMissionNow, freeName, calChk, ap, basesSet, borderSide, get ZF() { return ZF; }, get BEDIT() { return BEDIT; }, RB, calApply, calOk, CAL_FAC, csFromList, csFpl, get CSN() { return CSN; }, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
+window.APP = { AC, fplParse, f15Route, fplPasteApply, fplPasteUndo, routeUnits, freeC2Sync, fplBuild, navPopup, tacVhf, fileBase, opTitle, get NAVL() { return NAVL; }, newMissionNow, freeName, calChk, ap, basesSet, borderSide, get ZF() { return ZF; }, get BEDIT() { return BEDIT; }, RB, calApply, calOk, CAL_FAC, csFromList, csFpl, get CSN() { return CSN; }, heliList, set HELI(v) { HELI = v; }, apSvg, apKind, radPts, radWarn, get RAD() { return RAD; }, routeMapClick, freeMapZones, routeDrop, routeSync, routeOf, routeInsertBest, routeInsertAt, routeDel, routeMove, routeSet, kneeboardPdf, navProc, snapPt, awyBetween, fplSelF, navIgat, navLayFor, routeEditOn, fplPanelHtml, legT, fplDocTxt, drawNav, routeLegs, fplFromRoute, freeZones, freeAreaToggle, freeSearch, freeAreaWarn, freeMapClick, LEGT, setLevel, levelInit, sha256hex, LEVEL_KEYS, get LEVEL() { return LEVEL; }, evStrip, evFile, evOpenFile, effLevel, evLevel, isHq, addPilot, buildPayload, freePrep, newScenario, genIntroTxt, FREE, freeBuild, freeCands, exportKneeboard, bookMail, kindChooserHtml, isInternal, isSog, KIND, loDefault, loTxt, loApply, loSet, loAG, STORES, wpnOf, LIB, ADEP, NOBASE, SCHOOL, baseOk, baseWarn, accOf, baseAcc, baseApp, baseTwr, baseGca, zoneAts, zoneAtsTxt, recChain, recTxt, gcaApply, gcaOn, proposeC2, c2Card, notamList, POS, get NAV() { return NAV; }, navSvgP, navTypeTxt, NAVL_DEF, aspCard, atAreas, navSearch, navCls, navSvg, navLay, fplResHtml, get MAPWIN() { return MAPWIN; }, fplBuild, fplSuggest, fplWork, fplAll, fplTextFile, fplStore, navInit, get NAV() { return NAV; }, navNear, navRes, pubRef, pubCor, icaoLL, awyPath, navGraph, casSnapPub, renderFpl, drawNav, get TAB() { return TAB; }, set TAB(v) { TAB = v; }, ROLE_GROUPS, baseOk, baseInfo, syncBases, basesFromList, assignBases, aarWin, aarApply, aarSetTrack, tl, casSchedule, casDocJ, casDocJtacs, casReattack, casTaskById, assignCAS, mapStyle, applyMapStyle, reliefImg, drawRelief, DEM, demInit, demLoad, demRefresh, demFill, elevM, elevFt, elevMaxLine, runProfile, runScore, casTerrainIPs, limNorm, limOk, cusOverlaps, cusFromParts, notamList, casView, casVis, holdInside, casFit, holdAxis, holdLeg, wpnChoices, offsetSuggest, offsetBand, casDone, egress: casEgress, egrOpts, khGroups, khLabel, khPt, holdAnchor, casWheelIPs, casNorm, exportJtacPack, casHoldCheck, casDeconf, casDeconfAll, casMovePt, casHold, casHoldShape, keyhole, bullPos, authOn, ramrod, ramEnc, applyAuth, bullNear, zonePickHtml, bullSelHtml, bullShown, setBull, pubTracks, supportRow, autoReserve, exportGciPack, exportAarPack, VARIANTS, varToggle, aarSys, aarFits, gciCs, lvOk, holdLoop, aarNear, trkToggle, thChosen, mkTheatre, theatre, setTheatre, fullReset, get ADDMODE() { return ADDMODE; }, wSteps, wOpen, set WOPEN(v) { WOPEN = v; }, get WREACH() { return WREACH; }, borderGeom, borderSide, borderIssues, borderAuto, get BEDIT() { return BEDIT; }, AIRPORTS, cusLocked, manualRes, zonesAt, mapZones, zonePickHtml, ZF, zfList, zfMatch, cusFinishDraw, cusFromParts, cusFromScenario, notamList, AIP: () => AIPDATA, cfgIssues, activeConfigs, fixConfigs, setEvents, PROF, EVT, parsePointsJson, parseSector, setPoints, POINTS: () => POINTS, geom, trkInArea, pickTrack, TRK, containmentIssues, RES, assignFreqs, issueRevision, parseAirspace, setAirspace, route, buildPayload, buildPublicHtml, renderPublic, get PUB() { return PUB; }, set PUB(v) { PUB = v; }, get MODE() { return MODE; }, loadDemo, exportMasterplan, buildMasterplanPdf, mpAssets, get LAND() { return LAND; }, set LAND(v) { LAND = v; }, get S() { return S; }, set S(v) { S = v; }, generateGeneric, tailor, parseLines, parseCSV, importCSV, guessField, resolveType, deckGeneric, deckBrief, renderAll };
 </script>
 </body>
 </html>
