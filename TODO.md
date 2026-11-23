@@ -2,7 +2,7 @@
 
 ## Next build
 
-(empty – write the next requests here)
+- [ ] **Bug – navigation points of the previous mission stay on the map after "Nuova missione"** (staff 23 Nov, screenshot): `drawMap()` returns early when no theatre is chosen (new mission, chooser, simple mission before its theatre) before calling `drawNav()`, so the navigation layer (and the faint aerodromes / route layers drawn outside `LAYERS`) is never cleared until a reload. Fix: clear / redraw the navigation layer in that early return too (and on `newMissionNow()`), so a new mission starts with an empty map. Test: mission with points on → "Nuova missione" → no navigation markers.
 
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
