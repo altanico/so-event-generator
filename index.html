@@ -4915,7 +4915,7 @@ async function kneeboardPdf() { const { PDFDocument, rgb, StandardFonts } = PDFL
     const tr = c2.filter(c => !calCs.has(c.cs)).map(c => [c.cs, c.key === 'RTE' && /_xx_CTR$/.test(c.cs) ? c.freq : c.freq.replace(/ \/ /g, '/'), short(c.role)]);
     if (cal && calRows.length) tr.push([`${cal.ad} APP / TWR / GCA`, '-', 'see part 2']);
     head(cal ? 'Frequencies - transit' : 'Frequencies'); table([{ h: 'Station', w: .33 }, { h: 'Frequency', w: .28, f: M, s: 9.5 }, { h: 'Role', w: .39 }], tr.concat([['GUARD', '121.500/243.000', 'emergency']]));
-    head('Emergencies'); table([{ h: 'Case', w: .22 }, { h: 'Action', w: .78 }], [['Real emergency', freeTactical() ? 'KNOCK IT OFF, squawk 7700, follow ATC' : 'MAYDAY / PAN PAN on the frequency in use, squawk 7700, follow ATC'], ['Lost comms', 'squawk 7600, continue as filed, land at the planned aerodrome'], ['Weather', 'below minima: return to base']], { s: 9.5, hdr: false });
+    head('Emergencies'); table([{ h: 'Case', w: .2 }, { h: 'Action', w: .8 }], [['Emergency', freeTactical() ? 'KNOCK IT OFF, squawk 7700, follow ATC' : 'MAYDAY / PAN PAN, squawk 7700, follow ATC'], ['Lost comms', 'squawk 7600, continue as filed'], ['Weather', 'below minima: return to base']], { s: 9.5, hdr: false });
     // part 2 – the mission
     if (cal) { page('Part 2 - Calibration'); head(`Calibration - ${ap(cal.ad) ? cal.ad + ' ' + (ap(cal.ad).name || '') : cal.ad}`);
       table([{ h: '#', w: .08 }, { h: 'Check', w: .42 }, { h: 'Details', w: .5 }], cal.checks.map((c, i) => [String(i + 1), c.title, c.k === 'CNAV' ? c.data[1][1] : `RWY ${c.rwy || 'TBC'}, final ${c.fin} NM`]), { s: 10 });

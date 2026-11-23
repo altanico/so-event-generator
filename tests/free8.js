@@ -34,6 +34,7 @@ if(!['CAL:LIPH_APP','CAL:LIPS_TWR','CAL:LIPS_G_APP'].every(x=>c2.includes(x))) f
 const k1=await kneeTxt();
 const i2=k1.txt.indexOf('Part 2 - Calibration'); if(i2<0) fail.push('no part 2');
 const p1=k1.txt.slice(0,i2); if(!/FLIGHT PLAN|Flight plan/i.test(p1)||!/LIRR_MIL_CTR/.test(p1)||!/LIPP_MIL_CTR/.test(p1)||/LIPH_APP/.test(p1)) fail.push('part 1 content');
+if(/continued/.test(p1)) fail.push('part 1 spills onto a second page');
 const tp=await page.evaluate(()=>{ const t=[]; return t; });
 for(const fq of ['118.050','123.225','123.175','120.405','124.355','118.355']){ const n=(k1.txt.match(new RegExp(fq.replace('.','\\.'),'g'))||[]).length; if(n!==1) fail.push(`frequency ${fq} written ${n} times`); }
 if(k1.pages>6) fail.push('kneeboard pages '+k1.pages); if(k1.min<9) fail.push('text under 9 pt');
