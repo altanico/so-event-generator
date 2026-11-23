@@ -91,7 +91,7 @@ The generator never proposes a route: every flight plan starts as departure → 
 
 - `data/callsigns.json` – radio callsigns of the Italian units (staff list `RADIO_CALLSIGNS.xlsx`, public), built with `python3 tools/callsign_build.py RADIO_CALLSIGNS.xlsx`: the callsign of a flight comes from its base + aircraft (two digits, e.g. DARDO 01), field 7 uses the short FPL form (FRECC01) or the GAT callsign (IAM0401) when the plan is all GAT; QRA callsigns by base; Canadair numbers by base.
 - Events: "Basi degli assetti" = only the departure / arrival bases of the participants (several, all equal, no meaning in the story); the base of each flight is automatic or chosen in the flights table. The RED airfields of the story are computed from the border.
-- Simple mission "Calibration" (Navigation & Training): FLIGHTCHECK P-180 from LIRE; VOR / TACAN / NDB, ILS, PAPI or PAR check at one of the 19 military aerodromes, filtered by what each aerodrome has.
+- Simple mission "Calibration" (Navigation & Training): FLIGHTCHECK P-180 from LIRE; one or more checks (VOR / TACAN / NDB, ILS, PAPI, PAR) at one of the 19 military aerodromes, filtered by what each aerodrome has.
 
 ## Hosting and access (v1.27)
 
