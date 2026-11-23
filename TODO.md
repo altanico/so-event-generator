@@ -16,6 +16,15 @@
   - other simple missions: same layout (part 1 transit, part 2 the task pages: areas, CAS / JTAC, tasks), CAS / JTAC sections and the map keep their own page; A5, ≥ 9 pt;
   - test (Calibration kneeboard: FPL and frequencies on page 1, part 2 on a new page, every frequency string appears once in the text, page count down).
 
+- [ ] **Paste a flight plan made with other tools** (staff 23 Nov: the generated flight plans are a basic aid – no aircraft performance, no check of levels, airways availability, RAD / CDR, SID / STAR): in step 4 / flight plan panel, for each flight, a box **"Incolla piano di volo"** that accepts:
+  - the **whole ICAO FPL message** `(FPL-…-…)` (SimBrief, Little Navmap, IVAO Altitude / Webeye, EUROCONTROL tools) – fields 7, 8, 9, 10, 13, 15, 16, 18 read; the fields not pasted stay as generated;
+  - **only part of it**, e.g. just the route (field 15: `N0320F250 TAQ DCT BOA UM726 VIC`), or field 15 + 16;
+  - the IVAO `.fpl` file (Altitude export, `[FLIGHTPLAN]` with `ROUTE=`, `CRUISINGALT=`…), as text or file.
+  - Route reading: speed / level groups and changes (`/N0300F180`), points from the nav data (fixes, VOR / NDB, aerodromes), airways expanded between their two points (`awyPath`), coordinates (`4530N01230E`, `46N012E`), SID / STAR names and DCT kept as written; **unknown points are not dropped**: listed as a warning ("punto non trovato: XXXXX") and kept in the filed text.
+  - The pasted plan **replaces** the generated one for that flight: map line, nav log (track / distance / time with the pasted speed and levels), kneeboard, flight-plan text file; field 15 is filed exactly as pasted (not rebuilt). Button "Torna al piano generato". Saved with the mission (no participant data in it).
+  - Same warnings as today (RAD points for IGAT, VGAT above FL195…) but as hints, never blocking.
+- [ ] **Say that the generated flight plan is only a basic aid**: in the flight plan panel and on the kneeboard / flight-plan file a short note – "Suggested route only: aircraft performance, levels, airway availability, RAD / CDR and SID / STAR are not checked – check and file with your own planning tool." Test (paste a full FPL and a route only → nav log and field 15 follow the pasted text; unknown point → warning, kept; note present).
+
 ## On hold – HEMS mission with real HEMS bases and hospital helipads (staff 22 Nov)
 
 Waiting for the data: the staff looks for the list of the Italian HEMS bases and hospital helipads (the OpenStreetMap download by `helipads.yml` failed three times on 22 Nov: Overpass 502 / 504). Start only when the staff gives the list and says so.
