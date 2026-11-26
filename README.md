@@ -93,6 +93,12 @@ The generator never proposes a route: every flight plan starts as departure → 
 - Events: "Basi degli assetti" = only the departure / arrival bases of the participants (several, all equal, no meaning in the story); the base of each flight is automatic or chosen in the flights table. The RED airfields of the story are computed from the border.
 - Simple mission "Calibration" (Navigation & Training): FLIGHTCHECK P-180 from LIRE; one or more checks (VOR / TACAN / NDB, ILS, PAPI, PAR) at one of the 19 military aerodromes, filtered by what each aerodrome has.
 
+## Area search, change of mission type, SEAD / Strike variants (v1.37)
+
+- Simple missions, step 3: the area search shows suggestions while typing; a click or ↑ / ↓ + Enter chooses the area directly.
+- "← Cambia tipo di missione" is on the first screen of every kind of mission.
+- SEAD / Strike: fixed and mobile SAM, planned and dynamic targets can be chosen together. Dynamic targets and mobile SAM get an inject for the AEW / GCI controller (time, coordinates, TOT window, retasked flight) in the GCI pack only.
+
 ## Route frequencies, pasted flight plans, two-part kneeboard (v1.36)
 
 - The frequency list of a simple mission follows the route as if the flight had full ATC coverage: departure TWR / APP, the area units leg by leg (OAT legs → MIL sector of each ACC; GAT legs → civil ACC sectors, even with a military aircraft), the APP of aerodromes passed at low level, arrival APP / TWR. Frequencies only from the ATC data.
